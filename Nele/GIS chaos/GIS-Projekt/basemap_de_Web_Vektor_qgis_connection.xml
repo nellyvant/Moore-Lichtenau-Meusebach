@@ -1,0 +1,6 @@
+<!DOCTYPE connections>
+<qgsVectorTileConnections version="2.0">
+    <vectortile styleUrl="https://sgx.geodatenzentrum.de/gdz_basemapde_vektor/styles/bm_web_col.json" username="" zmin="0" zmax="15" password="" serviceType="-1" referer="" authcfg="" http-header:referer="" url="https://sgx.geodatenzentrum.de/gdz_basemapde_vektor/tiles/v2/bm_web_de_3857/{z}/{x}/{y}.pbf" name="basemap.de - Farbe"/>
+    <vectortile styleUrl="https://sgx.geodatenzentrum.de/gdz_basemapde_vektor/styles/bm_web_gry.json" username="" zmin="0" zmax="15" password="" serviceType="-1" referer="" authcfg="" http-header:referer="" url="https://sgx.geodatenzentrum.de/gdz_basemapde_vektor/tiles/v2/bm_web_de_3857/{z}/{x}/{y}.pbf" name="basemap.de - Grau"/>
+    <vectortile styleUrl="https://sgx.geodatenzentrum.de/gdz_basemapde_vektor/styles/bm_web_top.json" username="" zmin="0" zmax="15" password="" serviceType="-1" referer="" authcfg="" http-header:referer="" url="https://sgx.geodatenzentrum.de/gdz_basemapde_vektor/tiles/v2/bm_web_de_3857/{z}/{x}/{y}.pbf" name="basemap.de - Relief"/>
+</qgsVectorTileConnections>

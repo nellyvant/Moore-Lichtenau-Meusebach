@@ -1,0 +1,40 @@
+Wie habe ich die LIDAR Daten genutzt?
+
+Quelle: https://geoportal.geoportal-th.de/gaialight-th/_apps/atomfeedexplorer/?#feed=https%3A%2F%2Fgeoportal.geoportal-th.de%2Fdienste%2Fatom_th_hoehendaten_las%3Ftype%3Ddataset%26id%3Dc8363eb8-7f2a-49b5-bb59-a1571f40a21f
+Habe leider erstmal die Daten von 2010-2013 genommen (am 20.8.2025)
+muss das nochmal neu machen mit den neuen Daten von 2020-2025
+
+Kacheln:
+Meusebach 
+691_5631
+692_5630
+692_5631
+692_5632
+693_5631
+Lichtenau
+
+
+Bearbeitung
+Laden als Punktwolke in QGIS
+Filter nach Classification = 2 (Boden)
+Export als .laz Benennung Kachelnummer_only_ground.laz
+Laden der Kachelnummer_only_ground.laz in CloudCompare
+Tools -> Projection -> Rasterize
+step = 0,5
+active layer = Z
+direction = Z
+cell height = median
+project SF(s) = median value
+fill empty cells = kriging
+Export als Raster (export heights)
+Benennung als Kachelnummer.tiff
+
+Öffnen der .tiff in QGIS
+mit Hilfe von Add-On Profile Tools messen der Profile am Transekt
+
+Offene Fragen:
+Was ist genauer? DGM oder LIDAR?
+-> LIDAR mit 0,5 hat ca 1-6 Punkte pro 0,5m^2 -> damit genauer als DGM
+Ist Schrittgröße 0,5m geeignet?
+Wie gering kann ich die LIDAR Auflösung machen?
+Wie stark unterscheiden sich die Daten von 2010-2020? 

@@ -1,0 +1,55 @@
+# Data Management Plan
+
+Nele Herzig, 10.2.2024
+
+Projekt: Masterarbeit
+Kurzbeschreibung: in den Mooren bei Meusebach und Lichtenau soll herausgefunden werden, inwieweit sich der Zustand durch das Abholzen verändert hat
+
+## Datensammlung
+- Datenaufnahme in Lichtenau und Meusebach
+- Zeitraum März/April - September/Oktober (gesamte Vegetationsperdiode) -> Vegetationsaufnahme im Transekt Anfang Juni/Ende Mai ???
+- Vegetationsaufnahmen, wenn möglich im Transekt nach  Braun-Blanquet (im m^2, Sonderstandorte mit besonderer Moosvielfalt im dm^2)
+- Transekt, N-S&W-O Kreuztransekt auf jeder Fläche, Meusebach Kalte Küche: kontinuierlich, Meuesebach1: kontinuierlich, Lichtenau: Mittelpunkte 2mc voneinander entfernt
+- Aufnahme von Artmächtigkeit
+- Sammeln von Herbarbelegen
+	- Beschriftung der Moose vorm Bestimmen mit Ort, Datum, Uhrzeit, Standortbeschreibung (Konvolut mit Dtaum und Nr, Nr im Notizbuch mit Rest der Daten), Foto mit Nummer
+- Messung von abiotischen Faktoren (Torfmächtigkeit, Temperatur, Wasserstand)
+- Einmessen von Torfmoosvorkommen
+- Kartieren nach Kartierungsbogen botanische Gesellschaft Thüringen von geschützten und bedrohten Arten
+- Übertragung von Felddaten nach digital schnellstmöglich nach Ankunft zu Hause
+- Sicherung von Felddaten als Foto bzw. Scan
+- Speicherung in Tabellenform mit Eingabemaske für Vegetationsaufnahmen
+- Speicherung von GPS-Daten ebenfalls in Tabelle, evtl zusätzlich händisches Einzeichnen in Karte (mehr üfür mich als Gedankenstütze, damit ich weiß, welche Stellen ich schon hab)
+- Analyse der Artenzahl, Deckung von Kennarten, Evenness, Shannon-Index(?) und Modellierung in Abhängigkeit von Umweltparametern
+
+## Dokumentation und Metadaten
+- rreadme-Datei, die Inhalt aller Dateien enthält, z.B. als Tabelle
+- klare Dateibenennung
+- klare Spaltenbenennung in Tabellen
+- Benennung der Plots/Transekte + Kartendarstellung, einheitliche Farbvergabe für die Flächen und übergreifend für Transekte
+
+## Einhaltung ethischer und rechtlicher Richtlinien 
+
+- Betretungs- und Sammelerlaubnis der UNB
+- Absprache mit Forst
+- Nachnutzung der Daten für Herbarium (SIP), ThüringenForst, Natura2000, UNB SHK
+
+## Speichern und Backup  
+
+- SPeicherung lokal und in FSU Cloud
+- Nach Beendigung Speicherung in Git-Repository oder Server von SIP/Uni als .zip, wenn möglich
+- bei Datenverlust bin ich zuständig
+- Datenübertragung aus dem Feld mit Tabellen mit Auswahl-Eingabmaske, zusätzlich Original-Scans
+- Anfertigen von Herbarbelgen, Belege werden im Herabrium bestimmt, gefrostet, auf Herbarbogen aufgebracht und etikettiert
+- nutzung von .csv, .shp, .gpkg, .txt
+
+### 6.	Auswahl und Aufbewahrung 
+
+- Daten sollen möglichst lang und möglichst komplett aufbewahrt werden und zugänglich sein
+- Daten können und sollen für zukünftige Ausgleichsmaßnhamen genutzt werden, weitere Nutzungsmöglichkeiten unklar
+- Daten sind im Repositorium lanfristig und frei verfügbar
+
+### 7.	Teilen und Publikation von Daten 
+
+- die Daten sollen personenunabhängig verfügbar gemacht werden
+

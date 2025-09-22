@@ -1,0 +1,8 @@
+{
+"type": "FeatureCollection",
+"name": "V uliginosum Lichtenau",
+"crs": { "type": "name", "properties": { "name": "urn:ogc:def:crs:EPSG::25832" } },
+"features": [
+{ "type": "Feature", "properties": { "id": "8", "fid": 8, "ARTENGRUPP": "", "FAMILIE": "", "WISS_NAME": "Vaccinium uliginosum ", "WISS_NAME_": "", "DT_NAME": "", "RLTH": "", "RLD": "", "GESETZ": "", "STATUS_TEX": "", "MELDER": "", "ZEITRAUM": "15.08.2025", "VON": "", "BIS": "", "ORT": "Lichtenau", "FUNDORT": "Waldmoor Lichtenau ", "MTB": "", "MTB_NAME": "", "QUAD": "", "RECHTSWERT": "", "HOCHWERT": "", "GEOMTYP": "", "UNSCH_M_QU": "", "MENGETYP": "", "MENGE": "", "ANZAHL": "1", "FL_CHE_M": "0,3 qm", "H_UFIGKEIT": "", "BIOTOP": "", "GEF_HRDUNG": "", "GEF_HRDU_1": "", "STANDORT": "", "FERTILIT_T": "", "HINWEIS": "", "KURZZITAT": "", "REIHE": "", "SEITEN": "", "KARTEI": "", "BESTIMMER": "", "RW4": "", "HW4": "", "EAST": null, "NORTH": null, "EEA5_CELLC": "", "EEA10_CELL": "", "Projektnam": "", "Projekt-Nr": "", "X": 690243.00204609311, "Y": 5627196.1401774697, "Z": 404.4624723423272 }, "geometry": { "type": "Point", "coordinates": [ 690243.002046093111858, 5627196.140177469700575, 404.462472342327203 ] } }
+]
+}
