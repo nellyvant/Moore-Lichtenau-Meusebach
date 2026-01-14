@@ -1,0 +1,19 @@
+Die Drohnenfotos lassen sich trotz GitHub LFS nicht hochladen.
+Sie sind zu finden in der FSU Cloud oder unter https://my.hidrive.com/share/2a1i6k67l0
+
+
+Hallo Alexandra,
+
+es hat leider etwas länger gedauert, hier nun aber der Freigabe-Link zu den Bildern und einem Geopaket mit den eingemessenen Koordinaten:
+
+https://my.hidrive.com/share/2a1i6k67l0
+
+Der GNSS-Empfänger ist ein proNIVO PNR21i mit IMU-Neigungssensor in Verbindung mit der Vermessungssoftware PN Field pro (https://www.attenberger.de/media/ef/4b/a8/1716369487/JA-Datenblatt-Prospekt-PNR21-4-Seiter.pdf?ts=1716369487).
+
+Bei Fragen oder Problemen melde dich einfach!
+
+Viele Grüße
+Sebastian
+
+
+Sebastian Bischoff
