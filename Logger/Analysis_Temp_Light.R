@@ -10,6 +10,11 @@ library(lubridate)
 data$Date.Time..CEST.CET. <- mdy_hms(data$Date.Time..CEST.CET.)
 str(data)
 
+#entfernen der daten nach dem 30.9.
+rows_to_remove <- which(data$X. > 21894)
+myData <- data[-rows_to_remove, ]
+str(myData)
+
 #plot der gesamten zeitreihe
 plot(
   data$Date.Time..CEST.CET.,
