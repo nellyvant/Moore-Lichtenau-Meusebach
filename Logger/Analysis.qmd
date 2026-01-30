@@ -7,14 +7,14 @@ editor: visual
 # 1 genutzte Packages
 
 ```{r}
-library(tidyverse)
+#library(tidyverse)
+library(dplyr)
+library(lubridate)
+library(tidyr)
+library(ggplot2)
 ```
 
-dplyr als pakage zur besseren Lesbarkeit\
-lubridate zur Umwandlung der Zeitmessung in Datumsformat\
-ggplot2 zur verbesserten graphischen Darstellung
-
-# 2 Daten einlesen 
+# 2 Daten einlesen
 
 ## 2.1 Licht und Temperatur (außen)
 
@@ -65,6 +65,7 @@ MNS_th <- read.csv("Luftfeuchte-und-Temperatur-innen/Meusebach nass Süd 2025-11
 # 3 Daten bereinigen und strukturieren
 
 ```{r}
+#| label: long date conversion
 #Datumsformat umwandeln
 LM_lt$DateTime <- mdy_hms(LM_lt$Date.Time..CEST.CET.)
 LM_th$DateTime <- mdy_hms(LM_th$Date.Time..CEST.CET.)
@@ -98,6 +99,18 @@ MNN_lt$DateTime <- mdy_hms(MNN_lt$Date.Time..CEST.)
 MNN_th$DateTime <- mdy_hms(MNN_th$Date.Time..CEST.)
 MNS_lt$DateTime <- mdy_hms(MNS_lt$Date.Time..CEST.CET.)
 MNS_th$DateTime <- mdy_hms(MNS_th$Date.Time..CEST.CET.)
+```
+
+```{r}
+#| label: alternative date conversion
+logger_names <- ls(pattern = "_lt$|_th$")
+for (obj in logger_names) {
+  df <- get(obj)
+  date_col <- names(df)[grepl("^Date.Time", names(df))]
+  df$DateTime <- mdy_hms(df[[date_col]], tz = "Europe/Berlin")
+  assign(obj, df)
+}
+
 ```
 
 ```{r}
@@ -290,6 +303,10 @@ for (logger in logger_names) {
   assign(logger, get(logger) %>% 
            filter(!if_all(all_of(messwert_spalten), is.na)))
 }
+```
+
+```{r}
+str(MNS)
 ```
 
 ```{r}
