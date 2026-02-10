@@ -314,3 +314,122 @@ str(MNS)
 all_loggers <- bind_rows(lapply(logger_names, get))
 
 ```
+
+# 4 Tagesmitteltemperaturen
+
+```{r}
+#Berechnung der Tagesmitteltemperatur pro Logger in einer separaten Tabelle 
+# genutzte Packages
+library(dplyr)
+library(lubridate)
+
+# Datum ohne Uhrzeit erzeugen, Mittelwerte gruppiert nach Loggerstandort und Tag erzeugen 
+daily_logger_means <- all_loggers %>%
+  mutate(Datum = as.Date(DateTime)) %>%     # Datum erzeugen
+  group_by(Logger_ID, Datum) %>%             # Gruppierung
+  summarise(
+    Temp_sonne_mean = mean(Temp_sonne_C, na.rm = TRUE),
+    Temp_schatten_mean = mean(Temp_schatten_C, na.rm = TRUE),
+    Messungen = n(),                         # optional: Anzahl der Messungen
+    .groups = "drop"
+  )
+
+```
+
+# 5 Extremwerte pro Logger
+
+```{r}
+# Mittelwerte gruppiert nach Loggerstandort und Tag erzeugen, zusätzlich Min & Max Temperatur am Tag 
+#daily_logger_means <- all_loggers %>%
+  mutate(Datum = as.Date(DateTime)) %>%
+  group_by(Logger_ID, Datum) %>%
+  summarise(
+    Temp_sonne_mean = mean(Temp_sonne_C, na.rm = TRUE),
+    Temp_schatten_mean = mean(Temp_schatten_C, na.rm = TRUE),
+
+    Temp_sonne_max = ifelse(
+      all(is.na(Temp_sonne_C)), NA,
+      max(Temp_sonne_C, na.rm = TRUE)
+    ),
+    Temp_sonne_min = ifelse(
+      all(is.na(Temp_sonne_C)), NA,
+      min(Temp_sonne_C, na.rm = TRUE)
+    ),
+
+    Temp_schatten_max = ifelse(
+      all(is.na(Temp_schatten_C)), NA,
+      max(Temp_schatten_C, na.rm = TRUE)
+    ),
+    Temp_schatten_min = ifelse(
+      all(is.na(Temp_schatten_C)), NA,
+      min(Temp_schatten_C, na.rm = TRUE)
+    ),
+
+    Messungen = n(),
+    .groups = "drop"
+  )
+
+
+#Separate Tabelle um anzeigen zu lassen, zu welcher Uhrzeit die Min & Max Werte gemessen wurden
+daily_logger_extrema <- all_loggers %>%
+  mutate(Datum = as.Date(DateTime)) %>%
+  group_by(Logger_ID, Datum) %>%
+  summarise(
+
+    ## ===== SONNE =====
+    Temp_sonne_max =
+      if (all(is.na(Temp_sonne_C))) NA_real_
+      else max(Temp_sonne_C, na.rm = TRUE),
+
+    Time_sonne_max =
+      if (all(is.na(Temp_sonne_C))) as.POSIXct(NA)
+      else DateTime[which.max(Temp_sonne_C)],
+
+    Temp_sonne_min =
+      if (all(is.na(Temp_sonne_C))) NA_real_
+      else min(Temp_sonne_C, na.rm = TRUE),
+
+    Time_sonne_min =
+      if (all(is.na(Temp_sonne_C))) as.POSIXct(NA)
+      else DateTime[which.min(Temp_sonne_C)],
+
+    ## ===== SCHATTEN =====
+    Temp_schatten_max =
+      if (all(is.na(Temp_schatten_C))) NA_real_
+      else max(Temp_schatten_C, na.rm = TRUE),
+
+    Time_schatten_max =
+      if (all(is.na(Temp_schatten_C))) as.POSIXct(NA)
+      else DateTime[which.max(Temp_schatten_C)],
+
+    Temp_schatten_min =
+      if (all(is.na(Temp_schatten_C))) NA_real_
+      else min(Temp_schatten_C, na.rm = TRUE),
+
+    Time_schatten_min =
+      if (all(is.na(Temp_schatten_C))) as.POSIXct(NA)
+      else DateTime[which.min(Temp_schatten_C)],
+
+    Messungen = n(),
+    .groups = "drop"
+  )
+
+#Auswertung
+extrema_logger <- daily_logger_extrema %>%
+  group_by(Logger_ID) %>%
+  summarise(
+    # Sonne
+    Sonne_max = max(Temp_sonne_max, na.rm = TRUE),
+    Sonne_max_Zeit = Time_sonne_max[which.max(Temp_sonne_max)],
+
+    Sonne_min = min(Temp_sonne_min, na.rm = TRUE),
+    Sonne_min_Zeit = Time_sonne_min[which.min(Temp_sonne_min)],
+
+    # Schatten
+    Schatten_max = max(Temp_schatten_max, na.rm = TRUE),
+    Schatten_max_Zeit = Time_schatten_max[which.max(Temp_schatten_max)],
+
+    Schatten_min = min(Temp_schatten_min, na.rm = TRUE),
+    Schatten_min_Zeit = Time_schatten_min[which.min(Temp_schatten_min)]
+  )
+```
