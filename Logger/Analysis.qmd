@@ -325,14 +325,20 @@ library(lubridate)
 
 # Datum ohne Uhrzeit erzeugen, Mittelwerte gruppiert nach Loggerstandort und Tag erzeugen 
 daily_logger_means <- all_loggers %>%
-  mutate(Datum = as.Date(DateTime)) %>%     # Datum erzeugen
-  group_by(Logger_ID, Datum) %>%             # Gruppierung
+  mutate(Datum = as.Date(DateTime)) %>%       # Datum erzeugen
+  group_by(Logger_ID, Datum) %>%              # Gruppierung
   summarise(
+    # Fläche und Logger vom ersten Eintrag des Tages übernehmen
+    Standort = first(Standort),
+    Logger = first(Logger),
+
     Temp_sonne_mean = mean(Temp_sonne_C, na.rm = TRUE),
     Temp_schatten_mean = mean(Temp_schatten_C, na.rm = TRUE),
-    Messungen = n(),                         # optional: Anzahl der Messungen
+    Messungen = n(),                          # optional: Anzahl der Messungen
     .groups = "drop"
-  )
+  ) %>%
+  # Optional: Spalten neu ordnen, damit Fläche und Logger vorne stehen
+  select(Logger_ID, Standort, Logger, Datum, everything())
 
 summary(daily_logger_means)
 str(daily_logger_means)
@@ -357,11 +363,59 @@ daily_logger_means_min_max <- daily_logger_means %>%
   )
 ```
 
+```{r}
+#Boxplots - Vergleich der Logger der einzelnen Flächen (nur der äußere Logger oder der innere)
+library(ggplot2)
+library(tidyr)
+
+# Filter für Standort L und die gewünschten Logger
+df_plot <- daily_logger_means %>%
+  filter(Standort == "L", Logger %in% c("M", "N", "O", "S", "W"))
+
+# Boxplot erstellen
+ggplot(df_plot, aes(x = Logger, y = Temp_sonne_mean, fill = Logger)) +
+  geom_boxplot() +
+  labs(
+    title = "Vergleich der Tagesmittelwerte des äußeren Sensors pro Logger - Lichtenau",
+    x = "Loggerstandort",
+    y = "Tagesmitteltemperatur (°C)"
+  ) +
+  theme_minimal() +
+  theme(legend.position = "none") 
+```
+
+```{r}
+#Boxplots - Vergleich der Logger der einzelnen Flächen (äußerer und innerer Logger)
+# Filter für Standort L und die gewünschten Logger
+df_plot <- daily_logger_means %>%
+  filter(Standort == "L", Logger %in% c("M", "N", "O", "S", "W")) %>%
+  # In langes Format bringen: Sonne / Schatten
+  pivot_longer(
+    cols = c(Temp_sonne_mean, Temp_schatten_mean),
+    names_to = "Licht",
+    values_to = "Temperatur"
+  ) %>%
+  mutate(Licht = recode(Licht,
+                        Temp_sonne_mean = "Außen",
+                        Temp_schatten_mean = "Innen"))
+
+# Boxplot erstellen, Sonne und Schatten nebeneinander pro Logger
+ggplot(df_plot, aes(x = Logger, y = Temperatur, fill = Licht)) +
+  geom_boxplot(position = position_dodge(width = 0.8)) +
+  labs(
+    title = "Vergleich der Tagesmittelwerte der äußeren und inneren Sensoren pro Logger - Lichtenau",
+    x = "Logger",
+    y = "Tagesmitteltemperatur (°C)",
+    fill = "Sensorposition"
+  ) +
+  theme_minimal()
+```
+
 # 5 Extremwerte pro Logger
 
 ```{r}
 # Mittelwerte gruppiert nach Loggerstandort und Tag erzeugen, zusätzlich Min & Max Temperatur am Tag 
-#daily_logger_means <- all_loggers %>%
+daily_logger_means <- all_loggers %>%
   mutate(Datum = as.Date(DateTime)) %>%
   group_by(Logger_ID, Datum) %>%
   summarise(
