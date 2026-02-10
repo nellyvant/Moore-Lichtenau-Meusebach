@@ -334,6 +334,27 @@ daily_logger_means <- all_loggers %>%
     .groups = "drop"
   )
 
+summary(daily_logger_means)
+str(daily_logger_means)
+```
+
+```{r}
+#Minimum & Maximum der Temperaturmittelwerte für die einzelnen Logger 
+daily_logger_means_min_max <- daily_logger_means %>%
+  group_by(Logger_ID) %>%
+  summarise(
+    # Sonne
+    Sonne_max_mean = max(Temp_sonne_mean, na.rm = TRUE),
+    Sonne_max_mean_Tag = Datum[which.max(Temp_sonne_mean)],
+    Sonne_min_mean = min(Temp_sonne_mean, na.rm = TRUE),
+    Sonne_min_mean_Tag = Datum[which.min(Temp_sonne_mean)],
+
+    # Schatten
+    Schatten_max_mean = max(Temp_schatten_mean, na.rm = TRUE),
+    Schatten_max_mean_Tag = Datum[which.max(Temp_schatten_mean)],
+    Schatten_min_mean = min(Temp_schatten_mean, na.rm = TRUE),
+    Schatten_min_mean_Tag = Datum[which.min(Temp_schatten_mean)]
+  )
 ```
 
 # 5 Extremwerte pro Logger
