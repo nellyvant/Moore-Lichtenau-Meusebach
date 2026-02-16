@@ -1,0 +1,159 @@
+---
+title: "Analyse Wassertiefen"
+format: html
+editor: visual
+---
+
+# 1 Genutzte Packages 
+
+```{r}
+library(readxl)
+library(dplyr)
+library(ggplot2)
+library(lubridate)
+```
+
+# 2 Daten einlesen 
+
+```{r}
+Wassertiefen <- read_excel("Tabelle Wassertiefe.xlsx")
+summary(Wassertiefen)
+str(Wassertiefen)
+class(Wassertiefen$Datum)
+
+# Datum als Date konvertieren
+Wassertiefen$Datum <- as.Date(Wassertiefen$Datum)
+class(Wassertiefen$Datum)
+```
+
+# 3 Auswertung
+
+```{r}
+# Zeitraum Mai–Sep 2025
+start_datum <- as.Date("2025-05-01")
+end_datum   <- as.Date("2025-09-30")
+
+df_sub <- Wassertiefen %>%
+  filter(Datum >= start_datum & Datum <= end_datum)
+```
+
+## 3.1 Jahresverlauf der Wassertiefe (MT vs MN vs L)
+
+```{r}
+
+```
+
+## 3.2 Unterschiede zwischen den Standorten 
+
+```{r}
+
+```
+
+```{r}
+# Boxplot pro Standort, Messpunkte farblich unterscheiden
+ggplot(df_sub, aes(x = factor(Standort), y = Wassertiefe, fill = factor(Messpunkt))) +
+  geom_boxplot(position = position_dodge(0.8)) +
+  labs(title = "Vergleich der Wassertiefen nach Standort und Messstelle (Mai–Sep 2025)",
+       x = "Standort",
+       y = "Wassertiefe (cm)",
+       fill = "Messstelle") +
+  theme_minimal()
+
+```
+
+## 3.3 Unterschiede innerhalb eines Standortes 
+
+```{r}
+####Jahresverlauf - Liniendiagramm
+plot_lin <- function(df, st, start="2025-05-01", end="2025-09-30", titel=NULL) {
+  df_sub <- df %>% filter(Standort == st,
+                          Datum >= as.Date(start),
+                          Datum <= as.Date(end))
+  
+  # Wenn kein Titel angegeben, automatisch generieren
+  if (is.null(titel)) {
+    titel <- paste("Wassertiefeschwankungen -", st)
+  }
+  
+  ggplot(df_sub, aes(Datum, Wassertiefe, color = factor(Messpunkt))) +
+    geom_line(linewidth=1) +
+    geom_point(size=2) +
+    labs(title=titel,
+         x="Datum", y="Wassertiefe (cm)", color="Messstelle") +
+    theme_minimal() +
+    scale_x_date(limits=c(as.Date(start), as.Date(end)),
+                 date_breaks="1 month", date_labels="%b %Y")
+}
+
+
+#### Unterschiede zw. den Messstellen - Boxplot 
+plot_box <- function(df, st, start="2025-05-01", end="2025-09-30", titel=NULL, x_name=NULL) {
+  
+  # Daten filtern
+  df_sub <- df %>% filter(Standort == st,
+                          Datum >= as.Date(start),
+                          Datum <= as.Date(end))
+  
+  # Titel setzen, falls NULL
+  if (is.null(titel)) {
+    titel <- paste("Wassertiefeschwankungen nach Messpunkt -", st)
+  }
+  
+  # x-Achsenname setzen, falls NULL
+  if (is.null(x_name)) {
+    x_name <- "Messpunkt"  # Standard
+  }
+  
+  ggplot(df_sub, aes(x = factor(Messpunkt), y = Wassertiefe, fill = factor(Messpunkt))) +
+    geom_boxplot() +
+    labs(
+      title = titel,
+      x = x_name,           # hier wird der flexible Name verwendet
+      y = "Wassertiefe (cm)",
+      fill = "Messstelle"
+    ) +
+    theme_minimal()
+}
+```
+
+### Meusebach trocken
+
+```{r}
+# Liniendiagramm
+plot_lin(Wassertiefen, "MT", titel="Wassertiefen in Meusebach trocken Mai–September 2025")
+```
+
+```{r}
+# Boxplot
+plot_box(Wassertiefen, st="MT",
+         titel="Messpunkte Meusebach trocken: Mai–Sep 2025",
+         x_name="Meusebach trocken")
+```
+
+### Meusebach nass
+
+```{r}
+# Liniendiagramm
+plot_lin(Wassertiefen, "MN", titel="Wassertiefen in Meusebach nass Mai–September 2025")
+```
+
+```{r}
+# Boxplot
+plot_box(Wassertiefen, st="MN",
+         titel="Messpunkte Meusebach nass: Mai–Sep 2025",
+         x_name="Meusebach nass")
+```
+
+### Lichtenau
+
+```{r}
+# Liniendiagramm
+plot_lin(Wassertiefen, "L", titel="Wassertiefen in Lichtenau: Mai–September 2025")
+```
+
+```{r}
+# Boxplot
+plot_box(Wassertiefen, st="L",
+         titel="Messpunkte Lichtenau: Mai–Sep 2025",
+         x_name="Meusebach nass")
+```
