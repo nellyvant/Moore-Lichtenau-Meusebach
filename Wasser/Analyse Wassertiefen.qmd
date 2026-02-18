@@ -4,7 +4,7 @@ format: html
 editor: visual
 ---
 
-# 1 Genutzte Packages 
+# 1 Genutzte Packages
 
 ```{r}
 library(readxl)
@@ -13,7 +13,7 @@ library(ggplot2)
 library(lubridate)
 ```
 
-# 2 Daten einlesen 
+# 2 Daten einlesen
 
 ```{r}
 Wassertiefen <- read_excel("Tabelle Wassertiefe.xlsx")
@@ -23,35 +23,56 @@ class(Wassertiefen$Datum)
 
 # Datum als Date konvertieren
 Wassertiefen$Datum <- as.Date(Wassertiefen$Datum)
+str(Wassertiefen)
 class(Wassertiefen$Datum)
 ```
 
 # 3 Auswertung
 
 ```{r}
-# Zeitraum Mai–Sep 2025
-start_datum <- as.Date("2025-05-01")
-end_datum   <- as.Date("2025-09-30")
+# Mittelwerte pro Tag/ pro Standort berechnen 
+WT_mittel <- Wassertiefen %>%
+  group_by(Datum, Standort) %>% 
+  summarise(WT_mean = mean(Wassertiefe, na.rm = TRUE)) %>%
+  ungroup()
 
-df_sub <- Wassertiefen %>%
-  filter(Datum >= start_datum & Datum <= end_datum)
 ```
 
 ## 3.1 Jahresverlauf der Wassertiefe (MT vs MN vs L)
 
 ```{r}
-
+# Liniendiagramm - Jahresverlauf
+ggplot(WT_mittel, aes(x = Datum, y = WT_mean, color = Standort)) +
+  geom_line(linewidth = 1) +
+  geom_point(size = 2) +
+  labs(
+    title = "Zeitlicher Verlauf der mittleren Wassertiefe nach Standort",
+    x = "Datum",
+    y = "Mittlere Wassertiefe (cm)",
+    color = "Standort"
+  ) +
+  theme_minimal() +
+  scale_x_date(date_breaks = "1 month", date_labels = "%b %Y")
 ```
 
-## 3.2 Unterschiede zwischen den Standorten 
+## 3.2 Unterschiede zwischen den Standorten
 
 ```{r}
+# Boxplot - Unterschiede zw. Standorten (Tagesmittelwerte)
+ggplot(WT_mittel, aes(x = factor(Standort), y = WT_mean, fill = Standort)) +
+  geom_boxplot() +
+  labs(
+    title = "Vergleich der mittleren Wassertiefe nach Standort",
+    x = "Standort",
+    y = "Mittlere Wassertiefe (cm)"
+  ) +
+  theme_minimal()
 
 ```
 
 ```{r}
 # Boxplot pro Standort, Messpunkte farblich unterscheiden
-ggplot(df_sub, aes(x = factor(Standort), y = Wassertiefe, fill = factor(Messpunkt))) +
+ggplot(Wassertiefen, aes(x = factor(Standort), y = Wassertiefe, fill = factor(Messpunkt))) +
   geom_boxplot(position = position_dodge(0.8)) +
   labs(title = "Vergleich der Wassertiefen nach Standort und Messstelle (Mai–Sep 2025)",
        x = "Standort",
@@ -61,38 +82,37 @@ ggplot(df_sub, aes(x = factor(Standort), y = Wassertiefe, fill = factor(Messpunk
 
 ```
 
-## 3.3 Unterschiede innerhalb eines Standortes 
+## 3.3 Unterschiede innerhalb eines Standortes
 
 ```{r}
 ####Jahresverlauf - Liniendiagramm
-plot_lin <- function(df, st, start="2025-05-01", end="2025-09-30", titel=NULL) {
-  df_sub <- df %>% filter(Standort == st,
-                          Datum >= as.Date(start),
-                          Datum <= as.Date(end))
+plot_lin <- function(df, st, titel=NULL) {
   
-  # Wenn kein Titel angegeben, automatisch generieren
+  # Daten  nach Standort filtern
+  df_sub1 <- df %>% filter(Standort == st)
+
+  # Automatischer Titel
   if (is.null(titel)) {
     titel <- paste("Wassertiefeschwankungen -", st)
   }
   
-  ggplot(df_sub, aes(Datum, Wassertiefe, color = factor(Messpunkt))) +
-    geom_line(linewidth=1) +
-    geom_point(size=2) +
-    labs(title=titel,
-         x="Datum", y="Wassertiefe (cm)", color="Messstelle") +
+  ggplot(df_sub1, aes(Datum, Wassertiefe, color = factor(Messpunkt))) +
+    geom_line(linewidth = 1) +
+    geom_point(size = 2) +
+    labs(title = titel,
+         x = "Datum", y = "Wassertiefe (cm)", color = "Messstelle") +
     theme_minimal() +
-    scale_x_date(limits=c(as.Date(start), as.Date(end)),
-                 date_breaks="1 month", date_labels="%b %Y")
+    # Achse automatisch an vorhandene Daten anpassen
+    scale_x_date(date_breaks = "1 month", date_labels = "%b %Y")
 }
 
 
+
 #### Unterschiede zw. den Messstellen - Boxplot 
-plot_box <- function(df, st, start="2025-05-01", end="2025-09-30", titel=NULL, x_name=NULL) {
+plot_box <- function(df, st, titel=NULL, x_name=NULL) {
   
   # Daten filtern
-  df_sub <- df %>% filter(Standort == st,
-                          Datum >= as.Date(start),
-                          Datum <= as.Date(end))
+  df_sub2 <- df %>% filter(Standort == st)
   
   # Titel setzen, falls NULL
   if (is.null(titel)) {
@@ -104,7 +124,7 @@ plot_box <- function(df, st, start="2025-05-01", end="2025-09-30", titel=NULL, x
     x_name <- "Messpunkt"  # Standard
   }
   
-  ggplot(df_sub, aes(x = factor(Messpunkt), y = Wassertiefe, fill = factor(Messpunkt))) +
+  ggplot(df_sub2, aes(x = factor(Messpunkt), y = Wassertiefe, fill = factor(Messpunkt))) +
     geom_boxplot() +
     labs(
       title = titel,
@@ -114,6 +134,7 @@ plot_box <- function(df, st, start="2025-05-01", end="2025-09-30", titel=NULL, x
     ) +
     theme_minimal()
 }
+
 ```
 
 ### Meusebach trocken
@@ -156,4 +177,49 @@ plot_lin(Wassertiefen, "L", titel="Wassertiefen in Lichtenau: Mai–September 20
 plot_box(Wassertiefen, st="L",
          titel="Messpunkte Lichtenau: Mai–Sep 2025",
          x_name="Meusebach nass")
+```
+
+## 3.4 Relevante Fragen, da die Diagramme ggf. ein falsches Bild vermitteln 
+
+### Wasserstandsschwankungen 
+
+```{r}
+# welcher Standort hat die größten Wasserstandsschwankungen?
+
+# Standardabweichung = wie stark der Wasserstand typischerweise um seinen Mittelwert schwankt
+# Spannweite des Wasserstands = extremste Unterschiede zwischen dem höchsten und niedrigsten gemessenen Wasserstand
+
+#Schwankung pro Standort (über Tagesmittelwerte)
+WT_var_st <- WT_mittel %>%
+  group_by(Standort) %>%
+  summarise(
+    sd_WT = sd(WT_mean, na.rm = TRUE),
+    range_WT = max(WT_mean, na.rm = TRUE) - min(WT_mean, na.rm = TRUE)
+  ) %>%
+  arrange(desc(sd_WT))
+
+WT_var_st
+
+```
+
+```{r}
+# Schwankung pro Messpunkt innerhalb eines Standorts
+WT_var_mp <- Wassertiefen %>%
+  group_by(Standort, Messpunkt) %>%
+  summarise(
+    sd_WT = sd(Wassertiefe, na.rm = TRUE),
+    range_WT = max(Wassertiefe, na.rm = TRUE) - min(Wassertiefe, na.rm = TRUE)
+  ) %>%
+  arrange(desc(sd_WT))
+
+WT_var_mp
+```
+
+```{r}
+# welcher Standort hat die meisten trocken gefallenen Tage, welcher die wenigsten (= Beständigkeit des Gewässers/Wasserspiegel)
+
+```
+
+```{r}
+# auch daraus kann man ggf ableiten, welches Gewässer das Wasser besser hält und Faktoren ableiten, warum es bei den anderen nicht so ist -> naturschutzfachliche Maßnahmen ggf ableiten/überdenken 
 ```
