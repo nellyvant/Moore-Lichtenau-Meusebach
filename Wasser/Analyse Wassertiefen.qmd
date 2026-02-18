@@ -11,6 +11,7 @@ library(readxl)
 library(dplyr)
 library(ggplot2)
 library(lubridate)
+library(tidyr)
 ```
 
 # 2 Daten einlesen
@@ -179,9 +180,44 @@ plot_box(Wassertiefen, st="L",
          x_name="Meusebach nass")
 ```
 
-## 3.4 Relevante Fragen, da die Diagramme ggf. ein falsches Bild vermitteln 
+# 4 Statistische Kennzahlen
 
-### Wasserstandsschwankungen 
+```{r}
+# Statistische Kennzahlen pro Messpunkt und Standort
+Kennzahlen <- Wassertiefen %>%
+  group_by(Standort, Messpunkt) %>%
+  summarise(
+    Mittelwert = mean(Wassertiefe, na.rm = TRUE),
+    Median = median(Wassertiefe, na.rm = TRUE),
+    Std = sd(Wassertiefe, na.rm = TRUE),
+    Min = min(Wassertiefe, na.rm = TRUE),
+    Max = max(Wassertiefe, na.rm = TRUE)
+  )
+
+Kennzahlen
+
+```
+
+```{r}
+# Statistische Kennzahlen pro Standort
+Kennzahlen_standort <- Wassertiefen %>%
+  group_by(Standort) %>%
+  summarise(
+    Mittelwert = mean(Wassertiefe, na.rm = TRUE),
+    Std = sd(Wassertiefe, na.rm = TRUE),
+    Min = min(Wassertiefe, na.rm = TRUE),
+    Max = max(Wassertiefe, na.rm = TRUE)
+  )
+
+Kennzahlen_standort
+
+```
+
+# 5 Relevante Fragen
+
+(da die Diagramme ggf. ein falsches Bild vermitteln)
+
+### Wasserstandsschwankungen
 
 ```{r}
 # welcher Standort hat die größten Wasserstandsschwankungen?
@@ -218,8 +254,130 @@ WT_var_mp
 ```{r}
 # welcher Standort hat die meisten trocken gefallenen Tage, welcher die wenigsten (= Beständigkeit des Gewässers/Wasserspiegel)
 
+# auch daraus kann man ggf ableiten, welches Gewässer das Wasser besser hält und Faktoren ableiten, warum es bei den anderen nicht so ist -> naturschutzfachliche Maßnahmen ggf ableiten/überdenken
+```
+
+# 6 Zusatz
+
+```{r}
+# Trocken- oder Hochwasserperioden zählen 
+# Interpolation (da der Wasserstand nicht kontinuirlich gemessen wurde/in regelmäßigen Abständen)
+library(zoo)
+
+# Daten nach Datum sortieren und interpolieren
+Wassertiefen <- Wassertiefen %>%
+  arrange(Standort, Messpunkt, Datum) %>%
+  group_by(Standort, Messpunkt) %>%
+  mutate(Wassertiefe_interp = na.approx(Wassertiefe, x = as.numeric(Datum))) %>%
+  ungroup()
+
+# Trocken, Normalwasser, Hochwasser definieren
+# Beispielwerte, noch keine konkreten festgelegt
+Wassertiefen <- Wassertiefen %>%
+  mutate(
+    Trocken = Wassertiefe_interp < 3,
+    Normalwasser = Wassertiefe_interp >= 3 & Wassertiefe_interp <= 25,
+    Hochwasser = Wassertiefe_interp > 25
+  )
+
+# Zusammenhängende Perioden identifizieren
+Wassertiefen <- Wassertiefen %>%
+  group_by(Standort, Messpunkt) %>%
+  mutate(
+    Trocken_grp = cumsum(Trocken != lag(Trocken, default=first(Trocken))),
+    Normalwasser_grp = cumsum(Normalwasser != lag(Normalwasser, default=first(Normalwasser))),
+    Hochwasser_grp = cumsum(Hochwasser != lag(Hochwasser, default=first(Hochwasser)))
+  ) %>%
+  ungroup()
+
+# Zusammenhängende Perioden zählen
+Perioden_Anzahl <- Wassertiefen %>%
+  group_by(Standort, Messpunkt) %>%
+  summarise(
+    TrockenPerioden = sum(Trocken & !duplicated(Trocken_grp)),
+    NormalwasserPerioden = sum(Normalwasser & !duplicated(Normalwasser_grp)),
+    HochwasserPerioden = sum(Hochwasser & !duplicated(Hochwasser_grp)),
+    .groups = "drop"
+  )
+
+Perioden_Anzahl
+
 ```
 
 ```{r}
-# auch daraus kann man ggf ableiten, welches Gewässer das Wasser besser hält und Faktoren ableiten, warum es bei den anderen nicht so ist -> naturschutzfachliche Maßnahmen ggf ableiten/überdenken 
+TrockenPerioden <- Wassertiefen %>%
+  filter(Trocken) %>%  # nur Trockenblöcke
+  group_by(Standort, Messpunkt, Trocken_grp) %>%  # nach zusammenhängenden Perioden
+  summarise(
+    Start = min(Datum),  # erster Tag der Periode
+    Ende = max(Datum),   # letzter Tag der Periode
+    Dauer_Tage = as.numeric(max(Datum) - min(Datum)) + 1,  # Dauer in Tagen
+    .groups = "drop"
+  )
+
+TrockenPerioden
+```
+
+```{r}
+HochwasserPerioden <- Wassertiefen %>%
+  filter(Hochwasser) %>%  # nur Hochwasserblöcke
+  group_by(Standort, Messpunkt, Hochwasser_grp) %>%
+  summarise(
+    Start = min(Datum),
+    Ende = max(Datum),
+    Dauer_Tage = as.numeric(max(Datum) - min(Datum)) + 1,
+    .groups = "drop"
+  )
+
+HochwasserPerioden
+```
+
+```{r}
+NormalwasserPerioden <- Wassertiefen %>%
+  filter(Normalwasser) %>%  # nur Normalwasserblöcke
+  group_by(Standort, Messpunkt, Normalwasser_grp) %>%  # bereits vorhanden!
+  summarise(
+    Start = min(Datum),
+    Ende = max(Datum),
+    Dauer_Tage = as.numeric(max(Datum) - min(Datum)) + 1,
+    .groups = "drop"
+  )
+
+NormalwasserPerioden
+```
+
+```{r}
+# Histogramm zur Häufigkeit der Wasserstände je Standort 
+ggplot(Wassertiefen, aes(x = Wassertiefe, fill = Standort)) +
+  geom_histogram(binwidth = 5, alpha = 0.7) +
+  facet_wrap(~Standort) +
+  theme_minimal() +
+  labs(title = "Verteilung der Wasserstände pro Standort",
+       x = "Wasserstand (cm)",
+       y = "Anzahl der Messungen")
+
+```
+
+```{r}
+# Histogramm zur Häufigkeit der Wasserstände je Messpunkt und Standort 
+Wassertiefen$Standort <- as.factor(Wassertiefen$Standort)
+Wassertiefen$Messpunkt <- as.factor(Wassertiefen$Messpunkt)
+
+standort_L <- Wassertiefen %>% 
+  filter(Standort == "L")
+#standort_L <- Wassertiefen %>%
+#  filter(Standort == "L", Messpunkt != "4")
+standort_MN <- Wassertiefen %>% 
+  filter(Standort == "MN")
+standort_MT <- Wassertiefen %>% 
+  filter(Standort == "MT")
+
+ggplot(standort_MN, aes(x = Wassertiefe, fill = Messpunkt)) +
+  geom_histogram(binwidth = 5, alpha = 0.7) +
+  facet_wrap(~Messpunkt) +
+  theme_minimal() +
+  labs(title = "Histogramm pro Messpunkt & Standort",
+       x = "Wasserstand (cm)",
+       y = "Anzahl Messungen")
+
 ```
