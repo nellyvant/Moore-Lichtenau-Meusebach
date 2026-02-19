@@ -298,6 +298,8 @@ for (logger in logger_names) {
 }
 ```
 
+hier fehlt noch die überprüfung, ob bei der NA entfernung sachen gelöscht wurde, die eigentlich drin sien sollten, also zb wo ein logger mal aus versehen nur temp aufgezeichnet hat, aber nicht die lichtinitensität. ich denke, man könnte einfach schauen, wo die NAs sind und wenn sie nur am ende sind, dann sollte alles gut sein. wenn es NAs irgendwo mittendrin gibt, dann nicht!
+
 ```{r}
 #entfernen von Zeilen ohne Messwerte (entstanden durch Auslesen der Logger)
 messwert_spalten <- c("Temp_sonne_C", "Licht_lux", "Temp_schatten_C", "relLF_percent", "Taupunkt_C")
@@ -307,6 +309,7 @@ for (logger in logger_names) {
   assign(logger, get(logger) %>% 
            filter(!if_all(all_of(messwert_spalten), is.na)))
 }
+
 ```
 
 #do not run
@@ -322,7 +325,9 @@ str(all_loggers)
 
 ```
 
-# 4 Tagesmitteltemperaturen
+# 4 Temperaturen
+
+## 4.1 Tagesmitteltemperaturen
 
 ```{r}
 #Berechnung der Tagesmitteltemperatur pro Logger in einer separaten Tabelle 
@@ -343,8 +348,6 @@ daily_logger_means <- all_loggers %>%
   select(Logger_ID, Standort, Logger, Datum, everything())
 
 summary(daily_logger_means)
-
-
 ```
 
 ```{r}
@@ -365,6 +368,8 @@ daily_logger_means_min_max <- daily_logger_means %>%
     Schatten_min_mean_Tag = Datum[which.min(Temp_schatten_mean)]
   )
 ```
+
+## 4.2 Boxplots
 
 ```{r}
 #Boxplots - Vergleich der Logger der einzelnen Flächen (nur der äußere Logger oder der innere)
@@ -400,9 +405,9 @@ ggplot(df_plot, aes(x = Logger, y = Temp_sonne_mean, fill = Logger)) +
   ) +
   theme_minimal() +
   theme(legend.position = "none") +
-  facet_wrap(~Standort, ncol = 1, scales = "free_y")  # jede Facet kann eigene y-Skala haben
+  facet_wrap(~Standort, ncol = 1, scales = "free_y")
 
-#ggsave("boxplot_loggers.png", width = 6, height = 20)  # Höhe größer
+ggsave("boxplot_temp_mean_loggers.png", width = 6, height = 20) 
 ```
 
 ```{r}
@@ -432,7 +437,7 @@ ggplot(df_plot, aes(x = Logger, y = Temperatur, fill = Licht)) +
   theme_minimal()
 ```
 
-# 5 Extremwerte pro Logger
+## 4.3 Extremwerte pro Logger
 
 ```{r}
 # Mittelwerte gruppiert nach Loggerstandort und Tag erzeugen, zusätzlich Min & Max Temperatur am Tag 
@@ -526,5 +531,148 @@ extrema_logger <- daily_logger_extrema %>%
   )
 ```
 
-```{}
+## 4.4 Temperaturen im Jahresverlauf
+
+```{r}
+#Mittelwerte für jede Fläche bilden
+area_mean <- daily_logger_means %>%
+  group_by(Standort, Datum) %>%
+  summarise(
+    Temp_sonne_area_mean = mean(Temp_sonne_mean, na.rm = TRUE),
+    Temp_schatten_area_mean = mean(Temp_schatten_mean, na.rm = TRUE),
+    .groups = "drop"
+  )
+summary(area_mean)
+
+ggplot(area_mean, aes(x = Datum, 
+                      y = Temp_sonne_area_mean, 
+                      color = Standort)) +
+  geom_line(linewidth = 1) +
+  labs(
+    title = "Tagesmitteltemperatur (Sonne) pro Standort",
+    x = "Datum",
+    y = "Flächenmittel Temperatur (°C)",
+    color = "Standort"
+  ) +
+  theme_minimal() +
+  theme(
+    plot.title = element_text(hjust = 0.5)
+  )
+ggsave("area_mean_temp_in_year.png", width = 20, height = 6) 
+```
+
+# 5 luftfeuchte?
+
+ich hab keine lust, den code für jedes parameter zu copy pasten
+
+ich will eine tablle daily_logger_means machen, die mittelwerte von temp_sonne, temp_schatten, luftfeuchte, licht und taupukt direkt in einem hat\
+aus dieser tabelle können wir dann wieder die extremwerttabelle machen und die plots\
+ich probiere erstmal aus, ob das funktioniert. deswegen betrachte 5. mal als testfeld :)
+
+überlegung: ich brauche ne stabdard deviation und vlt auch range (max-min). ist das sinnvoll, das für jeden tag für jeden logger zu machen? oder kann ich (zusätzlich) auch noch für jeden einzelnen logger herausfinden, was an diesem konkreten punkt die jahresmitteltemp, usw sind und dazu sd und range? ist das sinnvoll? denn die werte schwanken ja ganz klar im jahresverlauf... aber grade range und sd wären ja auch übers ganze jahr spannend\
+ich werd wohl beides mal machen
+
+## 5.1 Tagesmittel
+
+```{r}
+#Berechnung der Tagesmittelwerte pro Logger in einer neuen Tabelle 
+
+# Datum ohne Uhrzeit erzeugen, Mittelwerte gruppiert nach Loggerstandort und Tag erzeugen 
+daily_logger_means <- all_loggers %>%
+  mutate(Datum = as.Date(DateTime)) %>%       
+  group_by(Logger_ID, Datum) %>%              
+  summarise(
+    # Fläche und Logger vom ersten Eintrag des Tages übernehmen
+    Standort = first(Standort),
+    Logger = first(Logger),
+
+    Temp_sonne_mean = mean(Temp_sonne_C, na.rm = TRUE),
+    Temp_schatten_mean = mean(Temp_schatten_C, na.rm = TRUE),
+    Licht_mean = mean(Licht_lux, na.rm =T),
+    rLF_mean = mean(relLF_percent, na.rm =T),
+    Tp_mean = mean(Taupunkt_C, na.rm=T),
+    .groups = "drop"
+  ) %>%
+  select(Logger_ID, Standort, Logger, Datum, everything())
+
+summary(daily_logger_means)
+```
+
+hier kommt noch dieses codechunk im original: #Minimum & Maximum der Temperaturmittelwerte für die einzelnen Logger
+
+## Tagesextrema
+
+```{r}
+# Mittelwerte gruppiert nach Loggerstandort und Tag erzeugen, zusätzlich Min & Max Temperatur am Tag 
+daily_logger_summary <- all_loggers %>%
+  mutate(Datum = as.Date(DateTime)) %>%
+  group_by(Logger_ID, Datum) %>%
+  summarise(
+    Temp_sonne_mean = mean(Temp_sonne_C),
+    Temp_sonne_max = max(Temp_sonne_C),
+    Temp_sonne_min = min(Temp_sonne_C),
+    
+    Temp_schatten_mean = mean(Temp_schatten_C),
+    Temp_schatten_max =  max(Temp_schatten_C),
+    Temp_schatten_min = min(Temp_schatten_C),
+    
+    Licht_mean = mean(Licht_lux),
+    Licht_max = max(Licht_lux),
+    Licht_min = min(Licht_lux),
+    
+    rLF_mean = mean(relLF_percent),
+    rLF_max = max(relLF_percent),
+    rLF_min = min(relLF_percent),
+    
+    Tp_mean = mean(Taupunkt_C),
+    Tp_max = max(Taupunkt_C),
+    Tp_min = min(Taupunkt_C),
+    
+    .groups = "drop"
+  )
+
+summary(daily_logger_summary)
+  
+```
+
+data by logger
+
+```{r}
+logger_year <- all_loggers %>%
+  group_by(Logger_ID) %>%
+  summarise(
+    Tempsonne_Jahresmittel = mean(Temp_sonne_C, na.rm = TRUE),
+    Tempsonne_Jahres_sd = sd(Temp_sonne_C, na.rm = TRUE),
+    Tempsonne_Jahres_min = min(Temp_sonne_C, na.rm = TRUE),
+    Tempsonne_Jahres_max = max(Temp_sonne_C, na.rm = TRUE),
+    Tempsonne_Jahres_range = Tempsonne_Jahres_max - Tempsonne_Jahres_min,
+    
+    Tempschatten_Jahresmittel = mean(Temp_schatten_C, na.rm = TRUE),
+    Tempschatten_Jahres_sd = sd(Temp_schatten_C, na.rm = TRUE),
+    Tempschatten_Jahres_min = min(Temp_schatten_C, na.rm = TRUE),
+    Tempschatten_Jahres_max = max(Temp_schatten_C, na.rm = TRUE),
+    Tempschatten_Jahres_range = Tempschatten_Jahres_max - Tempschatten_Jahres_min,
+    
+    Licht_Jahresmittel = mean(Licht_lux, na.rm = TRUE),
+    Licht_Jahres_sd = sd(Licht_lux, na.rm = TRUE),
+    Licht_Jahres_min = min(Licht_lux, na.rm = TRUE),
+    Licht_Jahres_max = max(Licht_lux, na.rm = TRUE),
+    Licht_Jahres_range = Licht_Jahres_max - Licht_Jahres_min,
+    
+    rLF_Jahresmittel = mean(relLF_percent, na.rm = TRUE),
+    rLF_Jahres_sd = sd(relLF_percent, na.rm = TRUE),
+    rLF_Jahres_min = min(relLF_percent, na.rm = TRUE),
+    rLF_Jahres_max = max(relLF_percent, na.rm = TRUE),
+    rLF_Jahres_range = rLF_Jahres_max - rLF_Jahres_min,
+    
+    Tp_Jahresmittel = mean(Taupunkt_C, na.rm = TRUE),
+    Tp_Jahres_sd = sd(Taupunkt_C, na.rm = TRUE),
+    Tp_Jahres_min = min(Taupunkt_C, na.rm = TRUE),
+    Tp_Jahres_max = max(Taupunkt_C, na.rm = TRUE),
+    Tp_Jahres_range = Tp_Jahres_max - Tp_Jahres_min,
+    
+    .groups = "drop"
+  )
+
+summary(logger_year)
 ```
