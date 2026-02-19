@@ -101,10 +101,12 @@ MNS_lt$DateTime <- mdy_hms(MNS_lt$Date.Time..CEST.CET.)
 MNS_th$DateTime <- mdy_hms(MNS_th$Date.Time..CEST.CET.)
 ```
 
+#do not run
+
 ```{r}
 #| label: alternative date conversion
 logger_names <- ls(pattern = "_lt$|_th$")
-for (obj in logger_names) {
+for (obj in logger_names) 
   df <- get(obj)
   date_col <- names(df)[grepl("^Date.Time", names(df))]
   df$DateTime <- mdy_hms(df[[date_col]], tz = "Europe/Berlin")
@@ -112,6 +114,8 @@ for (obj in logger_names) {
 }
 
 ```
+
+#do not run
 
 ```{r}
 # Tabellen beider Logger pro Standort zusammenführen
@@ -305,6 +309,8 @@ for (logger in logger_names) {
 }
 ```
 
+#do not run
+
 ```{r}
 str(MNS)
 ```
@@ -312,6 +318,7 @@ str(MNS)
 ```{r}
 #Zusammenführen als Masterdatensatz
 all_loggers <- bind_rows(lapply(logger_names, get))
+str(all_loggers)
 
 ```
 
@@ -319,14 +326,11 @@ all_loggers <- bind_rows(lapply(logger_names, get))
 
 ```{r}
 #Berechnung der Tagesmitteltemperatur pro Logger in einer separaten Tabelle 
-# genutzte Packages
-library(dplyr)
-library(lubridate)
 
 # Datum ohne Uhrzeit erzeugen, Mittelwerte gruppiert nach Loggerstandort und Tag erzeugen 
 daily_logger_means <- all_loggers %>%
-  mutate(Datum = as.Date(DateTime)) %>%       # Datum erzeugen
-  group_by(Logger_ID, Datum) %>%              # Gruppierung
+  mutate(Datum = as.Date(DateTime)) %>%       
+  group_by(Logger_ID, Datum) %>%              
   summarise(
     # Fläche und Logger vom ersten Eintrag des Tages übernehmen
     Standort = first(Standort),
@@ -334,14 +338,13 @@ daily_logger_means <- all_loggers %>%
 
     Temp_sonne_mean = mean(Temp_sonne_C, na.rm = TRUE),
     Temp_schatten_mean = mean(Temp_schatten_C, na.rm = TRUE),
-    Messungen = n(),                          # optional: Anzahl der Messungen
     .groups = "drop"
   ) %>%
-  # Optional: Spalten neu ordnen, damit Fläche und Logger vorne stehen
   select(Logger_ID, Standort, Logger, Datum, everything())
 
 summary(daily_logger_means)
-str(daily_logger_means)
+
+
 ```
 
 ```{r}
@@ -365,8 +368,6 @@ daily_logger_means_min_max <- daily_logger_means %>%
 
 ```{r}
 #Boxplots - Vergleich der Logger der einzelnen Flächen (nur der äußere Logger oder der innere)
-library(ggplot2)
-library(tidyr)
 
 # Filter für Standort L und die gewünschten Logger
 df_plot <- daily_logger_means %>%
@@ -382,6 +383,26 @@ ggplot(df_plot, aes(x = Logger, y = Temp_sonne_mean, fill = Logger)) +
   ) +
   theme_minimal() +
   theme(legend.position = "none") 
+```
+
+```{r}
+# eben erzeugter Plot für alle 3 Flächen
+df_plot <- daily_logger_means %>%
+  filter(Standort %in% c("L", "MN", "MT"),
+         Logger %in% c("M", "N", "O", "S", "W"))
+
+ggplot(df_plot, aes(x = Logger, y = Temp_sonne_mean, fill = Logger)) +
+  geom_boxplot() +
+  labs(
+    title = "Vergleich der Tagesmittelwerte des äußeren Sensors pro Logger",
+    x = "Loggerstandort",
+    y = "Tagesmitteltemperatur (°C)"
+  ) +
+  theme_minimal() +
+  theme(legend.position = "none") +
+  facet_wrap(~Standort, ncol = 1, scales = "free_y")  # jede Facet kann eigene y-Skala haben
+
+#ggsave("boxplot_loggers.png", width = 6, height = 20)  # Höhe größer
 ```
 
 ```{r}
@@ -415,7 +436,7 @@ ggplot(df_plot, aes(x = Logger, y = Temperatur, fill = Licht)) +
 
 ```{r}
 # Mittelwerte gruppiert nach Loggerstandort und Tag erzeugen, zusätzlich Min & Max Temperatur am Tag 
-daily_logger_means <- all_loggers %>%
+daily_logger_summary <- all_loggers %>%
   mutate(Datum = as.Date(DateTime)) %>%
   group_by(Logger_ID, Datum) %>%
   summarise(
@@ -439,8 +460,6 @@ daily_logger_means <- all_loggers %>%
       all(is.na(Temp_schatten_C)), NA,
       min(Temp_schatten_C, na.rm = TRUE)
     ),
-
-    Messungen = n(),
     .groups = "drop"
   )
 
@@ -484,8 +503,6 @@ daily_logger_extrema <- all_loggers %>%
     Time_schatten_min =
       if (all(is.na(Temp_schatten_C))) as.POSIXct(NA)
       else DateTime[which.min(Temp_schatten_C)],
-
-    Messungen = n(),
     .groups = "drop"
   )
 
@@ -507,4 +524,7 @@ extrema_logger <- daily_logger_extrema %>%
     Schatten_min = min(Temp_schatten_min, na.rm = TRUE),
     Schatten_min_Zeit = Time_schatten_min[which.min(Temp_schatten_min)]
   )
+```
+
+```{}
 ```
