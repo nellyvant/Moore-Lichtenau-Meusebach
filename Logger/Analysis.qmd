@@ -93,8 +93,8 @@ MNM_lt$DateTime <- mdy_hms(MNM_lt$Date.Time..CEST.CET.)
 MNM_th$DateTime <- mdy_hms(MNM_th$Date.Time..CEST.CET.)
 MNO_lt$DateTime <- mdy_hms(MNO_lt$Date.Time..CEST.)
 MNO_th$DateTime <- mdy_hms(MNO_th$Date.Time..CEST.)
-MNW_lt$DateTime <- mdy_hms(MNW_lt$Date.Time..CEST.CET.)
-MNW_th$DateTime <- mdy_hms(MNW_th$Date.Time..CEST.CET.)
+MNW_lt$DateTime <- mdy_hms(MNW_lt$Date.Time..CEST.)
+MNW_th$DateTime <- mdy_hms(MNW_th$Date.Time..CEST.)
 MNN_lt$DateTime <- mdy_hms(MNN_lt$Date.Time..CEST.)
 MNN_th$DateTime <- mdy_hms(MNN_th$Date.Time..CEST.)
 MNS_lt$DateTime <- mdy_hms(MNS_lt$Date.Time..CEST.CET.)
@@ -111,7 +111,7 @@ for (obj in logger_names)
   date_col <- names(df)[grepl("^Date.Time", names(df))]
   df$DateTime <- mdy_hms(df[[date_col]], tz = "Europe/Berlin")
   assign(obj, df)
-}
+
 
 ```
 
@@ -287,14 +287,16 @@ MNS <- join_loggers(
 ```
 
 ```{r}
+# alle Daten vor dem 08.05.2025 00:00 Uhr entfernen
 # alle Daten nach dem 30.9.2025 23:50 Uhr entfernen
-cutoff <- as.POSIXct("2025-09-30 23:50:00", tz="UTC")
+cutoff_start <- as.POSIXct("2025-05-08 00:00:00", tz="UTC")
+cutoff_end   <- as.POSIXct("2025-09-30 23:50:00", tz="UTC")
 
 logger_names <- c("LM", "LO", "LW", "LN", "LS", "MTM", "MTO", "MTW", "MTN", "MTS", "MNM", "MNO", "MNW", "MNN", "MNS")
 
 for (logger in logger_names) {
   assign(logger, get(logger) %>% 
-           filter(DateTime <= cutoff))
+           filter(DateTime >= cutoff_start & DateTime <= cutoff_end))
 }
 ```
 
