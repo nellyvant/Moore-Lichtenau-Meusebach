@@ -337,23 +337,19 @@ logger_list <- all_loggers %>%
   distinct(Standort, Logger, Logger_ID)
 
 # Zeitreihe erstellen: alle 10 Minuten vom 08.05 bis 30.09.2025
-zeitpunkte <- tibble(DateTime = seq(
-  from = as.POSIXct("2025-05-08 00:00:00"),
-  to   = as.POSIXct("2025-09-30 23:50:00"),
+zeitpunkte <- seq(
+  from = as.POSIXct("2025-05-08 00:00:00", tz = "UTC"),
+  to   = as.POSIXct("2025-09-30 23:50:00", tz = "UTC"),
   by   = "10 min"
-))
+)
 
 # Kreuzprodukt
 voller_raster <- tidyr::crossing(logger_list, zeitpunkte)
+voller_raster <- voller_raster %>%
+  rename(DateTime = zeitpunkte)
 
 # Originaldaten einfügen
-all_loggers_complete <- voller_raster %>%
-  left_join(all_loggers, by = c("Standort", "Logger", "Logger_ID", "DateTime")) %>%
-  # Filter auf gewünschten Zeitraum (sicherstellen)
-  filter(DateTime >= as.POSIXct("2025-05-08 00:00:00") &
-         DateTime <= as.POSIXct("2025-09-30 23:50:00"))
-
-
+all_loggers_complete <- voller_raster %>% left_join(all_loggers, by = c("Standort", "Logger", "Logger_ID", "DateTime"))
 
 # Fehlende Werte pro Zeile zählen (mindestens eine Messgröße fehlt)
 fehlende_zeitpunkte <- all_loggers_complete %>%
@@ -378,6 +374,8 @@ fehlende_werte_summary <- fehlende_zeitpunkte %>%
 
 Mittels Modell Messwerte schätzen/erzeugen
 
+Es lernt nur aus sich selbst, nicht aus den anderen Loggern
+
 ```{r}
 #install.packages("mice")
 library(mice)
@@ -400,7 +398,7 @@ numeric_cols_flag <- numeric_cols %>%
 
 # Imputation mit mice durchführen
 # method = "pmm" = predictive mean matching
-imputed_data <- mice(numeric_cols, m = 1, method = "pmm", maxit = 5, seed = 123)
+imputed_data <- mice(numeric_cols, m = 1, method = "pmm", maxit = 50, seed = 123)
 completed_data <- complete(imputed_data)
 
 # Ergebnisse wieder zusammenfügen
@@ -408,6 +406,57 @@ MT_data_imputed <- cbind(meta, completed_data)
 
 # Flag hinzufügen
 imputation_flag <- cbind(meta, numeric_cols_flag)
+
+
+plot(imputed_data)
+imputed_data$predictorMatrix
+densityplot(imputed_data)
+```
+
+Es lernt aus den anderen Loggern am Standort
+
+```{r}
+messgroessen <- c(
+  "Temp_sonne_C",
+  "Temp_schatten_C",
+  "Licht_lux",
+  "relLF_percent",
+  "Taupunkt_C"
+)
+
+MT_wide <- MT_data_complete %>%
+  select(DateTime, Logger, all_of(messgroessen)) %>%
+  pivot_wider(
+    names_from  = Logger,
+    values_from = all_of(messgroessen),
+    names_sep   = "_"
+  )
+
+meta <- MT_wide %>%
+  select(DateTime)
+
+numeric_cols <- MT_wide %>%
+  select(-DateTime)
+
+numeric_cols_flag <- numeric_cols %>%
+  mutate(across(everything(), ~is.na(.)))
+
+
+imputed_data <- mice(
+  numeric_cols,
+  m = 1,        # eine imputierte Version
+  method = "pmm",
+  maxit = 50,    # 5 Iterationen
+  seed = 123
+)
+
+completed_data <- complete(imputed_data)
+
+MT_imputed_wide <- cbind(meta, completed_data)
+
+plot(imputed_data)
+imputed_data$predictorMatrix
+densityplot(imputed_data)
 
 ```
 
