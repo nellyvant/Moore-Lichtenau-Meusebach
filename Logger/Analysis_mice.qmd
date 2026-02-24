@@ -1,0 +1,764 @@
+---
+title: "Datenanalyse_Logger"
+format: html
+editor: visual
+---
+
+# 1 genutzte Packages
+
+```{r}
+#library(tidyverse)
+library(dplyr)
+library(lubridate)
+library(tidyr)
+library(ggplot2)
+```
+
+# 2 Daten einlesen
+
+## 2.1 Licht und Temperatur (außen)
+
+```{r}
+#Lichtenau
+LM_lt <- read.csv("Licht-und-Temperatur-aussen/Lichtenau Mitte 2025-11-04 18_39_12 CET.csv")
+LO_lt <- read.csv("Licht-und-Temperatur-aussen/Lichtenau Ost 2025-10-02 14_50_43 CEST.csv")
+LW_lt <- read.csv("Licht-und-Temperatur-aussen/Lichtenau West 2025-11-04 18_36_30 CET.csv")
+LN_lt <- read.csv("Licht-und-Temperatur-aussen/Lichtenau Nord 2025-10-02 14_52_52 CEST.csv")
+LS_lt <- read.csv("Licht-und-Temperatur-aussen/Lichtenau Süd 2025-10-02 14_51_42 CEST.csv")
+#Meusebach trocken
+MTM_lt <- read.csv("Licht-und-Temperatur-aussen/Meusebach trock Mitt 2025-11-04 10_33_23 CET.csv")
+MTO_lt <- read.csv("Licht-und-Temperatur-aussen/Meusebach trock Ost 2025-11-04 10_42_29 CET.csv")
+MTW_lt <- read.csv("Licht-und-Temperatur-aussen/Meusebach trock West 2025-10-02 14_56_44 CEST.csv")
+MTN_lt <- read.csv("Licht-und-Temperatur-aussen/Meusebach trock Nord 2025-11-04 10_34_51 CET.csv")
+MTS_lt<- read.csv("Licht-und-Temperatur-aussen/Meusebach trock Süd 2025-10-02 14_54_52 CEST.csv")
+#Meusebach nass
+MNM_lt <- read.csv("Licht-und-Temperatur-aussen/Meusebach nass Mitte 2025-11-04 11_37_40 CET.csv")
+MNO_lt <- read.csv("Licht-und-Temperatur-aussen/Meusebach nass Ost  2025-10-02 14_55_48 CEST.csv")
+MNW_lt <- read.csv("Licht-und-Temperatur-aussen/Meusebach nass West 2025-11-04 11_33_52 CET.csv")
+MNN_lt <- read.csv("Licht-und-Temperatur-aussen/Meusebach nass Nord 2025-10-02 14_53_40 CEST.csv")
+MNS_lt <- read.csv("Licht-und-Temperatur-aussen/Meusebach nass Süd 2025-11-04 11_35_49 CET.csv")
+```
+
+## 2.2 Temperatur und Luftfeuchte (innen)
+
+```{r}
+#Lichtenau
+LM_th <- read.csv("Luftfeuchte-und-Temperatur-innen/Lichtenau Mitte  2025-11-04 14_05_01 CET.csv")
+LO_th <- read.csv("Luftfeuchte-und-Temperatur-innen/Lichtenau Ost 2025-10-02 14_47_35 CEST.csv")
+LW_th <- read.csv("Luftfeuchte-und-Temperatur-innen/Lichtenau West 2025-11-04 14_05_41 CET.csv")
+LN_th <- read.csv("Luftfeuchte-und-Temperatur-innen/Lichtenau Nord 2025-10-02 14_47_08 CEST.csv")
+LS_th <- read.csv("Luftfeuchte-und-Temperatur-innen/Lichtenau Süd 2025-10-02 14_46_44 CEST.csv")
+#Meusebach trocken
+MTM_th <- read.csv("Luftfeuchte-und-Temperatur-innen/Meusebach trock Mitt 2025-11-04 10_30_53 CET.csv")
+MTO_th <- read.csv("Luftfeuchte-und-Temperatur-innen/Meusebach trock Ost 2025-11-04 10_31_49 CET.csv")
+MTW_th <- read.csv("Luftfeuchte-und-Temperatur-innen/Meusebach trock West 2025-10-02 14_45_08 CEST.csv")
+MTN_th <- read.csv("Luftfeuchte-und-Temperatur-innen/Meusebach trock Nord 2025-11-04 10_32_27 CET.csv")
+MTS_th <- read.csv("Luftfeuchte-und-Temperatur-innen/Meusebach trock Süd 2025-10-02 14_43_36 CEST.csv")
+#Meusebach nass
+MNM_th <- read.csv("Luftfeuchte-und-Temperatur-innen/Meusebach nass Mitte 2025-11-04 11_36_57 CET.csv")
+MNO_th <- read.csv("Luftfeuchte-und-Temperatur-innen/Meusebach nass Ost 2025-10-02 14_45_34 CEST.csv")
+MNW_th <- read.csv("Luftfeuchte-und-Temperatur-innen/Meusebach nass West 2025-11-04 11_33_09 CET.csv")
+MNN_th <- read.csv("Luftfeuchte-und-Temperatur-innen/Meusebach nass Nord 2025-10-02 14_45_57 CEST.csv")
+MNS_th <- read.csv("Luftfeuchte-und-Temperatur-innen/Meusebach nass Süd 2025-11-04 11_35_14 CET.csv")
+```
+
+# 3 Daten bereinigen und strukturieren
+
+```{r}
+#| label: long date conversion
+#Datumsformat umwandeln
+LM_lt$DateTime <- mdy_hms(LM_lt$Date.Time..CEST.CET.)
+LM_th$DateTime <- mdy_hms(LM_th$Date.Time..CEST.CET.)
+LO_lt$DateTime <- mdy_hms(LO_lt$Date.Time..CEST.)
+LO_th$DateTime <- mdy_hms(LO_th$Date.Time..CEST.)
+LW_lt$DateTime <- mdy_hms(LW_lt$Date.Time..CEST.CET.)
+LW_th$DateTime <- mdy_hms(LW_th$Date.Time..CEST.CET.)
+LN_lt$DateTime <- mdy_hms(LN_lt$Date.Time..CEST.)
+LN_th$DateTime <- mdy_hms(LN_th$Date.Time..CEST.)
+LS_lt$DateTime <- mdy_hms(LS_lt$Date.Time..CEST.)
+LS_th$DateTime <- mdy_hms(LS_th$Date.Time..CEST.)
+
+MTM_lt$DateTime <- mdy_hms(MTM_lt$Date.Time..CEST.CET.)
+MTM_th$DateTime <- mdy_hms(MTM_th$Date.Time..CEST.CET.)
+MTO_lt$DateTime <- mdy_hms(MTO_lt$Date.Time..CEST.CET.)
+MTO_th$DateTime <- mdy_hms(MTO_th$Date.Time..CEST.CET.)
+MTW_lt$DateTime <- mdy_hms(MTW_lt$Date.Time..CEST.)
+MTW_th$DateTime <- mdy_hms(MTW_th$Date.Time..CEST.)
+MTN_lt$DateTime <- mdy_hms(MTN_lt$Date.Time..CEST.CET.)
+MTN_th$DateTime <- mdy_hms(MTN_th$Date.Time..CEST.CET.)
+MTS_lt$DateTime <- mdy_hms(MTS_lt$Date.Time..CEST.)
+MTS_th$DateTime <- mdy_hms(MTS_th$Date.Time..CEST.)
+
+MNM_lt$DateTime <- mdy_hms(MNM_lt$Date.Time..CEST.CET.)
+MNM_th$DateTime <- mdy_hms(MNM_th$Date.Time..CEST.CET.)
+MNO_lt$DateTime <- mdy_hms(MNO_lt$Date.Time..CEST.)
+MNO_th$DateTime <- mdy_hms(MNO_th$Date.Time..CEST.)
+MNW_lt$DateTime <- mdy_hms(MNW_lt$Date.Time..CEST.)
+MNW_th$DateTime <- mdy_hms(MNW_th$Date.Time..CEST.)
+MNN_lt$DateTime <- mdy_hms(MNN_lt$Date.Time..CEST.)
+MNN_th$DateTime <- mdy_hms(MNN_th$Date.Time..CEST.)
+MNS_lt$DateTime <- mdy_hms(MNS_lt$Date.Time..CEST.CET.)
+MNS_th$DateTime <- mdy_hms(MNS_th$Date.Time..CEST.CET.)
+```
+
+#do not run
+
+```{r}
+#| label: alternative date conversion
+logger_names <- ls(pattern = "_lt$|_th$")
+for (obj in logger_names) 
+  df <- get(obj)
+  date_col <- names(df)[grepl("^Date.Time", names(df))]
+  df$DateTime <- mdy_hms(df[[date_col]], tz = "Europe/Berlin")
+  assign(obj, df)
+
+
+```
+
+#do not run
+
+```{r}
+# Tabellen beider Logger pro Standort zusammenführen
+#einige Variablen in den Originaltabellen brauchen wir nicht mehr, daher bauen wir eine cleane Tabelle, die nur analyserelevante Daten beinhaltet
+LM_lt_clean <- LM_lt %>%
+  select(
+    DateTime,
+    Temp_sonne = Temperature.....C.,
+    Licht_lux  = Light....lux.
+  )
+
+LM_th_clean <- LM_th %>%
+  select(
+    DateTime,
+    Temp_schatten = Temperature.....C.,
+    relLF         = RH......,
+    Taupunkt      = Dew.Point.....C.
+  )
+# Zusammenführen der beiden Tabellen vom gleichen Standort mit join
+LM <- full_join(LM_lt_clean,LM_th_clean,by = "DateTime")
+# Einfügen einer Loggerkennung, Standortkennnung und Logger ID
+LM <- LM %>%
+  mutate(
+    Standort = "L",
+    Logger   = "M",
+    Logger_ID = "LM"
+  )
+summary(LM)
+str(LM)
+```
+
+```{r}
+#zum Zusammenführen der Tabellen wurde die folgende Fuktion erstellt
+
+join_loggers <- function(df_lt, df_th, standort, logger) {
+
+  # cleane Tabellen erstellen, weil in Originaltabellen einiges irrelevantes drin
+  lt_clean <- df_lt %>%
+    select(
+      DateTime,
+      Temp_sonne_C = Temperature.....C.,
+      Licht_lux  = Light....lux.
+    )
+
+  th_clean <- df_th %>%
+    select(
+      DateTime,
+      Temp_schatten_C = Temperature.....C.,
+      relLF_percent         = RH......,
+      Taupunkt_C      = Dew.Point.....C.
+    )
+
+  # join
+  full_join(lt_clean, th_clean, by = "DateTime") %>%
+    mutate(
+      Standort  = standort,
+      Logger    = logger,
+      Logger_ID = paste0(standort, logger)
+    )
+}
+```
+
+```{r}
+#Lichtenau Mitte
+LM <- join_loggers(
+  df_lt    = LM_lt,
+  df_th    = LM_th,
+  standort = "L",
+  logger   = "M"
+)
+#Lichtenau Ost
+LO <- join_loggers(
+  df_lt    = LO_lt,
+  df_th    = LO_th,
+  standort = "L",
+  logger   = "O"
+)
+#Lichtenau West
+LW <- join_loggers(
+  df_lt    = LW_lt,
+  df_th    = LW_th,
+  standort = "L",
+  logger   = "W"
+)
+#Lichtenau Nord
+LN <- join_loggers(
+  df_lt    = LN_lt,
+  df_th    = LN_th,
+  standort = "L",
+  logger   = "N"
+)
+#Lichtenau Süd
+LS <- join_loggers(
+  df_lt    = LS_lt,
+  df_th    = LS_th,
+  standort = "L",
+  logger   = "S"
+)
+#Meusebach trocken Mitte
+MTM <- join_loggers(
+  df_lt    = MTM_lt,
+  df_th    = MTM_th,
+  standort = "MT",
+  logger   = "M"
+)
+#Meusebach trocken Ost
+MTO <- join_loggers(
+  df_lt    = MTO_lt,
+  df_th    = MTO_th,
+  standort = "MT",
+  logger   = "O"
+)
+#Meusebach trocken West
+MTW <- join_loggers(
+  df_lt    = MTW_lt,
+  df_th    = MTW_th,
+  standort = "MT",
+  logger   = "W"
+)
+#Meusebach trocken Nord
+MTN <- join_loggers(
+  df_lt    = MTN_lt,
+  df_th    = MTN_th,
+  standort = "MT",
+  logger   = "N"
+)
+#Meusebach trocken Süd
+MTS <- join_loggers(
+  df_lt    = MTS_lt,
+  df_th    = MTS_th,
+  standort = "MT",
+  logger   = "S"
+)
+#Meusebach nass Mitte
+MNM <- join_loggers(
+  df_lt    = MNM_lt,
+  df_th    = MNM_th,
+  standort = "MN",
+  logger   = "M"
+)
+#Meusebach nass Ost
+MNO <- join_loggers(
+  df_lt    = MNO_lt,
+  df_th    = MNO_th,
+  standort = "MN",
+  logger   = "O"
+)
+#Meusebach nass West
+MNW <- join_loggers(
+  df_lt    = MNW_lt,
+  df_th    = MNW_th,
+  standort = "MN",
+  logger   = "W"
+)
+#Meusebach nass Nord
+MNN <- join_loggers(
+  df_lt    = MNN_lt,
+  df_th    = MNN_th,
+  standort = "MN",
+  logger   = "N"
+)
+#Meusebach nass Süd
+MNS <- join_loggers(
+  df_lt    = MNS_lt,
+  df_th    = MNS_th,
+  standort = "MN",
+  logger   = "S"
+)
+```
+
+```{r}
+# alle Daten vor dem 08.05.2025 00:00 Uhr entfernen
+# alle Daten nach dem 30.9.2025 23:50 Uhr entfernen
+cutoff_start <- as.POSIXct("2025-05-08 00:00:00", tz="UTC")
+cutoff_end   <- as.POSIXct("2025-09-30 23:50:00", tz="UTC")
+
+logger_names <- c("LM", "LO", "LW", "LN", "LS", "MTM", "MTO", "MTW", "MTN", "MTS", "MNM", "MNO", "MNW", "MNN", "MNS")
+
+for (logger in logger_names) {
+  assign(logger, get(logger) %>% 
+           filter(DateTime >= cutoff_start & DateTime <= cutoff_end))
+}
+```
+
+hier fehlt noch die überprüfung, ob bei der NA entfernung sachen gelöscht wurde, die eigentlich drin sien sollten, also zb wo ein logger mal aus versehen nur temp aufgezeichnet hat, aber nicht die lichtinitensität. ich denke, man könnte einfach schauen, wo die NAs sind und wenn sie nur am ende sind, dann sollte alles gut sein. wenn es NAs irgendwo mittendrin gibt, dann nicht!
+
+```{r}
+#entfernen von Zeilen ohne Messwerte (entstanden durch Auslesen der Logger)
+#messwert_spalten <- c("Temp_sonne_C", "Licht_lux", "Temp_schatten_C", "relLF_percent", "Taupunkt_C")
+
+#for (logger in logger_names) {
+  # Tabelle holen, filtern, wieder zurückschreiben
+  #assign(logger, get(logger) %>% 
+           #filter(!if_all(all_of(messwert_spalten), is.na)))
+#}
+
+```
+
+```{r}
+#Zusammenführen als Masterdatensatz
+all_loggers <- bind_rows(lapply(logger_names, get))
+str(all_loggers)
+
+```
+
+### Fehlende Daten per Model erzeugen
+
+Fehlende Messwerte identifizieren
+
+```{r}
+# Zeitspalte korrekt formatieren
+all_loggers <- all_loggers %>%
+  mutate(DateTime = as.POSIXct(DateTime, format="%Y-%m-%d %H:%M:%S")) %>%
+  filter(DateTime >= as.POSIXct("2025-05-08 00:00:00") &
+         DateTime <= as.POSIXct("2025-09-30 23:59:59"))
+
+# Alle Logger und Standorte explizit bestimmen
+logger_list <- all_loggers %>% 
+  distinct(Standort, Logger, Logger_ID)
+
+# Zeitreihe erstellen: alle 10 Minuten vom 08.05 bis 30.09.2025
+zeitpunkte <- tibble(DateTime = seq(
+  from = as.POSIXct("2025-05-08 00:00:00"),
+  to   = as.POSIXct("2025-09-30 23:50:00"),
+  by   = "10 min"
+))
+
+# Kreuzprodukt
+voller_raster <- tidyr::crossing(logger_list, zeitpunkte)
+
+# Originaldaten einfügen
+all_loggers_complete <- voller_raster %>%
+  left_join(all_loggers, by = c("Standort", "Logger", "Logger_ID", "DateTime")) %>%
+  # Filter auf gewünschten Zeitraum (sicherstellen)
+  filter(DateTime >= as.POSIXct("2025-05-08 00:00:00") &
+         DateTime <= as.POSIXct("2025-09-30 23:50:00"))
+
+
+
+# Fehlende Werte pro Zeile zählen (mindestens eine Messgröße fehlt)
+fehlende_zeitpunkte <- all_loggers_complete %>%
+  mutate(Anzahl_NA = rowSums(is.na(select(., Temp_sonne_C, Licht_lux, Temp_schatten_C,
+                                         relLF_percent, Taupunkt_C)))) %>%
+  filter(Anzahl_NA > 0)  # Zeilen, bei denen mindestens eine Messgröße fehlt
+
+# Zusammenfassung pro Logger und Standort
+fehlende_werte_summary <- fehlende_zeitpunkte %>%
+  group_by(Standort, Logger, Logger_ID) %>%
+  summarise(
+    Temp_sonne_C_missing    = sum(is.na(Temp_sonne_C)),
+    Licht_lux_missing       = sum(is.na(Licht_lux)),
+    Temp_schatten_C_missing = sum(is.na(Temp_schatten_C)),
+    relLF_percent_missing   = sum(is.na(relLF_percent)),
+    Taupunkt_C_missing      = sum(is.na(Taupunkt_C)),
+    Gesamt_fehlend          = n(),   # alle Zeilen mit mindestens einem fehlenden Wert
+    .groups = "drop"
+  ) %>%
+  arrange(Standort, Logger, Logger_ID)
+```
+
+Mittels Modell Messwerte schätzen/erzeugen
+
+```{r}
+#install.packages("mice")
+library(mice)
+
+# Tabelle nur mit den Loggern von MT
+MT_data_complete <- all_loggers_complete %>%
+  filter(Standort == "MT")
+
+# Meta-Daten speichern
+meta <- MT_data_complete %>%
+  select(DateTime, Logger, Logger_ID, Standort)
+
+# Nur Messwerte auswählen (müssen numeric sein)
+numeric_cols <- MT_data_complete %>%
+  select(-DateTime, -Logger, -Logger_ID, -Standort)
+
+# Vor der Imputation Flag setzen
+numeric_cols_flag <- numeric_cols %>%
+  mutate(across(everything(), ~is.na(.)))  # TRUE = fehlend
+
+# Imputation mit mice durchführen
+# method = "pmm" = predictive mean matching
+imputed_data <- mice(numeric_cols, m = 1, method = "pmm", maxit = 5, seed = 123)
+completed_data <- complete(imputed_data)
+
+# Ergebnisse wieder zusammenfügen
+MT_data_imputed <- cbind(meta, completed_data)
+
+# Flag hinzufügen
+imputation_flag <- cbind(meta, numeric_cols_flag)
+
+```
+
+# 4 Temperaturen
+
+## 4.1 Tagesmitteltemperaturen
+
+```{r}
+#Berechnung der Tagesmitteltemperatur pro Logger in einer separaten Tabelle 
+
+# Datum ohne Uhrzeit erzeugen, Mittelwerte gruppiert nach Loggerstandort und Tag erzeugen 
+daily_logger_means <- all_loggers %>%
+  mutate(Datum = as.Date(DateTime)) %>%       
+  group_by(Logger_ID, Datum) %>%              
+  summarise(
+    # Fläche und Logger vom ersten Eintrag des Tages übernehmen
+    Standort = first(Standort),
+    Logger = first(Logger),
+
+    Temp_sonne_mean = mean(Temp_sonne_C, na.rm = TRUE),
+    Temp_schatten_mean = mean(Temp_schatten_C, na.rm = TRUE),
+    .groups = "drop"
+  ) %>%
+  select(Logger_ID, Standort, Logger, Datum, everything())
+
+summary(daily_logger_means)
+```
+
+```{r}
+#Minimum & Maximum der Temperaturmittelwerte für die einzelnen Logger 
+daily_logger_means_min_max <- daily_logger_means %>%
+  group_by(Logger_ID) %>%
+  summarise(
+    # Sonne
+    Sonne_max_mean = max(Temp_sonne_mean, na.rm = TRUE),
+    Sonne_max_mean_Tag = Datum[which.max(Temp_sonne_mean)],
+    Sonne_min_mean = min(Temp_sonne_mean, na.rm = TRUE),
+    Sonne_min_mean_Tag = Datum[which.min(Temp_sonne_mean)],
+
+    # Schatten
+    Schatten_max_mean = max(Temp_schatten_mean, na.rm = TRUE),
+    Schatten_max_mean_Tag = Datum[which.max(Temp_schatten_mean)],
+    Schatten_min_mean = min(Temp_schatten_mean, na.rm = TRUE),
+    Schatten_min_mean_Tag = Datum[which.min(Temp_schatten_mean)]
+  )
+```
+
+## 4.2 Boxplots
+
+```{r}
+#Boxplots - Vergleich der Logger der einzelnen Flächen (nur der äußere Logger oder der innere)
+
+# Filter für Standort L und die gewünschten Logger
+df_plot <- daily_logger_means %>%
+  filter(Standort == "L", Logger %in% c("M", "N", "O", "S", "W"))
+
+# Boxplot erstellen
+ggplot(df_plot, aes(x = Logger, y = Temp_sonne_mean, fill = Logger)) +
+  geom_boxplot() +
+  labs(
+    title = "Vergleich der Tagesmittelwerte des äußeren Sensors pro Logger - Lichtenau",
+    x = "Loggerstandort",
+    y = "Tagesmitteltemperatur (°C)"
+  ) +
+  theme_minimal() +
+  theme(legend.position = "none") 
+```
+
+```{r}
+# eben erzeugter Plot für alle 3 Flächen
+df_plot <- daily_logger_means %>%
+  filter(Standort %in% c("L", "MN", "MT"),
+         Logger %in% c("M", "N", "O", "S", "W"))
+
+ggplot(df_plot, aes(x = Logger, y = Temp_sonne_mean, fill = Logger)) +
+  geom_boxplot() +
+  labs(
+    title = "Vergleich der Tagesmittelwerte des äußeren Sensors pro Logger",
+    x = "Loggerstandort",
+    y = "Tagesmitteltemperatur (°C)"
+  ) +
+  theme_minimal() +
+  theme(legend.position = "none") +
+  facet_wrap(~Standort, ncol = 1, scales = "free_y")
+
+ggsave("boxplot_temp_mean_loggers.png", width = 6, height = 20) 
+```
+
+```{r}
+#Boxplots - Vergleich der Logger der einzelnen Flächen (äußerer und innerer Logger)
+# Filter für Standort L und die gewünschten Logger
+df_plot <- daily_logger_means %>%
+  filter(Standort == "L", Logger %in% c("M", "N", "O", "S", "W")) %>%
+  # In langes Format bringen: Sonne / Schatten
+  pivot_longer(
+    cols = c(Temp_sonne_mean, Temp_schatten_mean),
+    names_to = "Licht",
+    values_to = "Temperatur"
+  ) %>%
+  mutate(Licht = recode(Licht,
+                        Temp_sonne_mean = "Außen",
+                        Temp_schatten_mean = "Innen"))
+
+# Boxplot erstellen, Sonne und Schatten nebeneinander pro Logger
+ggplot(df_plot, aes(x = Logger, y = Temperatur, fill = Licht)) +
+  geom_boxplot(position = position_dodge(width = 0.8)) +
+  labs(
+    title = "Vergleich der Tagesmittelwerte der äußeren und inneren Sensoren pro Logger - Lichtenau",
+    x = "Logger",
+    y = "Tagesmitteltemperatur (°C)",
+    fill = "Sensorposition"
+  ) +
+  theme_minimal()
+```
+
+## 4.3 Extremwerte pro Logger
+
+```{r}
+# Mittelwerte gruppiert nach Loggerstandort und Tag erzeugen, zusätzlich Min & Max Temperatur am Tag 
+daily_logger_summary <- all_loggers %>%
+  mutate(Datum = as.Date(DateTime)) %>%
+  group_by(Logger_ID, Datum) %>%
+  summarise(
+    Temp_sonne_mean = mean(Temp_sonne_C, na.rm = TRUE),
+    Temp_schatten_mean = mean(Temp_schatten_C, na.rm = TRUE),
+
+    Temp_sonne_max = ifelse(
+      all(is.na(Temp_sonne_C)), NA,
+      max(Temp_sonne_C, na.rm = TRUE)
+    ),
+    Temp_sonne_min = ifelse(
+      all(is.na(Temp_sonne_C)), NA,
+      min(Temp_sonne_C, na.rm = TRUE)
+    ),
+
+    Temp_schatten_max = ifelse(
+      all(is.na(Temp_schatten_C)), NA,
+      max(Temp_schatten_C, na.rm = TRUE)
+    ),
+    Temp_schatten_min = ifelse(
+      all(is.na(Temp_schatten_C)), NA,
+      min(Temp_schatten_C, na.rm = TRUE)
+    ),
+    .groups = "drop"
+  )
+
+
+#Separate Tabelle um anzeigen zu lassen, zu welcher Uhrzeit die Min & Max Werte gemessen wurden
+daily_logger_extrema <- all_loggers %>%
+  mutate(Datum = as.Date(DateTime)) %>%
+  group_by(Logger_ID, Datum) %>%
+  summarise(
+
+    ## ===== SONNE =====
+    Temp_sonne_max =
+      if (all(is.na(Temp_sonne_C))) NA_real_
+      else max(Temp_sonne_C, na.rm = TRUE),
+
+    Time_sonne_max =
+      if (all(is.na(Temp_sonne_C))) as.POSIXct(NA)
+      else DateTime[which.max(Temp_sonne_C)],
+
+    Temp_sonne_min =
+      if (all(is.na(Temp_sonne_C))) NA_real_
+      else min(Temp_sonne_C, na.rm = TRUE),
+
+    Time_sonne_min =
+      if (all(is.na(Temp_sonne_C))) as.POSIXct(NA)
+      else DateTime[which.min(Temp_sonne_C)],
+
+    ## ===== SCHATTEN =====
+    Temp_schatten_max =
+      if (all(is.na(Temp_schatten_C))) NA_real_
+      else max(Temp_schatten_C, na.rm = TRUE),
+
+    Time_schatten_max =
+      if (all(is.na(Temp_schatten_C))) as.POSIXct(NA)
+      else DateTime[which.max(Temp_schatten_C)],
+
+    Temp_schatten_min =
+      if (all(is.na(Temp_schatten_C))) NA_real_
+      else min(Temp_schatten_C, na.rm = TRUE),
+
+    Time_schatten_min =
+      if (all(is.na(Temp_schatten_C))) as.POSIXct(NA)
+      else DateTime[which.min(Temp_schatten_C)],
+    .groups = "drop"
+  )
+
+#Auswertung
+extrema_logger <- daily_logger_extrema %>%
+  group_by(Logger_ID) %>%
+  summarise(
+    # Sonne
+    Sonne_max = max(Temp_sonne_max, na.rm = TRUE),
+    Sonne_max_Zeit = Time_sonne_max[which.max(Temp_sonne_max)],
+
+    Sonne_min = min(Temp_sonne_min, na.rm = TRUE),
+    Sonne_min_Zeit = Time_sonne_min[which.min(Temp_sonne_min)],
+
+    # Schatten
+    Schatten_max = max(Temp_schatten_max, na.rm = TRUE),
+    Schatten_max_Zeit = Time_schatten_max[which.max(Temp_schatten_max)],
+
+    Schatten_min = min(Temp_schatten_min, na.rm = TRUE),
+    Schatten_min_Zeit = Time_schatten_min[which.min(Temp_schatten_min)]
+  )
+```
+
+## 4.4 Temperaturen im Jahresverlauf
+
+```{r}
+#Mittelwerte für jede Fläche bilden
+area_mean <- daily_logger_means %>%
+  group_by(Standort, Datum) %>%
+  summarise(
+    Temp_sonne_area_mean = mean(Temp_sonne_mean, na.rm = TRUE),
+    Temp_schatten_area_mean = mean(Temp_schatten_mean, na.rm = TRUE),
+    .groups = "drop"
+  )
+summary(area_mean)
+
+ggplot(area_mean, aes(x = Datum, 
+                      y = Temp_sonne_area_mean, 
+                      color = Standort)) +
+  geom_line(linewidth = 1) +
+  labs(
+    title = "Tagesmitteltemperatur (Sonne) pro Standort",
+    x = "Datum",
+    y = "Flächenmittel Temperatur (°C)",
+    color = "Standort"
+  ) +
+  theme_minimal() +
+  theme(
+    plot.title = element_text(hjust = 0.5)
+  )
+ggsave("area_mean_temp_in_year.png", width = 20, height = 6) 
+```
+
+# 5 luftfeuchte?
+
+ich hab keine lust, den code für jedes parameter zu copy pasten
+
+ich will eine tablle daily_logger_means machen, die mittelwerte von temp_sonne, temp_schatten, luftfeuchte, licht und taupukt direkt in einem hat\
+aus dieser tabelle können wir dann wieder die extremwerttabelle machen und die plots\
+ich probiere erstmal aus, ob das funktioniert. deswegen betrachte 5. mal als testfeld :)
+
+überlegung: ich brauche ne stabdard deviation und vlt auch range (max-min). ist das sinnvoll, das für jeden tag für jeden logger zu machen? oder kann ich (zusätzlich) auch noch für jeden einzelnen logger herausfinden, was an diesem konkreten punkt die jahresmitteltemp, usw sind und dazu sd und range? ist das sinnvoll? denn die werte schwanken ja ganz klar im jahresverlauf... aber grade range und sd wären ja auch übers ganze jahr spannend\
+ich werd wohl beides mal machen
+
+## 5.1 Tagesmittel
+
+```{r}
+#Berechnung der Tagesmittelwerte pro Logger in einer neuen Tabelle 
+
+# Datum ohne Uhrzeit erzeugen, Mittelwerte gruppiert nach Loggerstandort und Tag erzeugen 
+daily_logger_means <- all_loggers %>%
+  mutate(Datum = as.Date(DateTime)) %>%       
+  group_by(Logger_ID, Datum) %>%              
+  summarise(
+    # Fläche und Logger vom ersten Eintrag des Tages übernehmen
+    Standort = first(Standort),
+    Logger = first(Logger),
+
+    Temp_sonne_mean = mean(Temp_sonne_C, na.rm = TRUE),
+    Temp_schatten_mean = mean(Temp_schatten_C, na.rm = TRUE),
+    Licht_mean = mean(Licht_lux, na.rm =T),
+    rLF_mean = mean(relLF_percent, na.rm =T),
+    Tp_mean = mean(Taupunkt_C, na.rm=T),
+    .groups = "drop"
+  ) %>%
+  select(Logger_ID, Standort, Logger, Datum, everything())
+
+summary(daily_logger_means)
+```
+
+hier kommt noch dieses codechunk im original: #Minimum & Maximum der Temperaturmittelwerte für die einzelnen Logger
+
+## Tagesextrema
+
+```{r}
+# Mittelwerte gruppiert nach Loggerstandort und Tag erzeugen, zusätzlich Min & Max Temperatur am Tag 
+daily_logger_summary <- all_loggers %>%
+  mutate(Datum = as.Date(DateTime)) %>%
+  group_by(Logger_ID, Datum) %>%
+  summarise(
+    Temp_sonne_mean = mean(Temp_sonne_C),
+    Temp_sonne_max = max(Temp_sonne_C),
+    Temp_sonne_min = min(Temp_sonne_C),
+    
+    Temp_schatten_mean = mean(Temp_schatten_C),
+    Temp_schatten_max =  max(Temp_schatten_C),
+    Temp_schatten_min = min(Temp_schatten_C),
+    
+    Licht_mean = mean(Licht_lux),
+    Licht_max = max(Licht_lux),
+    Licht_min = min(Licht_lux),
+    
+    rLF_mean = mean(relLF_percent),
+    rLF_max = max(relLF_percent),
+    rLF_min = min(relLF_percent),
+    
+    Tp_mean = mean(Taupunkt_C),
+    Tp_max = max(Taupunkt_C),
+    Tp_min = min(Taupunkt_C),
+    
+    .groups = "drop"
+  )
+
+summary(daily_logger_summary)
+  
+```
+
+data by logger
+
+```{r}
+logger_year <- all_loggers %>%
+  group_by(Logger_ID) %>%
+  summarise(
+    Tempsonne_Jahresmittel = mean(Temp_sonne_C, na.rm = TRUE),
+    Tempsonne_Jahres_sd = sd(Temp_sonne_C, na.rm = TRUE),
+    Tempsonne_Jahres_min = min(Temp_sonne_C, na.rm = TRUE),
+    Tempsonne_Jahres_max = max(Temp_sonne_C, na.rm = TRUE),
+    Tempsonne_Jahres_range = Tempsonne_Jahres_max - Tempsonne_Jahres_min,
+    
+    Tempschatten_Jahresmittel = mean(Temp_schatten_C, na.rm = TRUE),
+    Tempschatten_Jahres_sd = sd(Temp_schatten_C, na.rm = TRUE),
+    Tempschatten_Jahres_min = min(Temp_schatten_C, na.rm = TRUE),
+    Tempschatten_Jahres_max = max(Temp_schatten_C, na.rm = TRUE),
+    Tempschatten_Jahres_range = Tempschatten_Jahres_max - Tempschatten_Jahres_min,
+    
+    Licht_Jahresmittel = mean(Licht_lux, na.rm = TRUE),
+    Licht_Jahres_sd = sd(Licht_lux, na.rm = TRUE),
+    Licht_Jahres_min = min(Licht_lux, na.rm = TRUE),
+    Licht_Jahres_max = max(Licht_lux, na.rm = TRUE),
+    Licht_Jahres_range = Licht_Jahres_max - Licht_Jahres_min,
+    
+    rLF_Jahresmittel = mean(relLF_percent, na.rm = TRUE),
+    rLF_Jahres_sd = sd(relLF_percent, na.rm = TRUE),
+    rLF_Jahres_min = min(relLF_percent, na.rm = TRUE),
+    rLF_Jahres_max = max(relLF_percent, na.rm = TRUE),
+    rLF_Jahres_range = rLF_Jahres_max - rLF_Jahres_min,
+    
+    Tp_Jahresmittel = mean(Taupunkt_C, na.rm = TRUE),
+    Tp_Jahres_sd = sd(Taupunkt_C, na.rm = TRUE),
+    Tp_Jahres_min = min(Taupunkt_C, na.rm = TRUE),
+    Tp_Jahres_max = max(Taupunkt_C, na.rm = TRUE),
+    Tp_Jahres_range = Tp_Jahres_max - Tp_Jahres_min,
+    
+    .groups = "drop"
+  )
+
+summary(logger_year)
+```
