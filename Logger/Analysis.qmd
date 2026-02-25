@@ -302,6 +302,11 @@ for (logger in logger_names) {
 
 hier fehlt noch die überprüfung, ob bei der NA entfernung sachen gelöscht wurde, die eigentlich drin sien sollten, also zb wo ein logger mal aus versehen nur temp aufgezeichnet hat, aber nicht die lichtinitensität. ich denke, man könnte einfach schauen, wo die NAs sind und wenn sie nur am ende sind, dann sollte alles gut sein. wenn es NAs irgendwo mittendrin gibt, dann nicht!
 
+vorallem super wichtig wegen fehlender messwerte bei den lücken von 7 wochen\
+daher ohne inerpolation:
+
+#do not run
+
 ```{r}
 #entfernen von Zeilen ohne Messwerte (entstanden durch Auslesen der Logger)
 messwert_spalten <- c("Temp_sonne_C", "Licht_lux", "Temp_schatten_C", "relLF_percent", "Taupunkt_C")
@@ -576,6 +581,8 @@ ich werd wohl beides mal machen
 
 ## 5.1 Tagesmittel
 
+#ist quasi schon in daily_logger_summary enthalten
+
 ```{r}
 #Berechnung der Tagesmittelwerte pro Logger in einer neuen Tabelle 
 
@@ -588,8 +595,8 @@ daily_logger_means <- all_loggers %>%
     Standort = first(Standort),
     Logger = first(Logger),
 
-    Temp_sonne_mean = mean(Temp_sonne_C, na.rm = TRUE),
-    Temp_schatten_mean = mean(Temp_schatten_C, na.rm = TRUE),
+    Temp_sonne_mean = mean(Temp_sonne_C, na.rm = T),
+    Temp_schatten_mean = mean(Temp_schatten_C, na.rm = T),
     Licht_mean = mean(Licht_lux, na.rm =T),
     rLF_mean = mean(relLF_percent, na.rm =T),
     Tp_mean = mean(Taupunkt_C, na.rm=T),
@@ -610,25 +617,35 @@ daily_logger_summary <- all_loggers %>%
   mutate(Datum = as.Date(DateTime)) %>%
   group_by(Logger_ID, Datum) %>%
   summarise(
-    Temp_sonne_mean = mean(Temp_sonne_C),
-    Temp_sonne_max = max(Temp_sonne_C),
-    Temp_sonne_min = min(Temp_sonne_C),
+    Temp_sonne_mean = mean(Temp_sonne_C, na.rm = T),
+    Temp_sonne_max = max(Temp_sonne_C, na.rm = T),
+    Temp_sonne_min = min(Temp_sonne_C, na.rm = T),
+    Temp_sonne_sd = sd(Temp_sonne_C, na.rm = T),
+    Temp_sonne_range = Temp_sonne_max - Temp_sonne_min,
     
-    Temp_schatten_mean = mean(Temp_schatten_C),
-    Temp_schatten_max =  max(Temp_schatten_C),
-    Temp_schatten_min = min(Temp_schatten_C),
+    Temp_schatten_mean = mean(Temp_schatten_C, na.rm = T),
+    Temp_schatten_max =  max(Temp_schatten_C, na.rm = T),
+    Temp_schatten_min = min(Temp_schatten_C, na.rm = T),
+    Temp_schatten_sd = sd(Temp_schatten_C, na.rm = T),
+    Temp_schatten_range = Temp_schatten_max - Temp_schatten_min,
     
-    Licht_mean = mean(Licht_lux),
-    Licht_max = max(Licht_lux),
-    Licht_min = min(Licht_lux),
+    Licht_mean = mean(Licht_lux, na.rm = T),
+    Licht_max = max(Licht_lux, na.rm = T),
+    Licht_min = min(Licht_lux, na.rm = T),
+    Licht_sd = sd(Licht_lux, na.rm = T),
+    Licht_range = Licht_max - Licht_min,
     
-    rLF_mean = mean(relLF_percent),
-    rLF_max = max(relLF_percent),
-    rLF_min = min(relLF_percent),
+    rLF_mean = mean(relLF_percent, na.rm = T),
+    rLF_max = max(relLF_percent, na.rm = T),
+    rLF_min = min(relLF_percent, na.rm = T),
+    rLF_sd = sd(relLF_percent, na.rm = T),
+    rLF_range = rLF_max - rLF_min,
     
-    Tp_mean = mean(Taupunkt_C),
-    Tp_max = max(Taupunkt_C),
-    Tp_min = min(Taupunkt_C),
+    Tp_mean = mean(Taupunkt_C, na.rm = T),
+    Tp_max = max(Taupunkt_C, na.rm = T),
+    Tp_min = min(Taupunkt_C, na.rm = T),
+    Tp_sd = sd(Taupunkt_C, na.rm = T),
+    Tp_range = Tp_max - Tp_min,
     
     .groups = "drop"
   )
@@ -677,4 +694,30 @@ logger_year <- all_loggers %>%
   )
 
 summary(logger_year)
+```
+
+für die Weiterarbeit ist es vlt auch nice, die einzelnen parameter zu haben, da zb daily_logger_summary eine sehr riesige tabelle ist
+
+dabei kann man je nach parameter noch weitere spannende infos rausfinden
+
+```{r}
+# Licht
+#hier wäre es für die Mittelwerte mal spannend die Nacht (0 lux) auszuklammern und nur die Tagwerte anzuschauen, dazu die Sonnenscheindauer pro Tag bei jedem Logger
+# um Mondlicht auszuschließen ist Sonnenaufgang/Untergang bei 1 lux als Grenzwert festgelegt
+licht <- all_loggers %>%
+  mutate(Datum = as.Date(DateTime)) %>%
+  group_by(Logger_ID, Datum) %>%
+  summarise(
+    Licht_mean = mean(Licht_lux, na.rm = T),
+    Licht_max = max(Licht_lux, na.rm = T),
+    Licht_min = min(Licht_lux, na.rm = T),
+    Licht_sd = sd(Licht_lux, na.rm = T),
+    Licht_range = Licht_max - Licht_min,
+    Licht_mean_day = mean(Licht_lux[Licht_lux>1], na.rm =T),
+    Sonnenaufgang = min(DateTime[Licht_lux > 1], na.rm = TRUE),
+    Sonnenuntergang  = max(DateTime[Licht_lux > 1], na.rm = TRUE),
+    Tageslicht = as.numeric(difftime(Sonnenuntergang, Sonnenaufgang, units = "hours")),
+    .groups = "drop")
+      
+summary(licht)
 ```
