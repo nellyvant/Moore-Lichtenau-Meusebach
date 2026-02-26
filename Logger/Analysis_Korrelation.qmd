@@ -397,7 +397,7 @@ round(cor_mat, 2)
 ## 4.1 Lineares Modell 
 
 ```{r}
-###### Meusebach trocken - Mitte Logger: fehlende Daten für inneren & äußeren Logger
+###### Meusebach trocken - Mitte Logger: fehlende Daten für "Temp_sonne_C"
 
 # 1. Variable, die analysiert werden soll
 var <- "Temp_sonne_C"  
@@ -454,14 +454,10 @@ wide$MTM_filled <- ifelse(
 
 # 6. Validierung simulieren, zufällig 2000 bekannte MTM-Werte auswählen, um sie als "fehlend" zu markieren -> Vorhersagen -> messen, wie stark die Vorhersagen von den echten Werten abweichen
 set.seed(42)  
-
 idx <- sample(which(!is.na(wide$MTM)), 2000)
-
 wide_test <- wide
 wide_test$MTM[idx] <- NA
-
 pred_test <- predict(mod, newdata = wide_test)
-
 rmse <- sqrt(mean(
   (pred_test[idx] - wide$MTM[idx])^2
 ))
@@ -487,8 +483,8 @@ wide <- all_loggers %>%
   arrange(DateTime)
 
 # Zeitliche Features hinzufügen
-wide$Hour <- as.numeric(format(wide$DateTime, "%H"))       # Stunde des Tages (0-23), 0 = 24.00/ 0 Uhr 
-wide$Weekday <- as.factor(weekdays(wide$DateTime))         # Wochentag als Faktor
+wide$Hour <- as.numeric(format(wide$DateTime, "%H"))       # Stunde des Tages (0-23), 0 = 24.00/ 00.00 Uhr 
+wide$Weekday <- as.factor(weekdays(wide$DateTime))         
 wide$DayOfYear <- as.numeric(format(wide$DateTime, "%j"))  # Tag im Jahr (1-366)
 
 # Optional: Modell erkennt, dass 23 → 0 → 1 ein kontinuierlicher Tageszyklus ist
@@ -516,12 +512,9 @@ wide$MTM_filled <- ifelse(
 # RMSE validieren
 set.seed(42)
 idx <- sample(which(!is.na(wide$MTM)), 2000)
-
 wide_test <- wide
 wide_test$MTM[idx] <- NA
-
 pred_test <- predict(mod, newdata = wide_test)
-
 rmse <- sqrt(mean(
   (pred_test[idx] - wide$MTM[idx])^2
 ))
@@ -549,8 +542,6 @@ wide <- all_loggers %>%
 wide$Hour <- as.numeric(format(wide$DateTime, "%H"))
 wide$Weekday <- as.factor(weekdays(wide$DateTime))
 wide$DayOfYear <- as.numeric(format(wide$DateTime, "%j"))
-
-# Optional: Modell erkennt, dass 23 → 0 → 1 ein kontinuierlicher Tageszyklus ist
 wide$Hour_sin <- sin(2 * pi * wide$Hour / 24)
 wide$Hour_cos <- cos(2 * pi * wide$Hour / 24)
 
@@ -561,14 +552,16 @@ train <- wide %>%
 mod_rf <- randomForest(
   MTM ~ MTN + MTS + MTO + Hour_sin + Hour_cos + Weekday + DayOfYear,
   data = train,
-  ntree = 500,        # Anzahl Bäume
-  mtry = 3,           # Anzahl Features, die jeder Baum zufällig auswählt (Standard ist sqrt(#Features))
+  ntree = 500,        # je mehr, desto stabiler ist das Model
+  mtry = 3,           
   importance = TRUE   
 )
 
-# Modellübersicht
+# Modellübersicht -> man kann ableiten, wie wichtig die einzelnen Features waren (also: MTN, MTS, Hour_sin,Weekday, DayOfYear ...)
 mod_rf
 importance(mod_rf)
+# %IncMSE zeigt an, wie stark der Fehler steigt, wenn ein Feature zufällig permutiert wird -> Je höher der Wert, desto wichtiger ist das Feature für die Gesamtvorhersage
+# NodePurity sagt strukturbezogen, wie wichtig ein Feature für die Baumaufteilung ist
 
 pred_rf <- predict(mod_rf, newdata = wide)
 wide$MTM_filled_rf <- ifelse(
@@ -589,7 +582,27 @@ rmse_rf <- sqrt(mean(
 rmse_rf # deutlich besser !!!! random Modell besser als lineares 
 ```
 
-## 4.2 MissForest (kann fehlende Messgrößen in mehreren Loggern erkennen und schätzen, aber ungenauere Vorhersage)
+```{r}
+# erzeugte Daten wieder in die Originaltabelle einfügen 
+mtm_filled_long <- wide %>%
+  select(DateTime, MTM_filled_rf) %>%
+  rename(Temp_sonne_C_filled = MTM_filled_rf) %>%
+  mutate(Logger_ID = "MTM")
+
+all_loggers_filled <- all_loggers_complete %>%
+  left_join(mtm_filled_long,
+            by = c("DateTime", "Logger_ID")) %>%
+  mutate(
+    Temp_sonne_C = ifelse(
+      Logger_ID == "MTM" & is.na(Temp_sonne_C),
+      Temp_sonne_C_filled,
+      Temp_sonne_C
+    )
+  ) %>%
+  select(-Temp_sonne_C_filled)
+```
+
+## 4.2 MissForest (kann fehlende Messgrößen in mehreren Loggern erkennen und schätzen, aber ungenauere Vorhersage!!)
 
 ```{r}
 library(missForest)
