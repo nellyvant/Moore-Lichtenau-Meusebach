@@ -321,7 +321,108 @@ str(all_loggers)
 
 ```
 
-### Fehlende Daten per Model erzeugen
+# Fehlende Daten per Korrelation/ Modell erzeugen
+
+```{r}
+# welche der fehlenden Messwerte sind mit welchen vorhandenen am stärksten korreliert 
+df <- all_loggers %>%
+  filter(
+    Logger_ID == "LM",
+    Standort == "L"
+  ) %>%
+  select(
+    Temp_sonne_C,
+    Temp_schatten_C,
+    relLF_percent,
+    Taupunkt_C,
+    Licht_lux
+  ) %>%
+  na.omit()
+
+cor_mat <- cor(df)
+round(cor_mat, 2)
+
+```
+
+## Meusebach trocken - Logger Mitte (Bsp. Temp)
+
+```{r}
+###### Meusebach trocken - Mitte Logger: fehlende Daten für inneren & äußeren Logger
+
+# 1. Variable, die analysiert werden soll
+var <- "Temp_sonne_C"  
+
+# 2. Datensatz für einen bestimmten Standort vorbereiten
+wide <- all_loggers %>%
+  select(DateTime, Standort, Logger_ID, all_of(var)) %>%
+  # Nur Zeilen für den Standort "MT" behalten
+  filter(Standort == "MT") %>%
+  # Lange Tabelle in breite Tabelle umwandeln: eine Spalte pro Logger_ID
+  pivot_wider(names_from = Logger_ID,
+              values_from = all_of(var)) %>%
+  # Nach Datum/Uhrzeit sortieren
+  arrange(DateTime)
+
+# 3. Korrelationsmatrix der Logger-Spalten berechnen
+# Nur numerische Spalten auswählen
+cor_mat <- cor(
+  wide %>% select(where(is.numeric)),
+  use = "pairwise.complete.obs"
+)
+
+# 4. Korrelationsmatrix auf 2 Nachkommastellen runden
+round(cor_mat, 2)
+
+# 5. Korrelationswerte für Logger "MTM" sortiert
+sort(cor_mat["MTM", ], decreasing = TRUE)
+```
+
+```{r}
+# 1. Aus dem 'wide'-Datensatz werden alle Zeilen ausgewählt, bei denen 'MTM' nicht NA ist.
+train <- wide %>%
+  filter(!is.na(MTM))
+
+# 2. Lineares Regressionsmodell erstellen
+# 'MTM' wird als abhängige Variable genommen, 
+# und 'MTN', 'MTS' und 'MTO' als unabhängige Variablen.
+mod <- lm(MTM ~ MTN + MTS + MTO, data = train)
+
+# 3. Zusammenfassung des Modells anzeigen
+# relativ gute R² Werte, ca. 0.95
+summary(mod)
+
+# 4. Vorhersagen für alle Zeilen im Datensatz erstellen
+pred <- predict(mod, newdata = wide)
+
+# 5. Fehlende Werte in 'MTM' auffüllen
+# Wenn 'MTM' NA ist, wird der vorhergesagte Wert genommen, sonst bleibt der Originalwert
+wide$MTM_filled <- ifelse(
+  is.na(wide$MTM),
+  pred,
+  wide$MTM
+)
+
+# 6. Validierung simulieren, zufällig 2000 bekannte MTM-Werte auswählen, um sie als "fehlend" zu markieren -> Vorhersagen -> messen, wie stark die Vorhersagen von den echten Werten abweichen
+set.seed(42)  
+
+idx <- sample(which(!is.na(wide$MTM)), 2000)
+
+wide_test <- wide
+wide_test$MTM[idx] <- NA
+
+pred_test <- predict(mod, newdata = wide_test)
+
+rmse <- sqrt(mean(
+  (pred_test[idx] - wide$MTM[idx])^2
+))
+
+rmse # desto kleiner, umso besser -> 2,374
+# Standardabweichung von MTM berechnen -> 10,62
+sd_MTM <- sd(wide$MTM, na.rm = TRUE)
+sd_MTM
+```
+
+### Fehlende Daten per Modell erzeugen
 
 Fehlende Messwerte identifizieren
 
@@ -372,7 +473,39 @@ fehlende_werte_summary <- fehlende_zeitpunkte %>%
   arrange(Standort, Logger, Logger_ID)
 ```
 
-Mittels Modell Messwerte schätzen/erzeugen
+```{r}
+# Tabelle mit allen Daten des Standortes MT erzeugen
+MT_data <- all_loggers_complete %>%
+  filter(Standort == "MT")
+
+# Daten mittels Model berechnen - Bsp. MTW
+#install.packages("missForest")
+library(missForest)
+
+# MT-Daten auswählen
+# Angenommen MTW enthält alle Logger-Messungen von MTW
+MT_data <- MT_data %>%
+  mutate(DateTime = as.POSIXct(DateTime, format="%Y-%m-%d %H:%M:%S"))
+
+# Meta-Daten speichern (nicht imputieren)
+meta <- MT_data %>%
+  select(DateTime, Standort, Logger, Logger_ID)
+
+# Nur numerische Messwerte auswählen für MissForest
+numeric_cols <- MT_data %>%
+  select(-DateTime, -Standort, -Logger, -Logger_ID) %>%
+  mutate(across(everything(), as.numeric))
+
+# MissForest Imputation durchführen
+set.seed(123)  # für Reproduzierbarkeit
+imputed <- missForest(numeric_cols)
+
+# Ergebnisse wieder zusammenführen
+MTW_imputed <- cbind(meta, imputed$ximp)
+
+```
+
+Mittels Mice Messwerte schätzen/erzeugen
 
 Es lernt nur aus sich selbst, nicht aus den anderen Loggern
 
@@ -458,356 +591,4 @@ plot(imputed_data)
 imputed_data$predictorMatrix
 densityplot(imputed_data)
 
-```
-
-# 4 Temperaturen
-
-## 4.1 Tagesmitteltemperaturen
-
-```{r}
-#Berechnung der Tagesmitteltemperatur pro Logger in einer separaten Tabelle 
-
-# Datum ohne Uhrzeit erzeugen, Mittelwerte gruppiert nach Loggerstandort und Tag erzeugen 
-daily_logger_means <- all_loggers %>%
-  mutate(Datum = as.Date(DateTime)) %>%       
-  group_by(Logger_ID, Datum) %>%              
-  summarise(
-    # Fläche und Logger vom ersten Eintrag des Tages übernehmen
-    Standort = first(Standort),
-    Logger = first(Logger),
-
-    Temp_sonne_mean = mean(Temp_sonne_C, na.rm = TRUE),
-    Temp_schatten_mean = mean(Temp_schatten_C, na.rm = TRUE),
-    .groups = "drop"
-  ) %>%
-  select(Logger_ID, Standort, Logger, Datum, everything())
-
-summary(daily_logger_means)
-```
-
-```{r}
-#Minimum & Maximum der Temperaturmittelwerte für die einzelnen Logger 
-daily_logger_means_min_max <- daily_logger_means %>%
-  group_by(Logger_ID) %>%
-  summarise(
-    # Sonne
-    Sonne_max_mean = max(Temp_sonne_mean, na.rm = TRUE),
-    Sonne_max_mean_Tag = Datum[which.max(Temp_sonne_mean)],
-    Sonne_min_mean = min(Temp_sonne_mean, na.rm = TRUE),
-    Sonne_min_mean_Tag = Datum[which.min(Temp_sonne_mean)],
-
-    # Schatten
-    Schatten_max_mean = max(Temp_schatten_mean, na.rm = TRUE),
-    Schatten_max_mean_Tag = Datum[which.max(Temp_schatten_mean)],
-    Schatten_min_mean = min(Temp_schatten_mean, na.rm = TRUE),
-    Schatten_min_mean_Tag = Datum[which.min(Temp_schatten_mean)]
-  )
-```
-
-## 4.2 Boxplots
-
-```{r}
-#Boxplots - Vergleich der Logger der einzelnen Flächen (nur der äußere Logger oder der innere)
-
-# Filter für Standort L und die gewünschten Logger
-df_plot <- daily_logger_means %>%
-  filter(Standort == "L", Logger %in% c("M", "N", "O", "S", "W"))
-
-# Boxplot erstellen
-ggplot(df_plot, aes(x = Logger, y = Temp_sonne_mean, fill = Logger)) +
-  geom_boxplot() +
-  labs(
-    title = "Vergleich der Tagesmittelwerte des äußeren Sensors pro Logger - Lichtenau",
-    x = "Loggerstandort",
-    y = "Tagesmitteltemperatur (°C)"
-  ) +
-  theme_minimal() +
-  theme(legend.position = "none") 
-```
-
-```{r}
-# eben erzeugter Plot für alle 3 Flächen
-df_plot <- daily_logger_means %>%
-  filter(Standort %in% c("L", "MN", "MT"),
-         Logger %in% c("M", "N", "O", "S", "W"))
-
-ggplot(df_plot, aes(x = Logger, y = Temp_sonne_mean, fill = Logger)) +
-  geom_boxplot() +
-  labs(
-    title = "Vergleich der Tagesmittelwerte des äußeren Sensors pro Logger",
-    x = "Loggerstandort",
-    y = "Tagesmitteltemperatur (°C)"
-  ) +
-  theme_minimal() +
-  theme(legend.position = "none") +
-  facet_wrap(~Standort, ncol = 1, scales = "free_y")
-
-ggsave("boxplot_temp_mean_loggers.png", width = 6, height = 20) 
-```
-
-```{r}
-#Boxplots - Vergleich der Logger der einzelnen Flächen (äußerer und innerer Logger)
-# Filter für Standort L und die gewünschten Logger
-df_plot <- daily_logger_means %>%
-  filter(Standort == "L", Logger %in% c("M", "N", "O", "S", "W")) %>%
-  # In langes Format bringen: Sonne / Schatten
-  pivot_longer(
-    cols = c(Temp_sonne_mean, Temp_schatten_mean),
-    names_to = "Licht",
-    values_to = "Temperatur"
-  ) %>%
-  mutate(Licht = recode(Licht,
-                        Temp_sonne_mean = "Außen",
-                        Temp_schatten_mean = "Innen"))
-
-# Boxplot erstellen, Sonne und Schatten nebeneinander pro Logger
-ggplot(df_plot, aes(x = Logger, y = Temperatur, fill = Licht)) +
-  geom_boxplot(position = position_dodge(width = 0.8)) +
-  labs(
-    title = "Vergleich der Tagesmittelwerte der äußeren und inneren Sensoren pro Logger - Lichtenau",
-    x = "Logger",
-    y = "Tagesmitteltemperatur (°C)",
-    fill = "Sensorposition"
-  ) +
-  theme_minimal()
-```
-
-## 4.3 Extremwerte pro Logger
-
-```{r}
-# Mittelwerte gruppiert nach Loggerstandort und Tag erzeugen, zusätzlich Min & Max Temperatur am Tag 
-daily_logger_summary <- all_loggers %>%
-  mutate(Datum = as.Date(DateTime)) %>%
-  group_by(Logger_ID, Datum) %>%
-  summarise(
-    Temp_sonne_mean = mean(Temp_sonne_C, na.rm = TRUE),
-    Temp_schatten_mean = mean(Temp_schatten_C, na.rm = TRUE),
-
-    Temp_sonne_max = ifelse(
-      all(is.na(Temp_sonne_C)), NA,
-      max(Temp_sonne_C, na.rm = TRUE)
-    ),
-    Temp_sonne_min = ifelse(
-      all(is.na(Temp_sonne_C)), NA,
-      min(Temp_sonne_C, na.rm = TRUE)
-    ),
-
-    Temp_schatten_max = ifelse(
-      all(is.na(Temp_schatten_C)), NA,
-      max(Temp_schatten_C, na.rm = TRUE)
-    ),
-    Temp_schatten_min = ifelse(
-      all(is.na(Temp_schatten_C)), NA,
-      min(Temp_schatten_C, na.rm = TRUE)
-    ),
-    .groups = "drop"
-  )
-
-
-#Separate Tabelle um anzeigen zu lassen, zu welcher Uhrzeit die Min & Max Werte gemessen wurden
-daily_logger_extrema <- all_loggers %>%
-  mutate(Datum = as.Date(DateTime)) %>%
-  group_by(Logger_ID, Datum) %>%
-  summarise(
-
-    ## ===== SONNE =====
-    Temp_sonne_max =
-      if (all(is.na(Temp_sonne_C))) NA_real_
-      else max(Temp_sonne_C, na.rm = TRUE),
-
-    Time_sonne_max =
-      if (all(is.na(Temp_sonne_C))) as.POSIXct(NA)
-      else DateTime[which.max(Temp_sonne_C)],
-
-    Temp_sonne_min =
-      if (all(is.na(Temp_sonne_C))) NA_real_
-      else min(Temp_sonne_C, na.rm = TRUE),
-
-    Time_sonne_min =
-      if (all(is.na(Temp_sonne_C))) as.POSIXct(NA)
-      else DateTime[which.min(Temp_sonne_C)],
-
-    ## ===== SCHATTEN =====
-    Temp_schatten_max =
-      if (all(is.na(Temp_schatten_C))) NA_real_
-      else max(Temp_schatten_C, na.rm = TRUE),
-
-    Time_schatten_max =
-      if (all(is.na(Temp_schatten_C))) as.POSIXct(NA)
-      else DateTime[which.max(Temp_schatten_C)],
-
-    Temp_schatten_min =
-      if (all(is.na(Temp_schatten_C))) NA_real_
-      else min(Temp_schatten_C, na.rm = TRUE),
-
-    Time_schatten_min =
-      if (all(is.na(Temp_schatten_C))) as.POSIXct(NA)
-      else DateTime[which.min(Temp_schatten_C)],
-    .groups = "drop"
-  )
-
-#Auswertung
-extrema_logger <- daily_logger_extrema %>%
-  group_by(Logger_ID) %>%
-  summarise(
-    # Sonne
-    Sonne_max = max(Temp_sonne_max, na.rm = TRUE),
-    Sonne_max_Zeit = Time_sonne_max[which.max(Temp_sonne_max)],
-
-    Sonne_min = min(Temp_sonne_min, na.rm = TRUE),
-    Sonne_min_Zeit = Time_sonne_min[which.min(Temp_sonne_min)],
-
-    # Schatten
-    Schatten_max = max(Temp_schatten_max, na.rm = TRUE),
-    Schatten_max_Zeit = Time_schatten_max[which.max(Temp_schatten_max)],
-
-    Schatten_min = min(Temp_schatten_min, na.rm = TRUE),
-    Schatten_min_Zeit = Time_schatten_min[which.min(Temp_schatten_min)]
-  )
-```
-
-## 4.4 Temperaturen im Jahresverlauf
-
-```{r}
-#Mittelwerte für jede Fläche bilden
-area_mean <- daily_logger_means %>%
-  group_by(Standort, Datum) %>%
-  summarise(
-    Temp_sonne_area_mean = mean(Temp_sonne_mean, na.rm = TRUE),
-    Temp_schatten_area_mean = mean(Temp_schatten_mean, na.rm = TRUE),
-    .groups = "drop"
-  )
-summary(area_mean)
-
-ggplot(area_mean, aes(x = Datum, 
-                      y = Temp_sonne_area_mean, 
-                      color = Standort)) +
-  geom_line(linewidth = 1) +
-  labs(
-    title = "Tagesmitteltemperatur (Sonne) pro Standort",
-    x = "Datum",
-    y = "Flächenmittel Temperatur (°C)",
-    color = "Standort"
-  ) +
-  theme_minimal() +
-  theme(
-    plot.title = element_text(hjust = 0.5)
-  )
-ggsave("area_mean_temp_in_year.png", width = 20, height = 6) 
-```
-
-# 5 luftfeuchte?
-
-ich hab keine lust, den code für jedes parameter zu copy pasten
-
-ich will eine tablle daily_logger_means machen, die mittelwerte von temp_sonne, temp_schatten, luftfeuchte, licht und taupukt direkt in einem hat\
-aus dieser tabelle können wir dann wieder die extremwerttabelle machen und die plots\
-ich probiere erstmal aus, ob das funktioniert. deswegen betrachte 5. mal als testfeld :)
-
-überlegung: ich brauche ne stabdard deviation und vlt auch range (max-min). ist das sinnvoll, das für jeden tag für jeden logger zu machen? oder kann ich (zusätzlich) auch noch für jeden einzelnen logger herausfinden, was an diesem konkreten punkt die jahresmitteltemp, usw sind und dazu sd und range? ist das sinnvoll? denn die werte schwanken ja ganz klar im jahresverlauf... aber grade range und sd wären ja auch übers ganze jahr spannend\
-ich werd wohl beides mal machen
-
-## 5.1 Tagesmittel
-
-```{r}
-#Berechnung der Tagesmittelwerte pro Logger in einer neuen Tabelle 
-
-# Datum ohne Uhrzeit erzeugen, Mittelwerte gruppiert nach Loggerstandort und Tag erzeugen 
-daily_logger_means <- all_loggers %>%
-  mutate(Datum = as.Date(DateTime)) %>%       
-  group_by(Logger_ID, Datum) %>%              
-  summarise(
-    # Fläche und Logger vom ersten Eintrag des Tages übernehmen
-    Standort = first(Standort),
-    Logger = first(Logger),
-
-    Temp_sonne_mean = mean(Temp_sonne_C, na.rm = TRUE),
-    Temp_schatten_mean = mean(Temp_schatten_C, na.rm = TRUE),
-    Licht_mean = mean(Licht_lux, na.rm =T),
-    rLF_mean = mean(relLF_percent, na.rm =T),
-    Tp_mean = mean(Taupunkt_C, na.rm=T),
-    .groups = "drop"
-  ) %>%
-  select(Logger_ID, Standort, Logger, Datum, everything())
-
-summary(daily_logger_means)
-```
-
-hier kommt noch dieses codechunk im original: #Minimum & Maximum der Temperaturmittelwerte für die einzelnen Logger
-
-## Tagesextrema
-
-```{r}
-# Mittelwerte gruppiert nach Loggerstandort und Tag erzeugen, zusätzlich Min & Max Temperatur am Tag 
-daily_logger_summary <- all_loggers %>%
-  mutate(Datum = as.Date(DateTime)) %>%
-  group_by(Logger_ID, Datum) %>%
-  summarise(
-    Temp_sonne_mean = mean(Temp_sonne_C),
-    Temp_sonne_max = max(Temp_sonne_C),
-    Temp_sonne_min = min(Temp_sonne_C),
-    
-    Temp_schatten_mean = mean(Temp_schatten_C),
-    Temp_schatten_max =  max(Temp_schatten_C),
-    Temp_schatten_min = min(Temp_schatten_C),
-    
-    Licht_mean = mean(Licht_lux),
-    Licht_max = max(Licht_lux),
-    Licht_min = min(Licht_lux),
-    
-    rLF_mean = mean(relLF_percent),
-    rLF_max = max(relLF_percent),
-    rLF_min = min(relLF_percent),
-    
-    Tp_mean = mean(Taupunkt_C),
-    Tp_max = max(Taupunkt_C),
-    Tp_min = min(Taupunkt_C),
-    
-    .groups = "drop"
-  )
-
-summary(daily_logger_summary)
-  
-```
-
-data by logger
-
-```{r}
-logger_year <- all_loggers %>%
-  group_by(Logger_ID) %>%
-  summarise(
-    Tempsonne_Jahresmittel = mean(Temp_sonne_C, na.rm = TRUE),
-    Tempsonne_Jahres_sd = sd(Temp_sonne_C, na.rm = TRUE),
-    Tempsonne_Jahres_min = min(Temp_sonne_C, na.rm = TRUE),
-    Tempsonne_Jahres_max = max(Temp_sonne_C, na.rm = TRUE),
-    Tempsonne_Jahres_range = Tempsonne_Jahres_max - Tempsonne_Jahres_min,
-    
-    Tempschatten_Jahresmittel = mean(Temp_schatten_C, na.rm = TRUE),
-    Tempschatten_Jahres_sd = sd(Temp_schatten_C, na.rm = TRUE),
-    Tempschatten_Jahres_min = min(Temp_schatten_C, na.rm = TRUE),
-    Tempschatten_Jahres_max = max(Temp_schatten_C, na.rm = TRUE),
-    Tempschatten_Jahres_range = Tempschatten_Jahres_max - Tempschatten_Jahres_min,
-    
-    Licht_Jahresmittel = mean(Licht_lux, na.rm = TRUE),
-    Licht_Jahres_sd = sd(Licht_lux, na.rm = TRUE),
-    Licht_Jahres_min = min(Licht_lux, na.rm = TRUE),
-    Licht_Jahres_max = max(Licht_lux, na.rm = TRUE),
-    Licht_Jahres_range = Licht_Jahres_max - Licht_Jahres_min,
-    
-    rLF_Jahresmittel = mean(relLF_percent, na.rm = TRUE),
-    rLF_Jahres_sd = sd(relLF_percent, na.rm = TRUE),
-    rLF_Jahres_min = min(relLF_percent, na.rm = TRUE),
-    rLF_Jahres_max = max(relLF_percent, na.rm = TRUE),
-    rLF_Jahres_range = rLF_Jahres_max - rLF_Jahres_min,
-    
-    Tp_Jahresmittel = mean(Taupunkt_C, na.rm = TRUE),
-    Tp_Jahres_sd = sd(Taupunkt_C, na.rm = TRUE),
-    Tp_Jahres_min = min(Taupunkt_C, na.rm = TRUE),
-    Tp_Jahres_max = max(Taupunkt_C, na.rm = TRUE),
-    Tp_Jahres_range = Tp_Jahres_max - Tp_Jahres_min,
-    
-    .groups = "drop"
-  )
-
-summary(logger_year)
 ```
