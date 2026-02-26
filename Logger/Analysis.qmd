@@ -700,6 +700,8 @@ summary(logger_year)
 
 ## 6.1 Licht
 
+!!!Licht sollte evtl log-transformiert werden!!
+
 für die Weiterarbeit ist es vlt auch nice, die einzelnen parameter zu haben, da zb daily_logger_summary eine sehr riesige tabelle ist
 
 dabei kann man je nach parameter noch weitere spannende infos rausfinden
