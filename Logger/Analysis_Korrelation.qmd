@@ -321,7 +321,7 @@ str(all_loggers)
 
 ```
 
-# Fehlende Daten per Korrelation/ Modell erzeugen
+# 4 Fehlende Daten per Korrelation/ Modell erzeugen
 
 ```{r}
 # welche der fehlenden Messwerte sind mit welchen vorhandenen am stärksten korreliert 
@@ -344,7 +344,9 @@ round(cor_mat, 2)
 
 ```
 
-## Meusebach trocken - Logger Mitte (Bsp. Temp)
+**Meusebach trocken - Logger Mitte (Bsp. Temp)**
+
+## 4.1 Lineares Modell 
 
 ```{r}
 ###### Meusebach trocken - Mitte Logger: fehlende Daten für inneren & äußeren Logger
@@ -422,7 +424,131 @@ sd_MTM <- sd(wide$MTM, na.rm = TRUE)
 sd_MTM
 ```
 
-### Fehlende Daten per Modell erzeugen
+### 4.1.1 Lineares Modell mit zeitlichen Features
+
+```{r}
+# Variable definieren
+var <- "Temp_sonne_C"
+
+# Datensatz für Standort MT vorbereiten
+wide <- all_loggers %>%
+  select(DateTime, Standort, Logger_ID, all_of(var)) %>%
+  filter(Standort == "MT") %>%   # Nur Standort MT
+  pivot_wider(names_from = Logger_ID,
+              values_from = all_of(var)) %>%
+  arrange(DateTime)
+
+# Zeitliche Features hinzufügen
+wide$Hour <- as.numeric(format(wide$DateTime, "%H"))       # Stunde des Tages (0-23), 0 = 24.00/ 0 Uhr 
+wide$Weekday <- as.factor(weekdays(wide$DateTime))         # Wochentag als Faktor
+wide$DayOfYear <- as.numeric(format(wide$DateTime, "%j"))  # Tag im Jahr (1-366)
+
+# Optional: Modell erkennt, dass 23 → 0 → 1 ein kontinuierlicher Tageszyklus ist
+wide$Hour_sin <- sin(2 * pi * wide$Hour / 24)
+wide$Hour_cos <- cos(2 * pi * wide$Hour / 24)
+
+# Trainingsdatensatz vorbereiten (nur Zeilen mit MTM-Werten)
+train <- wide %>%
+  filter(!is.na(MTM))
+
+# Lineares Regressionsmodell mit zeitlichen Features
+mod <- lm(MTM ~ MTN + MTS + MTO + Hour + Hour_sin + Hour_cos + Weekday + DayOfYear, data = train)
+summary(mod)
+
+# Vorhersagen für alle Zeilen erstellen
+pred <- predict(mod, newdata = wide)
+
+# Fehlende Werte auffüllen
+wide$MTM_filled <- ifelse(
+  is.na(wide$MTM),
+  pred,
+  wide$MTM
+)
+
+# RMSE validieren
+set.seed(42)
+idx <- sample(which(!is.na(wide$MTM)), 2000)
+
+wide_test <- wide
+wide_test$MTM[idx] <- NA
+
+pred_test <- predict(mod, newdata = wide_test)
+
+rmse <- sqrt(mean(
+  (pred_test[idx] - wide$MTM[idx])^2
+))
+rmse # leicht verbessert 
+```
+
+## 4.2 RandomForest (nicht linear, kann plötzliche Schwankungen besser erfassen)
+
+```{r}
+# Packages
+library(randomForest)
+
+# Variable definieren
+var <- "Temp_sonne_C"
+
+# Datensatz vorbereiten wie vorher
+wide <- all_loggers %>%
+  select(DateTime, Standort, Logger_ID, all_of(var)) %>%
+  filter(Standort == "MT") %>%
+  pivot_wider(names_from = Logger_ID,
+              values_from = all_of(var)) %>%
+  arrange(DateTime)
+
+# Zeitliche Features hinzufügen
+wide$Hour <- as.numeric(format(wide$DateTime, "%H"))
+wide$Weekday <- as.factor(weekdays(wide$DateTime))
+wide$DayOfYear <- as.numeric(format(wide$DateTime, "%j"))
+
+# Optional: Modell erkennt, dass 23 → 0 → 1 ein kontinuierlicher Tageszyklus ist
+wide$Hour_sin <- sin(2 * pi * wide$Hour / 24)
+wide$Hour_cos <- cos(2 * pi * wide$Hour / 24)
+
+# Trainingsdatensatz (nur Zeilen mit MTM-Werten)
+train <- wide %>%
+  filter(!is.na(MTM))
+
+# Random Forest Modell erstellen
+mod_rf <- randomForest(
+  MTM ~ MTN + MTS + MTO + Hour_sin + Hour_cos + Weekday + DayOfYear,
+  data = train,
+  ntree = 500,        # Anzahl Bäume
+  mtry = 3,           # Anzahl Features, die jeder Baum zufällig auswählt (Standard ist sqrt(#Features))
+  importance = TRUE   
+)
+
+# Modellübersicht: wichtige Features
+mod_rf
+importance(mod_rf)
+
+# Vorhersagen für alle Zeilen erstellen
+pred_rf <- predict(mod_rf, newdata = wide)
+
+# Fehlende Werte auffüllen
+wide$MTM_filled_rf <- ifelse(
+  is.na(wide$MTM),
+  pred_rf,
+  wide$MTM
+)
+
+# RMSE validieren (wie vorher)
+set.seed(42)
+idx <- sample(which(!is.na(wide$MTM)), 2000)
+
+wide_test <- wide
+wide_test$MTM[idx] <- NA
+
+pred_test_rf <- predict(mod_rf, newdata = wide_test)
+
+rmse_rf <- sqrt(mean(
+  (pred_test_rf[idx] - wide$MTM[idx])^2
+))
+rmse_rf # deutlich besser !!!! random Modell besser als linear 
+```
+
+## 4.2 MissForest
 
 Fehlende Messwerte identifizieren
 
