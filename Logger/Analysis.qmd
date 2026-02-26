@@ -414,7 +414,7 @@ ggplot(df_plot, aes(x = Logger, y = Temp_sonne_mean, fill = Logger)) +
   theme(legend.position = "none") +
   facet_wrap(~Standort, ncol = 1, scales = "free_y")
 
-ggsave("boxplot_temp_mean_loggers.png", width = 6, height = 20) 
+#ggsave("boxplot_temp_mean_loggers.png", width = 6, height = 20) 
 ```
 
 ```{r}
@@ -568,7 +568,7 @@ ggplot(area_mean, aes(x = Datum,
 ggsave("area_mean_temp_in_year.png", width = 20, height = 6) 
 ```
 
-# 5 luftfeuchte?
+# 5 Summaries erstellen
 
 ich hab keine lust, den code für jedes parameter zu copy pasten
 
@@ -579,7 +579,7 @@ ich probiere erstmal aus, ob das funktioniert. deswegen betrachte 5. mal als tes
 überlegung: ich brauche ne stabdard deviation und vlt auch range (max-min). ist das sinnvoll, das für jeden tag für jeden logger zu machen? oder kann ich (zusätzlich) auch noch für jeden einzelnen logger herausfinden, was an diesem konkreten punkt die jahresmitteltemp, usw sind und dazu sd und range? ist das sinnvoll? denn die werte schwanken ja ganz klar im jahresverlauf... aber grade range und sd wären ja auch übers ganze jahr spannend\
 ich werd wohl beides mal machen
 
-## 5.1 Tagesmittel
+## Tagesmittel
 
 #ist quasi schon in daily_logger_summary enthalten
 
@@ -609,7 +609,7 @@ summary(daily_logger_means)
 
 hier kommt noch dieses codechunk im original: #Minimum & Maximum der Temperaturmittelwerte für die einzelnen Logger
 
-## Tagesextrema
+## 5.1 Summary pro Tag
 
 ```{r}
 # Mittelwerte gruppiert nach Loggerstandort und Tag erzeugen, zusätzlich Min & Max Temperatur am Tag 
@@ -654,7 +654,7 @@ summary(daily_logger_summary)
   
 ```
 
-data by logger
+## 5.2 Summary pro Logger
 
 ```{r}
 logger_year <- all_loggers %>%
@@ -696,6 +696,10 @@ logger_year <- all_loggers %>%
 summary(logger_year)
 ```
 
+# 6. Analyse einzelner Parameter
+
+## 6.1 Licht
+
 für die Weiterarbeit ist es vlt auch nice, die einzelnen parameter zu haben, da zb daily_logger_summary eine sehr riesige tabelle ist
 
 dabei kann man je nach parameter noch weitere spannende infos rausfinden
@@ -720,4 +724,197 @@ licht <- all_loggers %>%
     .groups = "drop")
       
 summary(licht)
+
+
+```
+
+## 6.2 Temperatur
+
+Welcher Tag hat die höchsten bzw. niedrigsten **Durchschnitts**temperatur?
+
+```{r}
+#Temperatur
+#Minimum & Maximum der Temperaturmittelwerte für die einzelnen Logger 
+daily_logger_means_min_max <- daily_logger_means %>%
+  group_by(Logger_ID) %>%
+  summarise(
+    # Sonne
+    Sonne_max_mean = max(Temp_sonne_mean, na.rm = TRUE),
+    Sonne_max_mean_Tag = Datum[which.max(Temp_sonne_mean)],
+    Sonne_min_mean = min(Temp_sonne_mean, na.rm = TRUE),
+    Sonne_min_mean_Tag = Datum[which.min(Temp_sonne_mean)],
+
+    # Schatten
+    Schatten_max_mean = max(Temp_schatten_mean, na.rm = TRUE),
+    Schatten_max_mean_Tag = Datum[which.max(Temp_schatten_mean)],
+    Schatten_min_mean = min(Temp_schatten_mean, na.rm = TRUE),
+    Schatten_min_mean_Tag = Datum[which.min(Temp_schatten_mean)])
+
+
+
+
+```
+
+### 6.2.1 Boxplots
+
+```{r}
+#Boxplots - Vergleich der Logger der einzelnen Flächen (nur der äußere Logger oder der innere)
+
+# Filter für Standort L und die gewünschten Logger
+df_plot <- daily_logger_means %>%
+  filter(Standort == "L", Logger %in% c("M", "N", "O", "S", "W"))
+
+# Boxplot erstellen
+ggplot(df_plot, aes(x = Logger, y = Temp_sonne_mean, fill = Logger)) +
+  geom_boxplot() +
+  labs(
+    title = "Vergleich der Tagesmittelwerte des äußeren Sensors pro Logger - Lichtenau",
+    x = "Loggerstandort",
+    y = "Tagesmitteltemperatur (°C)"
+  ) +
+  theme_minimal() +
+  theme(legend.position = "none") 
+```
+
+```{r}
+# eben erzeugter Plot für alle 3 Flächen
+df_plot <- daily_logger_means %>%
+  filter(Standort %in% c("L", "MN", "MT"),
+         Logger %in% c("M", "N", "O", "S", "W"))
+
+ggplot(df_plot, aes(x = Logger, y = Temp_sonne_mean, fill = Logger)) +
+  geom_boxplot() +
+  labs(
+    title = "Vergleich der Tagesmittelwerte des äußeren Sensors pro Logger",
+    x = "Loggerstandort",
+    y = "Tagesmitteltemperatur (°C)"
+  ) +
+  theme_minimal() +
+  theme(legend.position = "none") +
+  facet_wrap(~Standort, ncol = 1, scales = "free_y")
+
+#ggsave("boxplot_temp_mean_loggers.png", width = 6, height = 20) 
+```
+
+```{r}
+
+#Boxplots - Vergleich der Logger der einzelnen Flächen (äußerer und innerer Logger)
+# Filter für Standort L und die gewünschten Logger
+df_plot <- daily_logger_means %>%
+  filter(Standort == "L", Logger %in% c("M", "N", "O", "S", "W")) %>%
+  # In langes Format bringen: Sonne / Schatten
+  pivot_longer(
+    cols = c(Temp_sonne_mean, Temp_schatten_mean),
+    names_to = "Licht",
+    values_to = "Temperatur"
+  ) %>%
+  mutate(Licht = recode(Licht,
+                        Temp_sonne_mean = "Außen",
+                        Temp_schatten_mean = "Innen"))
+
+# Boxplot erstellen, Sonne und Schatten nebeneinander pro Logger
+ggplot(df_plot, aes(x = Logger, y = Temperatur, fill = Licht)) +
+  geom_boxplot(position = position_dodge(width = 0.8)) +
+  labs(
+    title = "Vergleich der Tagesmittelwerte der äußeren und inneren Sensoren pro Logger - Lichtenau",
+    x = "Logger",
+    y = "Tagesmitteltemperatur (°C)",
+    fill = "Sensorposition"
+  ) +
+  theme_minimal()
+```
+
+Welcher Tag hat die höchste bzw. niedrigste **absolute** Temperatur?
+
+```{r}
+#Separate Tabelle um anzeigen zu lassen, zu welcher Uhrzeit die Min & Max Werte gemessen wurden
+daily_logger_extrema <- all_loggers %>%
+  mutate(Datum = as.Date(DateTime)) %>%
+  group_by(Logger_ID, Datum) %>%
+  summarise(
+
+    ## ===== SONNE =====
+    Temp_sonne_max =
+      if (all(is.na(Temp_sonne_C))) NA_real_
+      else max(Temp_sonne_C, na.rm = TRUE),
+
+    Time_sonne_max =
+      if (all(is.na(Temp_sonne_C))) as.POSIXct(NA)
+      else DateTime[which.max(Temp_sonne_C)],
+
+    Temp_sonne_min =
+      if (all(is.na(Temp_sonne_C))) NA_real_
+      else min(Temp_sonne_C, na.rm = TRUE),
+
+    Time_sonne_min =
+      if (all(is.na(Temp_sonne_C))) as.POSIXct(NA)
+      else DateTime[which.min(Temp_sonne_C)],
+
+    ## ===== SCHATTEN =====
+    Temp_schatten_max =
+      if (all(is.na(Temp_schatten_C))) NA_real_
+      else max(Temp_schatten_C, na.rm = TRUE),
+
+    Time_schatten_max =
+      if (all(is.na(Temp_schatten_C))) as.POSIXct(NA)
+      else DateTime[which.max(Temp_schatten_C)],
+
+    Temp_schatten_min =
+      if (all(is.na(Temp_schatten_C))) NA_real_
+      else min(Temp_schatten_C, na.rm = TRUE),
+
+    Time_schatten_min =
+      if (all(is.na(Temp_schatten_C))) as.POSIXct(NA)
+      else DateTime[which.min(Temp_schatten_C)],
+    .groups = "drop"
+  )
+
+#Auswertung
+extrema_logger <- daily_logger_extrema %>%
+  group_by(Logger_ID) %>%
+  summarise(
+    # Sonne
+    Sonne_max = max(Temp_sonne_max, na.rm = TRUE),
+    Sonne_max_Zeit = Time_sonne_max[which.max(Temp_sonne_max)],
+
+    Sonne_min = min(Temp_sonne_min, na.rm = TRUE),
+    Sonne_min_Zeit = Time_sonne_min[which.min(Temp_sonne_min)],
+
+    # Schatten
+    Schatten_max = max(Temp_schatten_max, na.rm = TRUE),
+    Schatten_max_Zeit = Time_schatten_max[which.max(Temp_schatten_max)],
+
+    Schatten_min = min(Temp_schatten_min, na.rm = TRUE),
+    Schatten_min_Zeit = Time_schatten_min[which.min(Temp_schatten_min)]
+  )
+```
+
+#sollte schon in summary pro logger drinne sein, außer der plot natürlich
+
+```{r}
+#Mittelwerte für jede Fläche bilden
+area_mean <- daily_logger_means %>%
+  group_by(Standort, Datum) %>%
+  summarise(
+    Temp_sonne_area_mean = mean(Temp_sonne_mean, na.rm = TRUE),
+    Temp_schatten_area_mean = mean(Temp_schatten_mean, na.rm = TRUE),
+    .groups = "drop"
+  )
+summary(area_mean)
+
+ggplot(area_mean, aes(x = Datum, 
+                      y = Temp_sonne_area_mean, 
+                      color = Standort)) +
+  geom_line(linewidth = 1) +
+  labs(
+    title = "Tagesmitteltemperatur (Sonne) pro Standort",
+    x = "Datum",
+    y = "Flächenmittel Temperatur (°C)",
+    color = "Standort"
+  ) +
+  theme_minimal() +
+  theme(
+    plot.title = element_text(hjust = 0.5)
+  )
+#ggsave("area_mean_temp_in_year.png", width = 20, height = 6) 
 ```
