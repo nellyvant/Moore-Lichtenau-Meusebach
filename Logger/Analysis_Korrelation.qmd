@@ -304,13 +304,13 @@ hier fehlt noch die überprüfung, ob bei der NA entfernung sachen gelöscht wur
 
 ```{r}
 #entfernen von Zeilen ohne Messwerte (entstanden durch Auslesen der Logger)
-#messwert_spalten <- c("Temp_sonne_C", "Licht_lux", "Temp_schatten_C", "relLF_percent", "Taupunkt_C")
+messwert_spalten <- c("Temp_sonne_C", "Licht_lux", "Temp_schatten_C", "relLF_percent", "Taupunkt_C")
 
-#for (logger in logger_names) {
-  # Tabelle holen, filtern, wieder zurückschreiben
-  #assign(logger, get(logger) %>% 
-           #filter(!if_all(all_of(messwert_spalten), is.na)))
-#}
+for (logger in logger_names) {
+ # Tabelle holen, filtern, wieder zurückschreiben
+  assign(logger, get(logger) %>% 
+           filter(!if_all(all_of(messwert_spalten), is.na)))
+}
 
 ```
 
@@ -323,8 +323,58 @@ str(all_loggers)
 
 # 4 Fehlende Daten per Korrelation/ Modell erzeugen
 
+Identifizieren der fehlenden Daten, Raster erstellen mit allen vorhandene und fehlenden Daten (wenn eine Messgröße nicht durch den Logger gemessen wurde, existiert die entsprechende Zeile einfach nicht –\> durch den nachfolgenden Code werden diese Zeilen hinzugefügt)
+
 ```{r}
-# welche der fehlenden Messwerte sind mit welchen vorhandenen am stärksten korreliert 
+# Zeitspalte korrekt formatieren
+all_loggers1 <- all_loggers %>%
+  mutate(DateTime = as.POSIXct(DateTime, format="%Y-%m-%d %H:%M:%S")) %>%
+  filter(DateTime >= as.POSIXct("2025-05-08 00:00:00") &
+         DateTime <= as.POSIXct("2025-09-30 23:59:59"))
+
+# Alle Logger und Standorte explizit bestimmen
+logger_list <- all_loggers1 %>% 
+  distinct(Standort, Logger, Logger_ID)
+
+# Zeitreihe erstellen: alle 10 Minuten vom 08.05 bis 30.09.2025
+zeitpunkte <- seq(
+  from = as.POSIXct("2025-05-08 00:00:00", tz = "UTC"),
+  to   = as.POSIXct("2025-09-30 23:50:00", tz = "UTC"),
+  by   = "10 min"
+)
+
+# Kreuzprodukt
+voller_raster <- tidyr::crossing(logger_list, zeitpunkte)
+voller_raster <- voller_raster %>%
+  rename(DateTime = zeitpunkte)
+
+# Originaldaten einfügen
+all_loggers_complete <- voller_raster %>% left_join(all_loggers1, by = c("Standort", "Logger", "Logger_ID", "DateTime"))
+
+# Fehlende Werte pro Zeile zählen (mindestens eine Messgröße fehlt)
+fehlende_zeitpunkte <- all_loggers_complete %>%
+  mutate(Anzahl_NA = rowSums(is.na(select(., Temp_sonne_C, Licht_lux, Temp_schatten_C,
+                                         relLF_percent, Taupunkt_C)))) %>%
+  filter(Anzahl_NA > 0)  # Zeilen, bei denen mindestens eine Messgröße fehlt
+
+# Zusammenfassung pro Logger und Standort
+fehlende_werte_summary <- fehlende_zeitpunkte %>%
+  group_by(Standort, Logger, Logger_ID) %>%
+  summarise(
+    Temp_sonne_C_missing    = sum(is.na(Temp_sonne_C)),
+    Licht_lux_missing       = sum(is.na(Licht_lux)),
+    Temp_schatten_C_missing = sum(is.na(Temp_schatten_C)),
+    relLF_percent_missing   = sum(is.na(relLF_percent)),
+    Taupunkt_C_missing      = sum(is.na(Taupunkt_C)),
+    Gesamt_fehlend          = n(),   # alle Zeilen mit mindestens einem fehlenden Wert
+    .groups = "drop"
+  ) %>%
+  arrange(Standort, Logger, Logger_ID)
+```
+
+Korrelation - welche der fehlenden Messwerte sind mit welchen vorhandenen am stärksten korreliert
+
+```{r}
 df <- all_loggers %>%
   filter(
     Logger_ID == "LM",
@@ -343,8 +393,6 @@ cor_mat <- cor(df)
 round(cor_mat, 2)
 
 ```
-
-**Meusebach trocken - Logger Mitte (Bsp. Temp)**
 
 ## 4.1 Lineares Modell 
 
@@ -506,7 +554,6 @@ wide$DayOfYear <- as.numeric(format(wide$DateTime, "%j"))
 wide$Hour_sin <- sin(2 * pi * wide$Hour / 24)
 wide$Hour_cos <- cos(2 * pi * wide$Hour / 24)
 
-# Trainingsdatensatz (nur Zeilen mit MTM-Werten)
 train <- wide %>%
   filter(!is.na(MTM))
 
@@ -519,14 +566,11 @@ mod_rf <- randomForest(
   importance = TRUE   
 )
 
-# Modellübersicht: wichtige Features
+# Modellübersicht
 mod_rf
 importance(mod_rf)
 
-# Vorhersagen für alle Zeilen erstellen
 pred_rf <- predict(mod_rf, newdata = wide)
-
-# Fehlende Werte auffüllen
 wide$MTM_filled_rf <- ifelse(
   is.na(wide$MTM),
   pred_rf,
@@ -536,68 +580,99 @@ wide$MTM_filled_rf <- ifelse(
 # RMSE validieren (wie vorher)
 set.seed(42)
 idx <- sample(which(!is.na(wide$MTM)), 2000)
-
 wide_test <- wide
 wide_test$MTM[idx] <- NA
-
 pred_test_rf <- predict(mod_rf, newdata = wide_test)
-
 rmse_rf <- sqrt(mean(
   (pred_test_rf[idx] - wide$MTM[idx])^2
 ))
-rmse_rf # deutlich besser !!!! random Modell besser als linear 
+rmse_rf # deutlich besser !!!! random Modell besser als lineares 
 ```
 
-## 4.2 MissForest
-
-Fehlende Messwerte identifizieren
+## 4.2 MissForest (kann fehlende Messgrößen in mehreren Loggern erkennen und schätzen, aber ungenauere Vorhersage)
 
 ```{r}
-# Zeitspalte korrekt formatieren
-all_loggers <- all_loggers %>%
-  mutate(DateTime = as.POSIXct(DateTime, format="%Y-%m-%d %H:%M:%S")) %>%
-  filter(DateTime >= as.POSIXct("2025-05-08 00:00:00") &
-         DateTime <= as.POSIXct("2025-09-30 23:59:59"))
+library(missForest)
 
-# Alle Logger und Standorte explizit bestimmen
-logger_list <- all_loggers %>% 
-  distinct(Standort, Logger, Logger_ID)
+# 1️⃣ Nur numerische Logger + Zeitfeatures
+df_mf <- wide %>%
+  select(MTM, MTN, MTS, MTO, Hour, DayOfYear)
 
-# Zeitreihe erstellen: alle 10 Minuten vom 08.05 bis 30.09.2025
-zeitpunkte <- seq(
-  from = as.POSIXct("2025-05-08 00:00:00", tz = "UTC"),
-  to   = as.POSIXct("2025-09-30 23:50:00", tz = "UTC"),
-  by   = "10 min"
-)
+# 2️⃣ Weekday als Dummy-Spalten (Base R)
+# weekdays() liefert Faktor, hier in 0/1-Matrix umwandeln
+weekdays_factor <- as.factor(weekdays(wide$DateTime))
+weekdays_dummy <- model.matrix(~ weekdays_factor - 1)  # -1 entfernt Intercept
+colnames(weekdays_dummy) <- paste0("Weekday_", colnames(weekdays_dummy))
 
-# Kreuzprodukt
-voller_raster <- tidyr::crossing(logger_list, zeitpunkte)
-voller_raster <- voller_raster %>%
-  rename(DateTime = zeitpunkte)
+# 3️⃣ Alle numerischen + Dummy-Spalten zusammenfügen
+df_mf <- cbind(df_mf, weekdays_dummy)
 
-# Originaldaten einfügen
-all_loggers_complete <- voller_raster %>% left_join(all_loggers, by = c("Standort", "Logger", "Logger_ID", "DateTime"))
+# 4️⃣ missForest ausführen
+set.seed(42)
+imputed <- missForest(df_mf, verbose = TRUE, maxiter = 10)
 
-# Fehlende Werte pro Zeile zählen (mindestens eine Messgröße fehlt)
-fehlende_zeitpunkte <- all_loggers_complete %>%
-  mutate(Anzahl_NA = rowSums(is.na(select(., Temp_sonne_C, Licht_lux, Temp_schatten_C,
-                                         relLF_percent, Taupunkt_C)))) %>%
-  filter(Anzahl_NA > 0)  # Zeilen, bei denen mindestens eine Messgröße fehlt
-
-# Zusammenfassung pro Logger und Standort
-fehlende_werte_summary <- fehlende_zeitpunkte %>%
-  group_by(Standort, Logger, Logger_ID) %>%
-  summarise(
-    Temp_sonne_C_missing    = sum(is.na(Temp_sonne_C)),
-    Licht_lux_missing       = sum(is.na(Licht_lux)),
-    Temp_schatten_C_missing = sum(is.na(Temp_schatten_C)),
-    relLF_percent_missing   = sum(is.na(relLF_percent)),
-    Taupunkt_C_missing      = sum(is.na(Taupunkt_C)),
-    Gesamt_fehlend          = n(),   # alle Zeilen mit mindestens einem fehlenden Wert
-    .groups = "drop"
-  ) %>%
-  arrange(Standort, Logger, Logger_ID)
+# 5️⃣ Aufgefüllter Datensatz
+df_filled <- imputed$ximp
 ```
+
+```{r}
+# Lade Package
+library(missForest)
+
+var <- "Temp_sonne_C"
+
+wide <- all_loggers %>%
+  select(DateTime, Standort, Logger_ID, all_of(var)) %>%
+  filter(Standort == "MT") %>%
+  pivot_wider(names_from = Logger_ID,
+              values_from = all_of(var)) %>%
+  arrange(DateTime)
+
+# Zeitliche Features hinzufügen
+wide$Hour <- as.numeric(format(wide$DateTime, "%H"))
+wide$DayOfYear <- as.numeric(format(wide$DateTime, "%j"))
+
+# -----------------------------
+# 2️⃣ Nur numerische Logger + Zeitfeatures
+# -----------------------------
+df_mf <- wide %>%
+  select(MTM, MTN, MTS, MTO, Hour, DayOfYear)
+
+# Weekday als Dummy-Spalten (Base R)
+weekdays_factor <- as.factor(weekdays(wide$DateTime))
+weekdays_dummy <- model.matrix(~ weekdays_factor - 1)  # -1 entfernt Intercept
+colnames(weekdays_dummy) <- paste0("Weekday_", colnames(weekdays_dummy))
+
+# Alle numerischen + Dummy-Spalten zusammenfügen
+df_mf <- cbind(df_mf, weekdays_dummy)
+
+# -----------------------------
+# 3️⃣ Testwerte markieren für RMSE
+# -----------------------------
+set.seed(42)
+idx <- sample(which(!is.na(df_mf$MTM)), 2000)  # zufällige echte Werte
+df_test <- df_mf
+df_test$MTM[idx] <- NA  # diese Werte sollen imputiert werden
+
+# -----------------------------
+# 4️⃣ missForest ausführen
+# -----------------------------
+set.seed(42)
+imputed <- missForest(df_test, verbose = TRUE, maxiter = 10)
+
+# Aufgefüllter Datensatz
+df_filled <- imputed$ximp
+
+# -----------------------------
+# 5️⃣ RMSE für Testwerte berechnen
+# -----------------------------
+rmse_mf <- sqrt(mean(
+  (df_filled$MTM[idx] - df_mf$MTM[idx])^2
+))
+rmse_mf
+```
+
+Fehlende Messwerte identifizieren
 
 ```{r}
 # Tabelle mit allen Daten des Standortes MT erzeugen
