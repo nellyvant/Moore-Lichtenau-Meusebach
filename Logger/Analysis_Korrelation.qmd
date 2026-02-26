@@ -377,8 +377,8 @@ Korrelation - welche der fehlenden Messwerte sind mit welchen vorhandenen am st�
 ```{r}
 df <- all_loggers %>%
   filter(
-    Logger_ID == "LM",
-    Standort == "L"
+    Logger_ID == "MTM",
+    Standort == "MT"
   ) %>%
   select(
     Temp_sonne_C,
@@ -392,6 +392,113 @@ df <- all_loggers %>%
 cor_mat <- cor(df)
 round(cor_mat, 2)
 
+```
+
+```{r}
+# Standort MT filtern
+df_mt <- all_loggers %>%
+  filter(Standort == "MT")
+
+# Wide-Format erzeugen
+df_wide <- df_mt %>%
+  pivot_wider(
+    id_cols = DateTime,
+    names_from = Logger_ID,
+    values_from = c(
+      Temp_sonne_C,
+      Temp_schatten_C,
+      relLF_percent,
+      Taupunkt_C,
+      Licht_lux
+    )
+  )
+
+# Ziel-Logger festlegen
+target <- "MTM"
+
+# Alle anderen Logger automatisch bestimmen
+logger_ids <- unique(df_mt$Logger_ID)
+logger_ids <- logger_ids[logger_ids != target]
+
+# Korrelation berechnen
+cor_results <- lapply(logger_ids, function(id){
+
+  data.frame(
+    Logger = id,
+    cor_temp_out = cor(
+      df_wide[[paste0("Temp_sonne_C_", target)]],
+      df_wide[[paste0("Temp_sonne_C_", id)]],
+      use = "complete.obs"
+    ),
+    cor_temp_in = cor(
+      df_wide[[paste0("Temp_schatten_C_", target)]],
+      df_wide[[paste0("Temp_schatten_C_", id)]],
+      use = "complete.obs"
+    ),
+    cor_rh = cor(
+      df_wide[[paste0("relLF_percent_", target)]],
+      df_wide[[paste0("relLF_percent_", id)]],
+      use = "complete.obs"
+    ),
+    cor_tau = cor(
+      df_wide[[paste0("Taupunkt_C_", target)]],
+      df_wide[[paste0("Taupunkt_C_", id)]],
+      use = "complete.obs"
+    ),
+    cor_lux = cor(
+      df_wide[[paste0("Licht_lux_", target)]],
+      df_wide[[paste0("Licht_lux_", id)]],
+      use = "complete.obs"
+    )
+  )
+
+}) %>%
+  bind_rows()
+
+cor_results
+```
+
+```{r}
+vars <- c(
+  "Temp_sonne_C",
+  "Temp_schatten_C",
+  "relLF_percent",
+  "Taupunkt_C",
+  "Licht_lux"
+)
+
+target <- "MTM"
+
+other_loggers <- unique(df_mt$Logger_ID)
+other_loggers <- other_loggers[other_loggers != target]
+
+result <- list()
+
+for(logger in other_loggers){
+
+  comb <- expand.grid(
+    MTM_var = vars,
+    Other_var = vars
+  )
+
+  comb$Other_Logger <- logger
+
+  comb$correlation <- mapply(function(v1, v2){
+
+    cor(
+      df_wide[[paste0(v1,"_",target)]],
+      df_wide[[paste0(v2,"_",logger)]],
+      use = "complete.obs"
+    )
+
+  }, comb$MTM_var, comb$Other_var)
+
+  result[[logger]] <- comb
+}
+
+cross_logger_cor <- bind_rows(result)
+
+cross_logger_cor
 ```
 
 ## 4.1 Lineares Modell 
@@ -468,7 +575,7 @@ sd_MTM <- sd(wide$MTM, na.rm = TRUE)
 sd_MTM
 ```
 
-### 4.1.1 Lineares Modell mit zeitlichen Features
+### 4.1.1 Lineares Modell mit zeitlichen Features (nur geringfügig besser)
 
 ```{r}
 # Variable definieren
@@ -521,7 +628,7 @@ rmse <- sqrt(mean(
 rmse # leicht verbessert 
 ```
 
-## 4.2 RandomForest (nicht linear, kann plötzliche Schwankungen besser erfassen)
+## 4.2 RandomForest (nicht linear, kann plötzliche Schwankungen besser erfassen) - deutlich besser 
 
 ```{r}
 # Packages
@@ -602,31 +709,7 @@ all_loggers_filled <- all_loggers_complete %>%
   select(-Temp_sonne_C_filled)
 ```
 
-## 4.2 MissForest (kann fehlende Messgrößen in mehreren Loggern erkennen und schätzen, aber ungenauere Vorhersage!!)
-
-```{r}
-library(missForest)
-
-# 1️⃣ Nur numerische Logger + Zeitfeatures
-df_mf <- wide %>%
-  select(MTM, MTN, MTS, MTO, Hour, DayOfYear)
-
-# 2️⃣ Weekday als Dummy-Spalten (Base R)
-# weekdays() liefert Faktor, hier in 0/1-Matrix umwandeln
-weekdays_factor <- as.factor(weekdays(wide$DateTime))
-weekdays_dummy <- model.matrix(~ weekdays_factor - 1)  # -1 entfernt Intercept
-colnames(weekdays_dummy) <- paste0("Weekday_", colnames(weekdays_dummy))
-
-# 3️⃣ Alle numerischen + Dummy-Spalten zusammenfügen
-df_mf <- cbind(df_mf, weekdays_dummy)
-
-# 4️⃣ missForest ausführen
-set.seed(42)
-imputed <- missForest(df_mf, verbose = TRUE, maxiter = 10)
-
-# 5️⃣ Aufgefüllter Datensatz
-df_filled <- imputed$ximp
-```
+## 4.2 MissForest - nutzt RandomForest (kann fehlende Messgrößen in mehreren Loggern pro Standort erkennen und schätzen, aber ungenauere Vorhersage!!)
 
 ```{r}
 # Lade Package
@@ -688,40 +771,20 @@ rmse_mf
 Fehlende Messwerte identifizieren
 
 ```{r}
+#install.packages("missForest")
+library(missForest)
+        
 # Tabelle mit allen Daten des Standortes MT erzeugen
 MT_data <- all_loggers_complete %>%
   filter(Standort == "MT")
 
-# Daten mittels Model berechnen - Bsp. MTW
-#install.packages("missForest")
-library(missForest)
 
-# MT-Daten auswählen
-# Angenommen MTW enthält alle Logger-Messungen von MTW
-MT_data <- MT_data %>%
-  mutate(DateTime = as.POSIXct(DateTime, format="%Y-%m-%d %H:%M:%S"))
-
-# Meta-Daten speichern (nicht imputieren)
-meta <- MT_data %>%
-  select(DateTime, Standort, Logger, Logger_ID)
-
-# Nur numerische Messwerte auswählen für MissForest
-numeric_cols <- MT_data %>%
-  select(-DateTime, -Standort, -Logger, -Logger_ID) %>%
-  mutate(across(everything(), as.numeric))
-
-# MissForest Imputation durchführen
-set.seed(123)  # für Reproduzierbarkeit
-imputed <- missForest(numeric_cols)
-
-# Ergebnisse wieder zusammenführen
-MTW_imputed <- cbind(meta, imputed$ximp)
 
 ```
 
-Mittels Mice Messwerte schätzen/erzeugen
+## 4.3 Mice-Model
 
-Es lernt nur aus sich selbst, nicht aus den anderen Loggern
+### 4.3.1 lernt nur aus sich selbst (nicht aus den anderen Loggern)
 
 ```{r}
 #install.packages("mice")
@@ -760,7 +823,7 @@ imputed_data$predictorMatrix
 densityplot(imputed_data)
 ```
 
-Es lernt aus den anderen Loggern am Standort
+### 4.3.2 lernt aus den anderen Loggern am Standort
 
 ```{r}
 messgroessen <- c(
