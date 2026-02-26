@@ -520,38 +520,23 @@ wide <- all_loggers %>%
   # Nach Datum/Uhrzeit sortieren
   arrange(DateTime)
 
-# 3. Korrelationsmatrix der Logger-Spalten berechnen
-# Nur numerische Spalten auswählen
-cor_mat <- cor(
-  wide %>% select(where(is.numeric)),
-  use = "pairwise.complete.obs"
-)
-
-# 4. Korrelationsmatrix auf 2 Nachkommastellen runden
-round(cor_mat, 2)
-
-# 5. Korrelationswerte für Logger "MTM" sortiert
-sort(cor_mat["MTM", ], decreasing = TRUE)
-```
-
-```{r}
-# 1. Aus dem 'wide'-Datensatz werden alle Zeilen ausgewählt, bei denen 'MTM' nicht NA ist.
+# 3. Aus dem 'wide'-Datensatz werden alle Zeilen ausgewählt, bei denen 'MTM' nicht NA ist.
 train <- wide %>%
   filter(!is.na(MTM))
 
-# 2. Lineares Regressionsmodell erstellen
+# 4. Lineares Regressionsmodell erstellen
 # 'MTM' wird als abhängige Variable genommen, 
 # und 'MTN', 'MTS' und 'MTO' als unabhängige Variablen.
 mod <- lm(MTM ~ MTN + MTS + MTO, data = train)
 
-# 3. Zusammenfassung des Modells anzeigen
+# 5. Zusammenfassung des Modells anzeigen
 # relativ gute R² Werte, ca. 0.95
 summary(mod)
 
-# 4. Vorhersagen für alle Zeilen im Datensatz erstellen
+# 6. Vorhersagen für alle Zeilen im Datensatz erstellen
 pred <- predict(mod, newdata = wide)
 
-# 5. Fehlende Werte in 'MTM' auffüllen
+# 7. Fehlende Werte in 'MTM' auffüllen
 # Wenn 'MTM' NA ist, wird der vorhergesagte Wert genommen, sonst bleibt der Originalwert
 wide$MTM_filled <- ifelse(
   is.na(wide$MTM),
@@ -559,7 +544,7 @@ wide$MTM_filled <- ifelse(
   wide$MTM
 )
 
-# 6. Validierung simulieren, zufällig 2000 bekannte MTM-Werte auswählen, um sie als "fehlend" zu markieren -> Vorhersagen -> messen, wie stark die Vorhersagen von den echten Werten abweichen
+# 8. Validierung simulieren, zufällig 2000 bekannte MTM-Werte auswählen, um sie als "fehlend" zu markieren -> Vorhersagen -> messen, wie stark die Vorhersagen von den echten Werten abweichen
 set.seed(42)  
 idx <- sample(which(!is.na(wide$MTM)), 2000)
 wide_test <- wide
@@ -714,70 +699,6 @@ all_loggers_filled <- all_loggers_complete %>%
 ```{r}
 # Lade Package
 library(missForest)
-
-var <- "Temp_sonne_C"
-
-wide <- all_loggers %>%
-  select(DateTime, Standort, Logger_ID, all_of(var)) %>%
-  filter(Standort == "MT") %>%
-  pivot_wider(names_from = Logger_ID,
-              values_from = all_of(var)) %>%
-  arrange(DateTime)
-
-# Zeitliche Features hinzufügen
-wide$Hour <- as.numeric(format(wide$DateTime, "%H"))
-wide$DayOfYear <- as.numeric(format(wide$DateTime, "%j"))
-
-# -----------------------------
-# 2️⃣ Nur numerische Logger + Zeitfeatures
-# -----------------------------
-df_mf <- wide %>%
-  select(MTM, MTN, MTS, MTO, Hour, DayOfYear)
-
-# Weekday als Dummy-Spalten (Base R)
-weekdays_factor <- as.factor(weekdays(wide$DateTime))
-weekdays_dummy <- model.matrix(~ weekdays_factor - 1)  # -1 entfernt Intercept
-colnames(weekdays_dummy) <- paste0("Weekday_", colnames(weekdays_dummy))
-
-# Alle numerischen + Dummy-Spalten zusammenfügen
-df_mf <- cbind(df_mf, weekdays_dummy)
-
-# -----------------------------
-# 3️⃣ Testwerte markieren für RMSE
-# -----------------------------
-set.seed(42)
-idx <- sample(which(!is.na(df_mf$MTM)), 2000)  # zufällige echte Werte
-df_test <- df_mf
-df_test$MTM[idx] <- NA  # diese Werte sollen imputiert werden
-
-# -----------------------------
-# 4️⃣ missForest ausführen
-# -----------------------------
-set.seed(42)
-imputed <- missForest(df_test, verbose = TRUE, maxiter = 10)
-
-# Aufgefüllter Datensatz
-df_filled <- imputed$ximp
-
-# -----------------------------
-# 5️⃣ RMSE für Testwerte berechnen
-# -----------------------------
-rmse_mf <- sqrt(mean(
-  (df_filled$MTM[idx] - df_mf$MTM[idx])^2
-))
-rmse_mf
-```
-
-Fehlende Messwerte identifizieren
-
-```{r}
-#install.packages("missForest")
-library(missForest)
-        
-# Tabelle mit allen Daten des Standortes MT erzeugen
-MT_data <- all_loggers_complete %>%
-  filter(Standort == "MT")
-
 
 
 ```
