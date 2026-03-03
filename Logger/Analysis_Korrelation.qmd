@@ -760,7 +760,6 @@ nrmse <- mean_rmse / sd(df_original$MTM, na.rm = TRUE) # 14,39 %, ist ok, geht a
 nrmse
 
 # 5) Imputation mit allen Daten
-
 set.seed(42)
 final_imputation <- missForest(df_original,
                                verbose = TRUE,
@@ -772,7 +771,9 @@ df_filled <- final_imputation$ximp
 
 für mehrer Logger an einem Standort hat es nicht funktioniert (zumindest habe ich es nicht hinbekommen, wahrscheinlich zu viel NA-Werte für diese Model) -\> deswegen versuch mittels MissRanger (kann besser mit vielen NA-Werten umgehen)
 
-## 4.3 MissRanger
+## 4.3 MissRanger (dauert sehr lange - 1h Durchlaufzeit!!!)
+
+berechnet alle fehlenden Messwerte für alle Logger an einem Standort, extrem ungenau und unrealistische Werte
 
 ```{r}
 install.packages("missRanger")
@@ -796,10 +797,13 @@ numeric_cols <- MT_data %>%
   mutate(across(everything(), as.numeric))
 
 # MissRanger Imputation durchführen
+# PMM = Predictive Mean Matching.
+#Statt den Random-Forest-Wert direkt zu nehmen, sucht PMM die k nächstgelegenen Werte im Originaldatensatz und wählt zufällig einen davon.
+#Vorteil: realistischer, stabiler bei vielen fehlenden Werten.
 set.seed(123)  # für Reproduzierbarkeit
 imputed_numeric <- missRanger(
   numeric_cols,
-  pmm.k = 3   # predictive mean matching, stabil bei vielen NAs
+  pmm.k = 3   
 )
 
 # Ergebnisse wieder zusammenführen mit Meta-Daten
