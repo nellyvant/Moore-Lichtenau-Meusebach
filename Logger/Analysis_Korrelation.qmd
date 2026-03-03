@@ -501,7 +501,7 @@ cross_logger_cor <- bind_rows(result)
 cross_logger_cor
 ```
 
-## 4.1 Lineares Modell 
+## 4.1 Lineares Modell
 
 ```{r}
 ###### Meusebach trocken - Mitte Logger: fehlende Daten für "Temp_sonne_C"
@@ -613,7 +613,7 @@ rmse <- sqrt(mean(
 rmse # leicht verbessert 
 ```
 
-## 4.2 RandomForest (nicht linear, kann plötzliche Schwankungen besser erfassen) - deutlich besser 
+## 4.2 RandomForest (nicht linear, kann plötzliche Schwankungen besser erfassen) - deutlich besser
 
 ```{r}
 # Packages
@@ -699,6 +699,9 @@ all_loggers_filled <- all_loggers_complete %>%
 ```{r}
 # Lade Package
 library(missForest)
+
+
+
 
 
 ```
