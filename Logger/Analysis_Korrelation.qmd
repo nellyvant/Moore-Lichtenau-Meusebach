@@ -696,19 +696,123 @@ all_loggers_filled <- all_loggers_complete %>%
 
 ## 4.2 MissForest - nutzt RandomForest (kann fehlende Messgrößen in mehreren Loggern pro Standort erkennen und schätzen, aber ungenauere Vorhersage!!)
 
+nur für Temp_Sonne_C für Alle Logger (MTW & MTM) am Standort MT
+
 ```{r}
-# Lade Package
-library(missForest)
+# 1) Datensatz vorbereiten
+df_mf <- wide %>%
+  select(MTM, MTN, MTS, MTO, Hour, DayOfYear)
 
+# Wochentag als Dummy-Variablen
+weekdays_factor <- as.factor(weekdays(wide$DateTime))
+weekdays_dummy <- model.matrix(~ weekdays_factor - 1)
+colnames(weekdays_dummy) <- paste0("Weekday_", colnames(weekdays_dummy))
 
+df_mf <- cbind(df_mf, weekdays_dummy)
 
+# Sicherstellen: nur numeric oder factor
+df_mf <- as.data.frame(df_mf)
 
+# 2) Original sichern
+df_original <- df_mf
+
+# speichert die Positionen, an denen MTM echte Werte hatte
+valid_index <- which(!is.na(df_original$MTM))
+
+# 3) RMSE-Validierung (5 Wiederholungen)
+rmse_values <- numeric(5)
+
+for(i in 1:5){
+
+  set.seed(100 + i)
+
+  # 20% künstlich entfernen
+  test_sample <- sample(valid_index,
+                        size = floor(0.2 * length(valid_index)))
+
+  df_test <- df_original
+  df_test$MTM[test_sample] <- NA
+
+  # missForest ausführen
+  imputed_test <- missForest(
+    df_test,
+    verbose = FALSE,
+    maxiter = 10,
+    ntree = 500
+  )
+
+  # RMSE berechnen
+  rmse_i <- sqrt(mean(
+    (df_original$MTM[test_sample] -
+     imputed_test$ximp$MTM[test_sample])^2
+  ))
+
+  rmse_values[i] <- rmse_i
+}
+
+mean_rmse <- mean(rmse_values)
+sd_rmse   <- sd(rmse_values)
+mean_rmse # weicht im Durchschnitt 1,53 °C von echten Werten ab 
+sd_rmse # 0.032 -> sehr klein = die 5 Wiederholungen liefern fast identische Ergebnisse, Kein Zufallseffekt
+
+# Optional: relative RMSE = RMSE/SD -> man berechnet den Fehler relativ zur natürlichen Streuung
+nrmse <- mean_rmse / sd(df_original$MTM, na.rm = TRUE) # 14,39 %, ist ok, geht aber besser
+nrmse
+
+# 5) Imputation mit allen Daten
+
+set.seed(42)
+final_imputation <- missForest(df_original,
+                               verbose = TRUE,
+                               maxiter = 10,
+                               ntree = 500)
+
+df_filled <- final_imputation$ximp
+```
+
+für mehrer Logger an einem Standort hat es nicht funktioniert (zumindest habe ich es nicht hinbekommen, wahrscheinlich zu viel NA-Werte für diese Model) -\> deswegen versuch mittels MissRanger (kann besser mit vielen NA-Werten umgehen)
+
+## 4.3 MissRanger
+
+```{r}
+install.packages("missRanger")
+library(missRanger)
+
+# Tabelle mit allen Daten des Standortes MT erzeugen
+MT_data <- all_loggers_complete %>%
+  filter(Standort == "MT")
+
+# MT-Daten auswählen und DateTime konvertieren
+MT_data <- MT_data %>%
+  mutate(DateTime = as.POSIXct(DateTime, format="%Y-%m-%d %H:%M:%S"))
+
+# Meta-Daten speichern (nicht imputieren)
+meta <- MT_data %>%
+  select(DateTime, Standort, Logger, Logger_ID)
+
+# Nur numerische Messwerte auswählen für Imputation
+numeric_cols <- MT_data %>%
+  select(-DateTime, -Standort, -Logger, -Logger_ID) %>%
+  mutate(across(everything(), as.numeric))
+
+# MissRanger Imputation durchführen
+set.seed(123)  # für Reproduzierbarkeit
+imputed_numeric <- missRanger(
+  numeric_cols,
+  pmm.k = 3   # predictive mean matching, stabil bei vielen NAs
+)
+
+# Ergebnisse wieder zusammenführen mit Meta-Daten
+MTW_imputed <- cbind(meta, imputed_numeric)
+
+# Optional: Struktur prüfen
+str(MTW_imputed)
 
 ```
 
-## 4.3 Mice-Model
+## 4.4 Mice-Model
 
-### 4.3.1 lernt nur aus sich selbst (nicht aus den anderen Loggern)
+### 4.4.1 lernt nur aus sich selbst (nicht aus den anderen Loggern)
 
 ```{r}
 #install.packages("mice")
@@ -747,7 +851,7 @@ imputed_data$predictorMatrix
 densityplot(imputed_data)
 ```
 
-### 4.3.2 lernt aus den anderen Loggern am Standort
+### 4.4.2 lernt aus den anderen Loggern am Standort
 
 ```{r}
 messgroessen <- c(
