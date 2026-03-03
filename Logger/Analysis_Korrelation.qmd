@@ -900,7 +900,7 @@ MT_imputed_wide <- cbind(meta, completed_data)
 
 ```
 
-Prüfung ob die erzeugten Werte annähernd an die echten herankommen (dauert mega lange! ca 50 min)
+Prüfung ob die erzeugten Werte annähernd an die echten herankommen (dauert mega lange! \> 2h)
 
 ```{r}
 mess_cols <- grep(
