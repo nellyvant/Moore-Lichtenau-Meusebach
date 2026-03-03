@@ -776,7 +776,7 @@ für mehrer Logger an einem Standort hat es nicht funktioniert (zumindest habe i
 berechnet alle fehlenden Messwerte für alle Logger an einem Standort, extrem ungenau und unrealistische Werte
 
 ```{r}
-install.packages("missRanger")
+#install.packages("missRanger")
 library(missRanger)
 
 # Tabelle mit allen Daten des Standortes MT erzeugen
@@ -849,7 +849,6 @@ MT_data_imputed <- cbind(meta, completed_data)
 # Flag hinzufügen
 imputation_flag <- cbind(meta, numeric_cols_flag)
 
-
 plot(imputed_data)
 imputed_data$predictorMatrix
 densityplot(imputed_data)
@@ -874,21 +873,24 @@ MT_wide <- MT_data_complete %>%
     names_sep   = "_"
   )
 
-meta <- MT_wide %>%
-  select(DateTime)
+MT_wide <- MT_wide %>%
+  mutate(
+    Hour      = as.numeric(format(DateTime, "%H")),
+    Weekday   = as.factor(weekdays(DateTime)),
+    DayOfYear = as.numeric(format(DateTime, "%j")),
+    Hour_sin  = sin(2 * pi * Hour / 24),
+    Hour_cos  = cos(2 * pi * Hour / 24)
+  )
 
-numeric_cols <- MT_wide %>%
-  select(-DateTime)
+meta <- MT_wide %>% select(DateTime, Hour, Weekday, DayOfYear, Hour_sin, Hour_cos)
 
-numeric_cols_flag <- numeric_cols %>%
-  mutate(across(everything(), ~is.na(.)))
-
+numeric_cols <- MT_wide %>% select(-DateTime)
 
 imputed_data <- mice(
   numeric_cols,
   m = 1,        # eine imputierte Version
   method = "pmm",
-  maxit = 50,    # 5 Iterationen
+  maxit = 50,    # 50 Iterationen
   seed = 123
 )
 
@@ -896,8 +898,101 @@ completed_data <- complete(imputed_data)
 
 MT_imputed_wide <- cbind(meta, completed_data)
 
-plot(imputed_data)
-imputed_data$predictorMatrix
-densityplot(imputed_data)
+```
 
+Prüfung ob die erzeugten Werte annähernd an die echten herankommen (dauert mega lange! ca 50 min)
+
+```{r}
+mess_cols <- grep(
+  paste(messgroessen, collapse = "|"),
+  colnames(numeric_cols),
+  value = TRUE
+)
+
+numeric_cols_mess <- numeric_cols %>%
+  select(all_of(mess_cols)) %>%
+  mutate(across(everything(), as.numeric))  # sicherstellen, dass alles numerisch ist
+
+set.seed(123)
+n_reps <- 5       # Anzahl der Wiederholungen
+frac_na <- 0.2    # 20% künstlich entfernen
+
+rmse_results <- data.frame(
+  Variable = mess_cols,
+  mean_RMSE = NA,
+  sd_RMSE = NA,
+  nRMSE = NA
+)
+
+for(col in mess_cols) {
+  
+  rmse_values <- numeric(n_reps)
+  
+  for(i in 1:n_reps) {
+    
+    # 20% der Werte zufällig auf NA setzen
+    test_idx <- sample(1:nrow(numeric_cols_mess),
+                       size = floor(frac_na * nrow(numeric_cols_mess)))
+    
+    df_test <- numeric_cols_mess
+    df_test[test_idx, col] <- NA
+    
+    # MICE-Imputation nur auf Messspalten
+    imp <- mice(
+      df_test,
+      m = 1,
+      method = "pmm",
+      maxit = 10,
+      seed = 100 + i,
+      printFlag = TRUE
+    )
+    
+    imputed <- complete(imp)
+    
+    # RMSE für diese Wiederholung
+    rmse_values[i] <- sqrt(
+      mean((numeric_cols_mess[test_idx, col] - imputed[test_idx, col])^2, na.rm = TRUE)
+    )
+  }
+  
+  # Ergebnisse zusammenfassen
+  rmse_results[rmse_results$Variable == col, "mean_RMSE"] <- mean(rmse_values)
+  rmse_results[rmse_results$Variable == col, "sd_RMSE"]   <- sd(rmse_values)
+  rmse_results[rmse_results$Variable == col, "nRMSE"]     <- mean(rmse_values) / sd(numeric_cols_mess[[col]], na.rm = TRUE)
+}
+
+rmse_results <- rmse_results %>% arrange(nRMSE)
+rmse_results
+```
+
+```{r}
+# erzeugte Daten wieder in die Originaltabelle einfügen
+mess_cols <- grep(
+  "Temp_sonne_C|Temp_schatten_C|Licht_lux|relLF_percent|Taupunkt_C",
+  colnames(completed_data),
+  value = TRUE
+)
+
+# Long-Format erzeugen
+filled_long <- completed_data %>%
+  mutate(DateTime = meta$DateTime) %>%
+  pivot_longer(
+    cols = all_of(mess_cols),
+    names_to = c(".value", "Logger_ID"),  # Spaltenname in Messgröße + Logger_ID splitten
+    names_sep = "_"                       # trennt bei "_"
+  )
+
+# 3️⃣ Mit Originaldaten zusammenführen
+# -----------------------------
+all_loggers_filled <- all_loggers_complete %>%
+  left_join(filled_long, by = c("DateTime", "Logger_ID")) %>%
+  mutate(across(
+    all_of(c("Temp_sonne_C","Temp_schatten_C","Licht_lux","relLF_percent","Taupunkt_C")),
+    ~ ifelse(is.na(.x), get(paste0(cur_column(), "_filled")), .x)
+  )) %>%
+  select(-ends_with("_filled"))
+
+# all_loggers_filled enthält nun:
+# - alle Originaldaten
+# - alle fehlenden Messwerte wurden durch die imputierten Werte von mice ersetzt
 ```
