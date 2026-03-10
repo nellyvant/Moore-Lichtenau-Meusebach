@@ -395,6 +395,10 @@ round(cor_mat, 2)
 ```
 
 ```{r}
+# Standort MN filtern
+#df_mn <- all_loggers %>%
+#  filter(Standort == "MN")
+
 # Standort MT filtern
 df_mt <- all_loggers %>%
   filter(Standort == "MT")
@@ -468,9 +472,7 @@ vars <- c(
 )
 
 target <- "MTM"
-
 other_loggers <- unique(df_mt$Logger_ID)
-other_loggers <- other_loggers[other_loggers != target]
 
 result <- list()
 
@@ -499,6 +501,9 @@ for(logger in other_loggers){
 cross_logger_cor <- bind_rows(result)
 
 cross_logger_cor
+
+#library(writexl)
+#write_xlsx(cross_logger_cor, "cross_logger_cor.xlsx")
 ```
 
 ## 4.1 Lineares Modell
@@ -620,7 +625,9 @@ rmse # leicht verbessert
 library(randomForest)
 ```
 
-\################## Temp_sonne_C
+### Meusebach trocken
+
+#### MTM Temp_sonne_C
 
 ```{r}
 # Variable definieren
@@ -721,7 +728,7 @@ all_loggers_filled <- all_loggers_complete %>%
   select(-Temp_sonne_C_filled)
 ```
 
-\################## MTM Taupunkt
+#### MTM Taupunkt
 
 ```{r}
 # Variable definieren
@@ -826,11 +833,11 @@ all_loggers_filled <- all_loggers_filled %>%
 
 ```
 
-\################## MTM Relative Luftfeuchtigkeit
+#### MTM Relative Luftfeuchtigkeit
 
 ```{r}
 # Variable definieren
-var <- "RelLF_percent"
+var <- "relLF_percent"
 
 # Datensatz vorbereiten wie vorher
 wide <- all_loggers %>%
@@ -903,30 +910,229 @@ sd_rmse   <- sd(rmse_vals)
 nrmse     <- mean_rmse / sd(wide$MTM, na.rm = TRUE)
 # -> ändert sich bei wiederholten Durchlauf
 
-mean_rmse # Taupunkt: weicht ca. 0,20 °C von den echten Werten ab
-sd_rmse # SD: 0,002 -> bei 5 Wiederholungen fast identische Ergebnisse = stabiles Modell, keine Zufallseffekte 
-nrmse # Fehler relativ zur natürlichen Streuung: 0,060 -> Fehler ist relativ klein im Verhältnis zur natürlichen Variabilität
+mean_rmse # Taupunkt: weicht ca. 0,81 % von den echten Werten ab
+sd_rmse # SD: 0,01 -> bei 5 Wiederholungen fast identische Ergebnisse = stabiles Modell, keine Zufallseffekte 
+nrmse # Fehler relativ zur natürlichen Streuung: 0,044 -> Fehler ist relativ klein im Verhältnis zur natürlichen Variabilität
 
 # erzeugte Daten wieder in die Originaltabelle einfügen 
-mtm_filled_long_Tau <- wide %>%
+mtm_filled_long_LF <- wide %>%
   select(DateTime, MTM_filled_rf) %>%
-  rename(Taupunkt_C = MTM_filled_rf) %>%
+  rename(relLF_percent = MTM_filled_rf) %>%
   mutate(Logger_ID = "MTM")
 
-mtm_filled_long_renamed <- mtm_filled_long_Tau %>%
-  rename(Taupunkt_C_filled = Taupunkt_C)
+mtm_filled_long_renamed <- mtm_filled_long_LF %>%
+  rename(relLF_percent_filled = relLF_percent)
 
 all_loggers_filled <- all_loggers_filled %>%
   left_join(
-    mtm_filled_long_renamed %>% select(DateTime, Logger_ID, Taupunkt_C_filled),
+    mtm_filled_long_renamed %>% select(DateTime, Logger_ID, relLF_percent_filled),
     by = c("DateTime", "Logger_ID")
   ) %>%
   mutate(
-    Taupunkt_C = case_when(
-      Logger_ID == "MTM" & is.na(Taupunkt_C) ~ round(Taupunkt_C_filled, 2),
-      TRUE ~ round(Taupunkt_C, 2)  # auch die übrigen Werte runden
+    relLF_percent = case_when(
+      Logger_ID == "MTM" & is.na(relLF_percent) ~ round(relLF_percent_filled, 2),
+      TRUE ~ round(relLF_percent, 2)  # auch die übrigen Werte runden
     )
   ) %>%
-  select(-Taupunkt_C_filled)
+  select(-relLF_percent_filled)
+
+```
+
+#### MTM Temp_schatten_C
+
+```{r}
+# Variable definieren
+var <- "Temp_schatten_C"
+
+# Datensatz vorbereiten wie vorher
+wide <- all_loggers %>%
+  select(DateTime, Standort, Logger_ID, all_of(var)) %>%
+  filter(Standort == "MT") %>%
+  pivot_wider(names_from = Logger_ID,
+              values_from = all_of(var)) %>%
+  arrange(DateTime)
+
+# Zeitliche Features hinzufügen
+wide$Hour <- as.numeric(format(wide$DateTime, "%H"))
+wide$Weekday <- as.factor(weekdays(wide$DateTime))
+wide$DayOfYear <- as.numeric(format(wide$DateTime, "%j"))
+wide$Hour_sin <- sin(2 * pi * wide$Hour / 24)
+wide$Hour_cos <- cos(2 * pi * wide$Hour / 24)
+
+train <- wide %>%
+  filter(!is.na(MTM))
+
+# Random Forest Modell erstellen
+mod_rf <- randomForest(
+  MTM ~ MTN + MTS + MTO + Hour_sin + Hour_cos + Weekday + DayOfYear,
+  data = train,
+  ntree = 500,        # je mehr, desto stabiler ist das Model
+  mtry = 3,           
+  importance = TRUE   
+)
+
+ # Modellübersicht -> man kann ableiten, wie wichtig die einzelnen Features waren (also: MTN, MTS, Hour_sin,Weekday, DayOfYear ...)
+mod_rf
+importance(mod_rf)
+# %IncMSE zeigt an, wie stark der Fehler steigt, wenn ein Feature zufällig 
+
+pred_rf <- predict(mod_rf, newdata = wide)
+pred_rf <- round(pred_rf, 2)
+wide$MTM_filled_rf <- ifelse(
+  is.na(wide$MTM),
+  pred_rf,
+  wide$MTM
+)
+
+# RMSE validieren (wie vorher)
+set.seed(42)
+n_reps <- 5
+rmse_vals <- numeric(n_reps)
+
+for(i in 1:n_reps){
+
+  valid_idx <- which(!is.na(wide$MTM))
+
+  idx <- sample(
+    valid_idx,
+    size = floor(0.2 * length(valid_idx))
+  )
+
+  wide_test <- wide
+  wide_test$MTM[idx] <- NA
+
+  pred_test_rf <- predict(mod_rf, newdata = wide_test)
+
+  rmse_vals[i] <- sqrt(mean(
+    (pred_test_rf[idx] - wide$MTM[idx])^2
+  ))
+
+  cat("Wiederholung", i, "fertig\n")
+}
+
+mean_rmse <- mean(rmse_vals)
+sd_rmse   <- sd(rmse_vals)
+nrmse     <- mean_rmse / sd(wide$MTM, na.rm = TRUE)
+# -> ändert sich bei wiederholten Durchlauf
+
+mean_rmse # Taupunkt: weicht ca. 0,097 C° von den echten Werten ab
+sd_rmse # SD: 0,002 -> bei 5 Wiederholungen fast identische Ergebnisse = stabiles Modell, keine Zufallseffekte 
+nrmse # Fehler relativ zur natürlichen Streuung: 0,017 -> Fehler ist relativ klein im Verhältnis zur natürlichen Variabilität
+
+# erzeugte Daten wieder in die Originaltabelle einfügen 
+mtm_filled_long_Temp_schatten <- wide %>%
+  select(DateTime, MTM_filled_rf) %>%
+  rename(Temp_schatten_C = MTM_filled_rf) %>%
+  mutate(Logger_ID = "MTM")
+
+mtm_filled_long_renamed <- mtm_filled_long_Temp_schatten %>%
+  rename(Temp_schatten_C_filled = Temp_schatten_C)
+
+all_loggers_filled <- all_loggers_filled %>%
+  left_join(
+    mtm_filled_long_renamed %>% select(DateTime, Logger_ID, Temp_schatten_C_filled),
+    by = c("DateTime", "Logger_ID")
+  ) %>%
+  mutate(
+    Temp_schatten_C = case_when(
+      Logger_ID == "MTM" & is.na(Temp_schatten_C) ~ round(Temp_schatten_C_filled, 2),
+      TRUE ~ round(Temp_schatten_C, 2)  # auch die übrigen Werte runden
+    )
+  ) %>%
+  select(-Temp_schatten_C_filled)
+```
+
+#### MTM Licht_lux
+
+```{r}
+# Variable definieren
+var <- "Licht_lux"
+
+```
+
+#### MTW Temp_sonne_C
+
+```{r}
+# Variable definieren
+var <- "Temp_sonne_C"
+
+# Datensatz vorbereiten wie vorher
+wide <- all_loggers %>%
+  select(DateTime, Standort, Logger_ID, all_of(var)) %>%
+  filter(Standort == "MT") %>%
+  pivot_wider(names_from = Logger_ID,
+              values_from = all_of(var)) %>%
+  arrange(DateTime)
+
+# Zeitliche Features hinzufügen
+wide$Hour <- as.numeric(format(wide$DateTime, "%H"))
+wide$Weekday <- as.factor(weekdays(wide$DateTime))
+wide$DayOfYear <- as.numeric(format(wide$DateTime, "%j"))
+wide$Hour_sin <- sin(2 * pi * wide$Hour / 24)
+wide$Hour_cos <- cos(2 * pi * wide$Hour / 24)
+
+train <- wide %>%
+  filter(!is.na(MTW))
+
+# Random Forest Modell erstellen
+mod_rf <- randomForest(
+  MTW ~ MTN + MTS + Hour_sin + Hour_cos + Weekday + DayOfYear,
+  data = train,
+  ntree = 500,        # je mehr, desto stabiler ist das Model
+  mtry = 3,           
+  importance = TRUE   
+)
+
+# Modellübersicht -> man kann ableiten, wie wichtig die einzelnen Features waren (also: MTN, MTS, Hour_sin,Weekday, DayOfYear ...)
+mod_rf
+importance(mod_rf)
+# %IncMSE zeigt an, wie stark der Fehler steigt, wenn ein Feature zufällig permutiert wird -> Je höher der Wert, desto wichtiger ist das Feature für die Gesamtvorhersage
+# NodePurity sagt strukturbezogen, wie wichtig ein Feature für die Baumaufteilung ist
+
+pred_rf <- predict(mod_rf, newdata = wide)
+wide$MTW_filled_rf <- ifelse(
+  is.na(wide$MTW),
+  pred_rf,
+  wide$MTW
+)
+
+# RMSE validieren (wie vorher)
+set.seed(42)
+n_reps <- 5 # Anzahl der Wiederholungen
+rmse_vals <- numeric(n_reps) # speichert die werte der 5 Wiederholungen
+
+for(i in 1:n_reps){
+
+  valid_idx <- which(!is.na(wide$MTW)) # nur echte Messwerte auswählen
+
+  idx <- sample(
+    valid_idx,
+    size = floor(0.2 * length(valid_idx)) # zufällig 20% der Werte auswählen
+  )
+
+  wide_test <- wide # Kopie erzeugen
+  wide_test$MTW[idx] <- NA # künstlich 20% auf NA setzen 
+
+  pred_test_rf <- predict(mod_rf, newdata = wide_test) # Vorhersage mit Modell
+
+  rmse_vals[i] <- sqrt(mean(
+    (pred_test_rf[idx] - wide$MTW[idx])^2
+  )) # RMSE berechnen
+
+  cat("Wiederholung", i, "fertig\n") # Fortschrittsanzeige unten in der Console
+}
+
+mean_rmse <- mean(rmse_vals) # Mittelwert
+sd_rmse   <- sd(rmse_vals) # Standardabweichung 
+nrmse     <- mean_rmse / sd(wide$MTW, na.rm = TRUE) # Fehler relativ zur natürlichen Streuung
+
+mean_rmse # Temperatur: weicht ca. 0,59 °C von den echten Werten ab
+sd_rmse # SD: 0,02 -> bei 5 Wiederholungen sehr ähnliche identische Ergebnisse = stabiles Modell, keine Zufallseffekte
+nrmse # NRMSE: 0,055 -> Fehler ist relativ klein im Verhältnis zur natürlichen Variabilität
+```
+
+#### MTW Licht_lux
+
+```{r}
 
 ```
