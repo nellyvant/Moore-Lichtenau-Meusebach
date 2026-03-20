@@ -673,21 +673,49 @@ wide$MTM_filled_rf <- ifelse(
   wide$MTM
 )
 
-#RMSE berechnen aus den intern, durch das Modell berechneten MSE
-rmse_oob <- sqrt(mod_rf$mse[length(mod_rf$mse)])
-rmse_oob # = Werte weichen im Mitel ca. 1,31 °C von echten Werten ab
+# RMSE validieren (wie vorher)
+set.seed(42)
 
-#NRMSE berechnet auf der Basis der Spannweite der Daten
-nrmse_oob <- rmse_oob / (max(wide$MTM, na.rm = TRUE) - min(wide$MTM, na.rm = TRUE))
-nrmse_oob # = Größe des Fehlers im Verhältnis zur Variabilität der Daten - 0,022,  Fehler ist 2,2 % der gesamten Spannweite deiner Daten
-#Spannweite → sehr groß, da Extremwerte reinspielen → kleiner relativer Fehler (2,2 %)
+n_reps <- 5
+rmse_vals <- numeric(n_reps)
 
-#NRMSE berechnet auf der Basis der Standardabweichung der Daten
-#misst den Fehler relativ zur typischen Streuung der Daten (= wie stark das Modell im Durchschnitt vom Mittelwert abweicht, im Verhältnis zur normalen Variabilität der Messwerte)
-sd_mtm <- sd(wide$MTM, na.rm = TRUE)
-nrmse_sd <- rmse_oob / sd_mtm
-nrmse_sd # 0,123 -> Modellfehler ist im Mittel ca. 12,3 % der Standardabweichung der MTM-Daten
-# Fehler im Durchschnitt deutlich kleiner als die natürliche Streuung der Temperaturdaten
+valid_idx <- which(!is.na(wide$MTM)) # nur echte Messwerte
+
+for(i in 1:n_reps){
+  
+  # Zufällig 20% der Daten als Test auswählen
+  test_idx <- sample(valid_idx, size = floor(0.2 * length(valid_idx)))
+  train_idx <- setdiff(valid_idx, test_idx)
+  
+  # Trainings- und Testdaten erzeugen
+  train_data <- wide[train_idx, ]
+  test_data  <- wide[test_idx, ]
+  
+  # Random Forest auf Trainingsdaten trainieren
+  mod_rf <- randomForest(
+    MTM ~ MTN + MTS + MTO + Hour_sin + Hour_cos + Weekday + DayOfYear,
+    data = train_data,
+    ntree = 500,
+    mtry = 3
+  )
+  
+  # Vorhersage auf Testdaten
+  pred_test <- predict(mod_rf, newdata = test_data)
+  
+  # RMSE berechnen
+  rmse_vals[i] <- sqrt(mean((pred_test - test_data$MTM)^2))
+  
+  cat("Wiederholung", i, "fertig\n")
+}
+
+mean_rmse <- mean(rmse_vals)
+sd_rmse   <- sd(rmse_vals)
+nrmse     <- mean_rmse / sd(wide$MTM, na.rm = TRUE)
+
+mean_rmse
+sd_rmse
+nrmse
+
 ```
 
 ```{r}
@@ -756,18 +784,62 @@ wide$MTM_filled_rf <- ifelse(
   wide$MTM
 )
 
-#RMSE berechnen aus den intern, durch das Modell berechneten MSE
-rmse_oob <- sqrt(mod_rf$mse[length(mod_rf$mse)])
-rmse_oob # = Werte weichen im Mitel ca.0,454 °C von echten Werten ab
+# RMSE validieren (wie vorher)
+set.seed(42)
+n_reps <- 5
+rmse_vals <- numeric(n_reps)
 
-#NRMSE berechnet auf der Basis der Spannweite der Daten
-nrmse_oob <- rmse_oob / (max(wide$MTM, na.rm = TRUE) - min(wide$MTM, na.rm = TRUE))
-nrmse_oob # = Größe des Fehlers im Verhältnis zur Variabilität der Daten - 0,019,  Fehler ist 1,9 % der gesamten Spannweite deiner Daten
+for(i in 1:n_reps){
 
-#NRMSE berechnet auf der Basis der Standardabweichung der Daten
-sd_mtm <- sd(wide$MTM, na.rm = TRUE)
-nrmse_sd <- rmse_oob / sd_mtm
-nrmse_sd # 0,134 -> Modellfehler ist im Mittel ca. 13,4 % der Standardabweichung der MTM-Daten
+  valid_idx <- which(!is.na(wide$MTM))
+
+  idx <- sample(
+    valid_idx,
+    size = floor(0.2 * length(valid_idx))
+  )
+
+  wide_test <- wide
+  wide_test$MTM[idx] <- NA
+
+  pred_test_rf <- predict(mod_rf, newdata = wide_test)
+
+  rmse_vals[i] <- sqrt(mean(
+    (pred_test_rf[idx] - wide$MTM[idx])^2
+  ))
+
+  cat("Wiederholung", i, "fertig\n")
+}
+
+mean_rmse <- mean(rmse_vals)
+sd_rmse   <- sd(rmse_vals)
+nrmse     <- mean_rmse / sd(wide$MTM, na.rm = TRUE)
+# -> ändert sich bei wiederholten Durchlauf
+
+mean_rmse # Taupunkt: weicht ca. 0,20 °C von den echten Werten ab
+sd_rmse # SD: 0,002 -> bei 5 Wiederholungen fast identische Ergebnisse = stabiles Modell, keine Zufallseffekte 
+nrmse # Fehler relativ zur natürlichen Streuung: 0,060 -> Fehler ist relativ klein im Verhältnis zur natürlichen Variabilität
+
+# erzeugte Daten wieder in die Originaltabelle einfügen 
+mtm_filled_long_Tau <- wide %>%
+  select(DateTime, MTM_filled_rf) %>%
+  rename(Taupunkt_C = MTM_filled_rf) %>%
+  mutate(Logger_ID = "MTM")
+
+mtm_filled_long_renamed <- mtm_filled_long_Tau %>%
+  rename(Taupunkt_C_filled = Taupunkt_C)
+
+all_loggers_filled <- all_loggers_filled %>%
+  left_join(
+    mtm_filled_long_renamed %>% select(DateTime, Logger_ID, Taupunkt_C_filled),
+    by = c("DateTime", "Logger_ID")
+  ) %>%
+  mutate(
+    Taupunkt_C = case_when(
+      Logger_ID == "MTM" & is.na(Taupunkt_C) ~ round(Taupunkt_C_filled, 2),
+      TRUE ~ round(Taupunkt_C, 2)  # auch die übrigen Werte runden
+    )
+  ) %>%
+  select(-Taupunkt_C_filled)
 
 ```
 
@@ -817,18 +889,63 @@ wide$MTM_filled_rf <- ifelse(
   wide$MTM
 )
 
-#RMSE berechnen aus den intern, durch das Modell berechneten MSE
-rmse_oob <- sqrt(mod_rf$mse[length(mod_rf$mse)])
-rmse_oob # = Werte weichen im Mitel ca.1,8123 % von echten Werten ab
+# RMSE validieren (wie vorher)
+set.seed(42)
+n_reps <- 5
+rmse_vals <- numeric(n_reps)
 
-#NRMSE berechnet auf der Basis der Spannweite der Daten
-nrmse_oob <- rmse_oob / (max(wide$MTM, na.rm = TRUE) - min(wide$MTM, na.rm = TRUE))
-nrmse_oob # = Größe des Fehlers im Verhältnis zur Variabilität der Daten - 0,024,  Fehler ist 2,4 % der gesamten Spannweite deiner Daten
+for(i in 1:n_reps){
 
-#NRMSE berechnet auf der Basis der Standardabweichung der Daten
-sd_mtm <- sd(wide$MTM, na.rm = TRUE)
-nrmse_sd <- rmse_oob / sd_mtm
-nrmse_sd # 0,098 -> Modellfehler ist im Mittel ca. 9,8 % der Standardabweichung der MTM-Daten
+  valid_idx <- which(!is.na(wide$MTM))
+
+  idx <- sample(
+    valid_idx,
+    size = floor(0.2 * length(valid_idx))
+  )
+
+  wide_test <- wide
+  wide_test$MTM[idx] <- NA
+
+  pred_test_rf <- predict(mod_rf, newdata = wide_test)
+
+  rmse_vals[i] <- sqrt(mean(
+    (pred_test_rf[idx] - wide$MTM[idx])^2
+  ))
+
+  cat("Wiederholung", i, "fertig\n")
+}
+
+mean_rmse <- mean(rmse_vals)
+sd_rmse   <- sd(rmse_vals)
+nrmse     <- mean_rmse / sd(wide$MTM, na.rm = TRUE)
+# -> ändert sich bei wiederholten Durchlauf
+
+mean_rmse # Luftfeuchtigkeit: weicht ca. 0,81 % von den echten Werten ab
+sd_rmse # SD: 0,01 -> bei 5 Wiederholungen fast identische Ergebnisse = stabiles Modell, keine Zufallseffekte 
+nrmse # Fehler relativ zur natürlichen Streuung: 0,044 -> Fehler ist relativ klein im Verhältnis zur natürlichen Variabilität
+
+# erzeugte Daten wieder in die Originaltabelle einfügen 
+mtm_filled_long_LF <- wide %>%
+  select(DateTime, MTM_filled_rf) %>%
+  rename(relLF_percent = MTM_filled_rf) %>%
+  mutate(Logger_ID = "MTM")
+
+mtm_filled_long_renamed <- mtm_filled_long_LF %>%
+  rename(relLF_percent_filled = relLF_percent)
+
+all_loggers_filled <- all_loggers_filled %>%
+  left_join(
+    mtm_filled_long_renamed %>% select(DateTime, Logger_ID, relLF_percent_filled),
+    by = c("DateTime", "Logger_ID")
+  ) %>%
+  mutate(
+    relLF_percent = case_when(
+      Logger_ID == "MTM" & is.na(relLF_percent) ~ round(relLF_percent_filled, 2),
+      TRUE ~ round(relLF_percent, 2)  # auch die übrigen Werte runden
+    )
+  ) %>%
+  select(-relLF_percent_filled)
+
 ```
 
 #### MTM Temp_schatten_C
@@ -877,18 +994,62 @@ wide$MTM_filled_rf <- ifelse(
   wide$MTM
 )
 
-#RMSE berechnen aus den intern, durch das Modell berechneten MSE
-rmse_oob <- sqrt(mod_rf$mse[length(mod_rf$mse)])
-rmse_oob # = Werte weichen im Mitel ca.0,218 °C von echten Werten ab
+# RMSE validieren (wie vorher)
+set.seed(42)
+n_reps <- 5
+rmse_vals <- numeric(n_reps)
 
-#NRMSE berechnet auf der Basis der Spannweite der Daten
-nrmse_oob <- rmse_oob / (max(wide$MTM, na.rm = TRUE) - min(wide$MTM, na.rm = TRUE))
-nrmse_oob # = Größe des Fehlers im Verhältnis zur Variabilität der Daten - 0,007,  Fehler ist 0,7 % der gesamten Spannweite deiner Daten
+for(i in 1:n_reps){
 
-#NRMSE berechnet auf der Basis der Standardabweichung der Daten
-sd_mtm <- sd(wide$MTM, na.rm = TRUE)
-nrmse_sd <- rmse_oob / sd_mtm
-nrmse_sd # 0,039 -> Modellfehler ist im Mittel ca. 3,9 % der Standardabweichung der MTM-Daten
+  valid_idx <- which(!is.na(wide$MTM))
+
+  idx <- sample(
+    valid_idx,
+    size = floor(0.2 * length(valid_idx))
+  )
+
+  wide_test <- wide
+  wide_test$MTM[idx] <- NA
+
+  pred_test_rf <- predict(mod_rf, newdata = wide_test)
+
+  rmse_vals[i] <- sqrt(mean(
+    (pred_test_rf[idx] - wide$MTM[idx])^2
+  ))
+
+  cat("Wiederholung", i, "fertig\n")
+}
+
+mean_rmse <- mean(rmse_vals)
+sd_rmse   <- sd(rmse_vals)
+nrmse     <- mean_rmse / sd(wide$MTM, na.rm = TRUE)
+# -> ändert sich bei wiederholten Durchlauf
+
+mean_rmse # Temperatur (schatten): weicht ca. 0,097 C° von echten Werten ab
+sd_rmse # SD: 0,002 -> bei 5 Wiederholungen fast identische Ergebnisse = stabiles Modell, keine Zufallseffekte 
+nrmse # Fehler relativ zur natürlichen Streuung: 0,017 -> Fehler ist relativ klein im Verhältnis zur natürlichen Variabilität
+
+# erzeugte Daten wieder in die Originaltabelle einfügen 
+mtm_filled_long_Temp_schatten <- wide %>%
+  select(DateTime, MTM_filled_rf) %>%
+  rename(Temp_schatten_C = MTM_filled_rf) %>%
+  mutate(Logger_ID = "MTM")
+
+mtm_filled_long_renamed <- mtm_filled_long_Temp_schatten %>%
+  rename(Temp_schatten_C_filled = Temp_schatten_C)
+
+all_loggers_filled <- all_loggers_filled %>%
+  left_join(
+    mtm_filled_long_renamed %>% select(DateTime, Logger_ID, Temp_schatten_C_filled),
+    by = c("DateTime", "Logger_ID")
+  ) %>%
+  mutate(
+    Temp_schatten_C = case_when(
+      Logger_ID == "MTM" & is.na(Temp_schatten_C) ~ round(Temp_schatten_C_filled, 2),
+      TRUE ~ round(Temp_schatten_C, 2)  # auch die übrigen Werte runden
+    )
+  ) %>%
+  select(-Temp_schatten_C_filled)
 ```
 
 #### MTM Licht_lux
@@ -945,18 +1106,61 @@ wide$MTW_filled_rf <- ifelse(
   wide$MTW
 )
 
-#RMSE berechnen aus den intern, durch das Modell berechneten MSE
-rmse_oob <- sqrt(mod_rf$mse[length(mod_rf$mse)])
-rmse_oob # = Werte weichen im Mitel ca.0,218 °C von echten Werten ab
+# RMSE validieren (wie vorher)
+set.seed(42)
+n_reps <- 5 # Anzahl der Wiederholungen
+rmse_vals <- numeric(n_reps) # speichert die werte der 5 Wiederholungen
 
-#NRMSE berechnet auf der Basis der Spannweite der Daten
-nrmse_oob <- rmse_oob / (max(wide$MTM, na.rm = TRUE) - min(wide$MTM, na.rm = TRUE))
-nrmse_oob # = Größe des Fehlers im Verhältnis zur Variabilität der Daten - 0,007,  Fehler ist 0,7 % der gesamten Spannweite deiner Daten
+for(i in 1:n_reps){
 
-#NRMSE berechnet auf der Basis der Standardabweichung der Daten
-sd_mtm <- sd(wide$MTM, na.rm = TRUE)
-nrmse_sd <- rmse_oob / sd_mtm
-nrmse_sd # 0,039 -> Modellfehler ist im Mittel ca. 3,9 % der Standardabweichung der MTM-Daten
+  valid_idx <- which(!is.na(wide$MTW)) # nur echte Messwerte auswählen
+
+  idx <- sample(
+    valid_idx,
+    size = floor(0.2 * length(valid_idx)) # zufällig 20% der Werte auswählen
+  )
+
+  wide_test <- wide # Kopie erzeugen
+  wide_test$MTW[idx] <- NA # künstlich 20% auf NA setzen 
+
+  pred_test_rf <- predict(mod_rf, newdata = wide_test) # Vorhersage mit Modell
+
+  rmse_vals[i] <- sqrt(mean(
+    (pred_test_rf[idx] - wide$MTW[idx])^2
+  )) # RMSE berechnen
+
+  cat("Wiederholung", i, "fertig\n") # Fortschrittsanzeige unten in der Console
+}
+
+mean_rmse <- mean(rmse_vals) # Mittelwert
+sd_rmse   <- sd(rmse_vals) # Standardabweichung 
+nrmse     <- mean_rmse / sd(wide$MTW, na.rm = TRUE) # Fehler relativ zur natürlichen Streuung
+
+mean_rmse # Temperatur: weicht ca. 0,28 °C von den echten Werten ab
+sd_rmse # SD: 0,007 -> bei 5 Wiederholungen sehr ähnliche identische Ergebnisse = stabiles Modell, keine Zufallseffekte
+nrmse # NRMSE: 0,053 -> Fehler ist relativ klein im Verhältnis zur natürlichen Variabilität
+
+# erzeugte Daten wieder in die Originaltabelle einfügen 
+mtw_filled_long_Temp_schatten <- wide %>%
+  select(DateTime, MTW_filled_rf) %>%
+  rename(Temp_schatten_C = MTW_filled_rf) %>%
+  mutate(Logger_ID = "MTW")
+
+mtw_filled_long_renamed <- mtw_filled_long_Temp_schatten %>%
+  rename(Temp_schatten_C_filled = Temp_schatten_C)
+
+all_loggers_filled <- all_loggers_filled %>%
+  left_join(
+    mtw_filled_long_renamed %>% select(DateTime, Logger_ID, Temp_schatten_C_filled),
+    by = c("DateTime", "Logger_ID")
+  ) %>%
+  mutate(
+    Temp_schatten_C = case_when(
+      Logger_ID == "MTW" & is.na(Temp_schatten_C) ~ round(Temp_schatten_C_filled, 2),
+      TRUE ~ round(Temp_schatten_C, 2)  # auch die übrigen Werte runden
+    )
+  ) %>%
+  select(-Temp_schatten_C_filled)
 ```
 
 #### MTW Relative Luftfeuchtigkeit
