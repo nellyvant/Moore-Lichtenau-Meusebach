@@ -648,12 +648,23 @@ wide$DayOfYear <- as.numeric(format(wide$DateTime, "%j"))
 wide$Hour_sin <- sin(2 * pi * wide$Hour / 24)
 wide$Hour_cos <- cos(2 * pi * wide$Hour / 24)
 
+wide$is_weekend <- wide$Weekday %in% c("Saturday", "Sunday")#Wochenende-Flag
+wide$DayOfYear_sin <- sin(2 * pi * wide$DayOfYear / 365)#saisonaler Trend
+wide$DayOfYear_cos <- cos(2 * pi * wide$DayOfYear / 365)#kompletter zyklischer Trend
+
+wide <- wide %>%
+  mutate(
+    diff_MTN_MTS = ifelse(!is.na(MTN) & !is.na(MTS), MTN - MTS, NA),
+    diff_MTN_MTO = ifelse(!is.na(MTN) & !is.na(MTO), MTN - MTO, NA),
+    diff_MTS_MTO = ifelse(!is.na(MTS) & !is.na(MTO), MTS - MTO, NA)
+  )
+
 train <- wide %>%
   filter(!is.na(MTM))
 
 # Random Forest Modell erstellen
 mod_rf <- randomForest(
-  MTM ~ MTN + MTS + MTO + Hour_sin + Hour_cos + Weekday + DayOfYear,
+  MTM ~ MTN + MTS + MTO + Hour_sin + Hour_cos + Weekday + DayOfYear + DayOfYear_sin + DayOfYear_cos + is_weekend + diff_MTN_MTS + diff_MTN_MTO + diff_MTS_MTO,
   data = train,
   ntree = 500,        # je mehr, desto stabiler ist das Model
   mtry = 3,           
@@ -675,7 +686,7 @@ wide$MTM_filled_rf <- ifelse(
 
 #RMSE berechnen aus den intern, durch das Modell berechneten MSE
 rmse_oob <- sqrt(mod_rf$mse[length(mod_rf$mse)])
-rmse_oob # = Werte weichen im Mitel ca. 1,29 °C von echten Werten ab
+rmse_oob # = Werte weichen im Mitel ca. 1,27 °C von echten Werten ab
 
 #NRMSE berechnet auf der Basis der Spannweite der Daten
 nrmse_oob <- rmse_oob / (max(wide$MTM, na.rm = TRUE) - min(wide$MTM, na.rm = TRUE))
@@ -686,7 +697,7 @@ nrmse_oob # = Größe des Fehlers im Verhältnis zur Variabilität der Daten - 0
 #misst den Fehler relativ zur typischen Streuung der Daten (= wie stark das Modell im Durchschnitt vom Mittelwert abweicht, im Verhältnis zur normalen Variabilität der Messwerte)
 sd_mtm <- sd(wide$MTM, na.rm = TRUE)
 nrmse_sd <- rmse_oob / sd_mtm
-nrmse_sd # 0,121 -> Modellfehler ist im Mittel ca. 12,1 % der Standardabweichung der MTM-Daten
+nrmse_sd # 0,119 -> Modellfehler ist im Mittel ca. 11,9 % der Standardabweichung der MTM-Daten
 # Fehler im Durchschnitt deutlich kleiner als die natürliche Streuung der Temperaturdaten
 ```
 
@@ -731,12 +742,16 @@ wide$DayOfYear <- as.numeric(format(wide$DateTime, "%j"))
 wide$Hour_sin <- sin(2 * pi * wide$Hour / 24)
 wide$Hour_cos <- cos(2 * pi * wide$Hour / 24)
 
+wide$is_weekend <- wide$Weekday %in% c("Saturday", "Sunday")#Wochenende-Flag
+wide$DayOfYear_sin <- sin(2 * pi * wide$DayOfYear / 365)#saisonaler Trend
+wide$DayOfYear_cos <- cos(2 * pi * wide$DayOfYear / 365)#kompletter zyklischer Trend
+
 train <- wide %>%
   filter(!is.na(MTM))
 
 # Random Forest Modell erstellen
 mod_rf <- randomForest(
-  MTM ~ MTN + MTS + MTO + Hour_sin + Hour_cos + Weekday + DayOfYear,
+  MTM ~ MTN + MTS + MTO + Hour_sin + Hour_cos + Weekday + DayOfYear + DayOfYear_sin + DayOfYear_cos + is_weekend,
   data = train,
   ntree = 500,        # je mehr, desto stabiler ist das Model
   mtry = 3,           
@@ -757,16 +772,16 @@ wide$MTM_filled_rf <- ifelse(
 )
 #RMSE berechnen aus den intern, durch das Modell berechneten MSE
 rmse_oob <- sqrt(mod_rf$mse[length(mod_rf$mse)])
-rmse_oob # = Werte weichen im Mitel ca.0,454 °C von echten Werten ab
+rmse_oob # = Werte weichen im Mitel ca.0,449 °C von echten Werten ab
 
 #NRMSE berechnet auf der Basis der Spannweite der Daten
 nrmse_oob <- rmse_oob / (max(wide$MTM, na.rm = TRUE) - min(wide$MTM, na.rm = TRUE))
-nrmse_oob # = Größe des Fehlers im Verhältnis zur Variabilität der Daten - 0,019,  Fehler ist 1,9 % der gesamten Spannweite deiner Daten
+nrmse_oob # = Größe des Fehlers im Verhältnis zur Variabilität der Daten - 0,018,  Fehler ist 1,8 % der gesamten Spannweite deiner Daten
 
 #NRMSE berechnet auf der Basis der Standardabweichung der Daten
 sd_mtm <- sd(wide$MTM, na.rm = TRUE)
 nrmse_sd <- rmse_oob / sd_mtm
-nrmse_sd # 0,134 -> Modellfehler ist im Mittel ca. 13,4 % der Standardabweichung der MTM-Daten
+nrmse_sd # 0,132 -> Modellfehler ist im Mittel ca. 13,2 % der Standardabweichung der MTM-Daten
 
 # erzeugte Daten wieder in die Originaltabelle einfügen 
 mtm_filled_long_Tau <- wide %>%
@@ -813,12 +828,16 @@ wide$DayOfYear <- as.numeric(format(wide$DateTime, "%j"))
 wide$Hour_sin <- sin(2 * pi * wide$Hour / 24)
 wide$Hour_cos <- cos(2 * pi * wide$Hour / 24)
 
+wide$is_weekend <- wide$Weekday %in% c("Saturday", "Sunday")#Wochenende-Flag
+wide$DayOfYear_sin <- sin(2 * pi * wide$DayOfYear / 365)#saisonaler Trend
+wide$DayOfYear_cos <- cos(2 * pi * wide$DayOfYear / 365)#kompletter zyklischer Trend
+
 train <- wide %>%
   filter(!is.na(MTM))
 
 # Random Forest Modell erstellen
 mod_rf <- randomForest(
-  MTM ~ MTN + MTS + MTO + Hour_sin + Hour_cos + Weekday + DayOfYear,
+  MTM ~ MTN + MTS + MTO + Hour_sin + Hour_cos + Weekday + DayOfYear + DayOfYear_sin + DayOfYear_cos + is_weekend,
   data = train,
   ntree = 500,        # je mehr, desto stabiler ist das Model
   mtry = 3,           
@@ -840,16 +859,16 @@ wide$MTM_filled_rf <- ifelse(
 
 #RMSE berechnen aus den intern, durch das Modell berechneten MSE
 rmse_oob <- sqrt(mod_rf$mse[length(mod_rf$mse)])
-rmse_oob # = Werte weichen im Mitel ca.1,8123 % von echten Werten ab
+rmse_oob # = Werte weichen im Mitel ca.1,73 % von echten Werten ab
 
 #NRMSE berechnet auf der Basis der Spannweite der Daten
 nrmse_oob <- rmse_oob / (max(wide$MTM, na.rm = TRUE) - min(wide$MTM, na.rm = TRUE))
-nrmse_oob # = Größe des Fehlers im Verhältnis zur Variabilität der Daten - 0,024,  Fehler ist 2,4 % der gesamten Spannweite deiner Daten
+nrmse_oob # = Größe des Fehlers im Verhältnis zur Variabilität der Daten - 0,022,  Fehler ist 2,2 % der gesamten Spannweite deiner Daten
 
 #NRMSE berechnet auf der Basis der Standardabweichung der Daten
 sd_mtm <- sd(wide$MTM, na.rm = TRUE)
 nrmse_sd <- rmse_oob / sd_mtm
-nrmse_sd # 0,098 -> Modellfehler ist im Mittel ca. 9,8 % der Standardabweichung der MTM-Daten
+nrmse_sd # 0,094 -> Modellfehler ist im Mittel ca. 9,4 % der Standardabweichung der MTM-Daten
 
 # erzeugte Daten wieder in die Originaltabelle einfügen 
 mtm_filled_long_LF <- wide %>%
@@ -896,12 +915,23 @@ wide$DayOfYear <- as.numeric(format(wide$DateTime, "%j"))
 wide$Hour_sin <- sin(2 * pi * wide$Hour / 24)
 wide$Hour_cos <- cos(2 * pi * wide$Hour / 24)
 
+wide$is_weekend <- wide$Weekday %in% c("Saturday", "Sunday")#Wochenende-Flag
+wide$DayOfYear_sin <- sin(2 * pi * wide$DayOfYear / 365)#saisonaler Trend
+wide$DayOfYear_cos <- cos(2 * pi * wide$DayOfYear / 365)#kompletter zyklischer Trend
+
+wide <- wide %>%
+  mutate(
+    diff_MTN_MTS = ifelse(!is.na(MTN) & !is.na(MTS), MTN - MTS, NA),
+    diff_MTN_MTO = ifelse(!is.na(MTN) & !is.na(MTO), MTN - MTO, NA),
+    diff_MTS_MTO = ifelse(!is.na(MTS) & !is.na(MTO), MTS - MTO, NA)
+  )
+
 train <- wide %>%
   filter(!is.na(MTM))
 
 # Random Forest Modell erstellen
 mod_rf <- randomForest(
-  MTM ~ MTN + MTS + MTO + Hour_sin + Hour_cos + Weekday + DayOfYear,
+  MTM ~ MTN + MTS + MTO + Hour_sin + Hour_cos + Weekday + DayOfYear + DayOfYear_sin + DayOfYear_cos + is_weekend + diff_MTN_MTS + diff_MTN_MTO + diff_MTS_MTO,
   data = train,
   ntree = 500,        # je mehr, desto stabiler ist das Model
   mtry = 3,           
@@ -923,16 +953,16 @@ wide$MTM_filled_rf <- ifelse(
 
 #RMSE berechnen aus den intern, durch das Modell berechneten MSE
 rmse_oob <- sqrt(mod_rf$mse[length(mod_rf$mse)])
-rmse_oob # = Werte weichen im Mitel ca.0,218 °C von echten Werten ab
+rmse_oob # = Werte weichen im Mitel ca.0,206 °C von echten Werten ab
 
 #NRMSE berechnet auf der Basis der Spannweite der Daten
 nrmse_oob <- rmse_oob / (max(wide$MTM, na.rm = TRUE) - min(wide$MTM, na.rm = TRUE))
-nrmse_oob # = Größe des Fehlers im Verhältnis zur Variabilität der Daten - 0,007,  Fehler ist 0,7 % der gesamten Spannweite deiner Daten
+nrmse_oob # = Größe des Fehlers im Verhältnis zur Variabilität der Daten - 0,006,  Fehler ist 0,6 % der gesamten Spannweite deiner Daten
 
 #NRMSE berechnet auf der Basis der Standardabweichung der Daten
 sd_mtm <- sd(wide$MTM, na.rm = TRUE)
 nrmse_sd <- rmse_oob / sd_mtm
-nrmse_sd # 0,039 -> Modellfehler ist im Mittel ca. 3,9 % der Standardabweichung der MTM-Daten
+nrmse_sd # 0,036 -> Modellfehler ist im Mittel ca. 3,6 % der Standardabweichung der MTM-Daten
 
 # erzeugte Daten wieder in die Originaltabelle einfügen 
 mtm_filled_long_Temp_schatten <- wide %>%
@@ -960,8 +990,295 @@ all_loggers_filled <- all_loggers_filled %>%
 #### MTM Licht_lux
 
 ```{r}
+# Variable definieren
+var1 <- "Licht_lux"
+var2 <- "Temp_sonne_C"
 
+# Datensatz vorbereiten (beide Variablen reinholen)
+wide <- all_loggers %>%
+  select(DateTime, Standort, Logger_ID, all_of(c(var1, var2))) %>%
+  filter(Standort == "MT") %>%
+  pivot_wider(
+    names_from = Logger_ID,
+    values_from = all_of(c(var1, var2)),
+    names_sep = "_"
+  ) %>%
+  arrange(DateTime)
 
+# Zeitliche Features hinzufügen
+wide$Hour <- as.numeric(format(wide$DateTime, "%H"))
+wide$Weekday <- as.factor(weekdays(wide$DateTime))
+wide$DayOfYear <- as.numeric(format(wide$DateTime, "%j"))
+wide$Hour_sin <- sin(2 * pi * wide$Hour / 24)
+wide$Hour_cos <- cos(2 * pi * wide$Hour / 24)
+wide$is_weekend <- wide$Weekday %in% c("Saturday", "Sunday")
+wide$DayOfYear_sin <- sin(2 * pi * wide$DayOfYear / 365)
+wide$DayOfYear_cos <- cos(2 * pi * wide$DayOfYear / 365)
+
+# Trainingsdaten
+train <- wide %>%
+  filter(!is.na(Licht_lux_MTM))
+
+# Random Forest Modell (manuell wie bei dir erweitert)
+mod_rf <- randomForest(
+  Licht_lux_MTM ~ 
+    Temp_sonne_C_MTN + Licht_lux_MTN +
+    Hour_sin + Hour_cos + Weekday + DayOfYear +
+    DayOfYear_sin + DayOfYear_cos + is_weekend,
+  data = train,
+  ntree = 500,
+  mtry = 3,
+  importance = TRUE
+)
+
+# Modellübersicht
+mod_rf
+importance(mod_rf)
+
+# Vorhersage
+pred_rf <- predict(mod_rf, newdata = wide)
+pred_rf <- round(pred_rf, 2)
+
+wide$MNW_filled_rf <- ifelse(
+  is.na(wide$Licht_lux_MTM),
+  pred_rf,
+  wide$Licht_lux_MTM
+)
+
+# RMSE
+rmse_oob <- sqrt(mod_rf$mse[length(mod_rf$mse)])
+rmse_oob
+
+# NRMSE (Spannweite)
+nrmse_oob <- rmse_oob / (max(wide$Licht_lux_MTM, na.rm = TRUE) - 
+                        min(wide$Licht_lux_MTM, na.rm = TRUE))
+nrmse_oob
+
+# NRMSE (Standardabweichung)
+sd_mnw <- sd(wide$Licht_lux_MTM, na.rm = TRUE)
+nrmse_sd <- rmse_oob / sd_mnw
+nrmse_sd
+
+# erzeugte Daten wieder in die Originaltabelle einfügen 
+mtm_filled_long_Licht <- wide %>%
+  select(DateTime, MTM_filled_rf) %>%
+  rename(Licht_lux = MTM_filled_rf) %>%
+  mutate(Logger_ID = "MTM")
+
+mtm_filled_long_renamed <- mtm_filled_long_Licht %>%
+  rename(Licht_lux_filled = Licht_lux)
+
+all_loggers_filled <- all_loggers_filled %>%
+  left_join(
+    mtm_filled_long_renamed %>% select(DateTime, Logger_ID, Licht_lux_filled),
+    by = c("DateTime", "Logger_ID")
+  ) %>%
+  mutate(
+    Licht_lux = case_when(
+      Logger_ID == "MTM" & is.na(Licht_lux) ~ round(Licht_lux_filled, 2),
+      TRUE ~ round(Licht_lux, 2)  # auch die übrigen Werte runden
+    )
+  ) %>%
+  select(-Licht_lux_filled)
+```
+
+```{r}
+# Variable definieren
+var1 <- "Licht_lux"
+var2 <- "Temp_sonne_C"
+
+# Datensatz vorbereiten
+wide <- all_loggers %>%
+  select(DateTime, Standort, Logger_ID, all_of(c(var1, var2))) %>%
+  filter(Standort == "MT") %>%
+  pivot_wider(
+    names_from = Logger_ID,
+    values_from = all_of(c(var1, var2)),
+    names_sep = "_"
+  ) %>%
+  arrange(DateTime)
+
+# Zeitliche Features
+wide$Hour <- as.numeric(format(wide$DateTime, "%H"))
+wide$Weekday <- as.factor(weekdays(wide$DateTime))
+wide$DayOfYear <- as.numeric(format(wide$DateTime, "%j"))
+wide$Hour_sin <- sin(2 * pi * wide$Hour / 24)
+wide$Hour_cos <- cos(2 * pi * wide$Hour / 24)
+wide$is_weekend <- wide$Weekday %in% c("Saturday", "Sunday")
+wide$DayOfYear_sin <- sin(2 * pi * wide$DayOfYear / 365)
+wide$DayOfYear_cos <- cos(2 * pi * wide$DayOfYear / 365)
+wide$is_day <- wide$Hour >= 6 & wide$Hour <= 20
+
+# Log-Transformation (gegen extreme Peaks)
+wide$Licht_lux_MTM_log <- log1p(wide$Licht_lux_MTM)
+wide$Licht_lux_MTN_log <- log1p(wide$Licht_lux_MTN)
+
+# Trainingsdaten
+train <- wide %>%
+  filter(!is.na(Licht_lux_MTM_log))
+
+# Random Forest (auf Log-Skala!)
+mod_rf <- randomForest(
+  Licht_lux_MTM_log ~ 
+    Licht_lux_MTN_log +
+    Temp_sonne_C_MTN +
+    is_day +
+    Hour_sin + Hour_cos +
+    DayOfYear_sin + DayOfYear_cos,
+  data = train,
+  ntree = 500,
+  mtry = 3,
+  importance = TRUE
+)
+
+# Modellübersicht
+mod_rf
+importance(mod_rf)
+
+# Vorhersage (zurück transformieren!)
+pred_log <- predict(mod_rf, newdata = wide)
+pred_rf <- expm1(pred_log)
+
+wide$MTM_filled_rf <- ifelse(
+  is.na(wide$Licht_lux_MTM),
+  pred_rf,
+  wide$Licht_lux_MTM
+)
+
+# RMSE
+rmse_oob <- sqrt(mod_rf$mse[length(mod_rf$mse)])
+rmse_oob
+
+# NRMSE (Standardabweichung)
+sd_mtw <- sd(wide$Licht_lux_MTM, na.rm = TRUE)
+nrmse_sd <- rmse_oob / sd_mtw
+nrmse_sd
+
+# Zurück ins Long-Format
+mtm_filled_long_Licht <- wide %>%
+  select(DateTime, MTM_filled_rf) %>%
+  rename(Licht_lux = MTM_filled_rf) %>%
+  mutate(Logger_ID = "MTM")
+
+mtm_filled_long_renamed <- mtm_filled_long_Licht %>%
+  rename(Licht_lux_filled = Licht_lux)
+
+# In Originaldaten zurückführen
+all_loggers_filled <- all_loggers_filled %>%
+  left_join(
+    mtm_filled_long_renamed %>% 
+      select(DateTime, Logger_ID, Licht_lux_filled),
+    by = c("DateTime", "Logger_ID")
+  ) %>%
+  mutate(
+    Licht_lux = case_when(
+      Logger_ID == "MTM" & is.na(Licht_lux) ~ round(Licht_lux_filled, 2),
+      TRUE ~ round(Licht_lux, 2)
+    )
+  ) %>%
+  select(-Licht_lux_filled)
+```
+
+```{r}
+# Variablen definieren
+var1 <- "Licht_lux"
+var2 <- "Temp_sonne_C"
+
+# Datensatz vorbereiten
+wide <- all_loggers %>%
+  select(DateTime, Standort, Logger_ID, all_of(c(var1, var2))) %>%
+  filter(Standort == "MT") %>%
+  pivot_wider(
+    names_from = Logger_ID,
+    values_from = all_of(c(var1, var2)),
+    names_sep = "_"
+  ) %>%
+  arrange(DateTime)
+
+# Zeitliche Features hinzufügen
+wide$Hour <- as.numeric(format(wide$DateTime, "%H"))
+wide$Weekday <- as.factor(weekdays(wide$DateTime))
+wide$DayOfYear <- as.numeric(format(wide$DateTime, "%j"))
+wide$Hour_sin <- sin(2 * pi * wide$Hour / 24)
+wide$Hour_cos <- cos(2 * pi * wide$Hour / 24)
+wide$is_weekend <- wide$Weekday %in% c("Saturday", "Sunday")
+wide$DayOfYear_sin <- sin(2 * pi * wide$DayOfYear / 365)
+wide$DayOfYear_cos <- cos(2 * pi * wide$DayOfYear / 365)
+
+# Tag/Nacht-Flag (entscheidend für Licht)
+wide$is_day <- wide$Hour >= 6 & wide$Hour <= 20
+
+# Optional: Log-Transformation gegen extreme Peaks
+wide$Licht_lux_MTM_log <- log1p(wide$Licht_lux_MTM)
+wide$Licht_lux_MTN_log <- log1p(wide$Licht_lux_MTN)
+
+# Trainingsdaten
+train <- wide %>%
+  filter(!is.na(Licht_lux_MTM_log))
+
+# Random Forest Modell auf Log-Skala
+mod_rf <- randomForest(
+  Licht_lux_MTM_log ~ 
+    Licht_lux_MTN_log + Temp_sonne_C_MTN +
+    is_day + Hour_sin + Hour_cos +
+    DayOfYear_sin + DayOfYear_cos,
+  data = train,
+  ntree = 500,
+  mtry = 3,
+  importance = TRUE
+)
+
+# Modellübersicht
+mod_rf
+importance(mod_rf)
+
+# Vorhersage auf Log-Skala und zurücktransformieren
+pred_log <- predict(mod_rf, newdata = wide)
+pred_rf <- expm1(pred_log)
+
+wide$MTM_filled_rf <- ifelse(
+  is.na(wide$Licht_lux_MTM),
+  pred_rf,
+  wide$Licht_lux_MTM
+)
+
+# RMSE auf Originalskala
+rmse_oob <- sqrt(mean((wide$Licht_lux_MTM[!is.na(wide$Licht_lux_MTM)] - 
+                       pred_rf[!is.na(wide$Licht_lux_MTM)])^2))
+rmse_oob
+
+# NRMSE (Spannweite)
+nrmse_oob <- rmse_oob / (max(wide$Licht_lux_MTM, na.rm = TRUE) - min(wide$Licht_lux_MTM, na.rm = TRUE))
+nrmse_oob
+
+# NRMSE (Standardabweichung)
+sd_lux <- sd(wide$Licht_lux_MTM, na.rm = TRUE)
+nrmse_sd <- rmse_oob / sd_lux
+nrmse_sd
+
+# Zurück ins Long-Format
+mtm_filled_long_Licht <- wide %>%
+  select(DateTime, MTM_filled_rf) %>%
+  rename(Licht_lux = MTM_filled_rf) %>%
+  mutate(Logger_ID = "MTM")
+
+mtm_filled_long_renamed <- mtm_filled_long_Licht %>%
+  rename(Licht_lux_filled = Licht_lux)
+
+# In Originaldaten zurückführen
+all_loggers_filled <- all_loggers_filled %>%
+  left_join(
+    mtm_filled_long_renamed %>% 
+      select(DateTime, Logger_ID, Licht_lux_filled),
+    by = c("DateTime", "Logger_ID")
+  ) %>%
+  mutate(
+    Licht_lux = case_when(
+      Logger_ID == "MTM" & is.na(Licht_lux) ~ round(Licht_lux_filled, 2),
+      TRUE ~ round(Licht_lux, 2)
+    )
+  ) %>%
+  select(-Licht_lux_filled)
 ```
 
 \####################################################################
@@ -987,12 +1304,21 @@ wide$DayOfYear <- as.numeric(format(wide$DateTime, "%j"))
 wide$Hour_sin <- sin(2 * pi * wide$Hour / 24)
 wide$Hour_cos <- cos(2 * pi * wide$Hour / 24)
 
+wide$is_weekend <- wide$Weekday %in% c("Saturday", "Sunday")#Wochenende-Flag
+wide$DayOfYear_sin <- sin(2 * pi * wide$DayOfYear / 365)#saisonaler Trend
+wide$DayOfYear_cos <- cos(2 * pi * wide$DayOfYear / 365)#kompletter zyklischer Trend
+
+wide <- wide %>%
+  mutate(
+    diff_MTN_MTS = ifelse(!is.na(MTN) & !is.na(MTS), MTN - MTS, NA)
+  )
+
 train <- wide %>%
   filter(!is.na(MTW))
 
 # Random Forest Modell erstellen
 mod_rf <- randomForest(
-  MTW ~ MTN + MTS + Hour_sin + Hour_cos + Weekday + DayOfYear,
+  MTW ~ MTN + MTS + Hour_sin + Hour_cos + Weekday + DayOfYear + DayOfYear_sin + DayOfYear_cos + is_weekend + diff_MTN_MTS,
   data = train,
   ntree = 500,        # je mehr, desto stabiler ist das Model
   mtry = 3,           
@@ -1013,16 +1339,16 @@ wide$MTW_filled_rf <- ifelse(
 
 #RMSE berechnen aus den intern, durch das Modell berechneten MSE
 rmse_oob <- sqrt(mod_rf$mse[length(mod_rf$mse)])
-rmse_oob # = Werte weichen im Mitel ca.0,218 °C von echten Werten ab
+rmse_oob # = Werte weichen im Mitel ca.0,50 °C von echten Werten ab
 
 #NRMSE berechnet auf der Basis der Spannweite der Daten
 nrmse_oob <- rmse_oob / (max(wide$MTW, na.rm = TRUE) - min(wide$MTW, na.rm = TRUE))
-nrmse_oob # = Größe des Fehlers im Verhältnis zur Variabilität der Daten - 0,007,  Fehler ist 0,7 % der gesamten Spannweite deiner Daten
+nrmse_oob # = Größe des Fehlers im Verhältnis zur Variabilität der Daten - 0,016,  Fehler ist 1,6 % der gesamten Spannweite deiner Daten
 
 #NRMSE berechnet auf der Basis der Standardabweichung der Daten
 sd_mtw <- sd(wide$MTW, na.rm = TRUE)
 nrmse_sd <- rmse_oob / sd_mtw
-nrmse_sd # 0,039 -> Modellfehler ist im Mittel ca. 3,9 % der Standardabweichung der MTM-Daten
+nrmse_sd # 0,096 -> Modellfehler ist im Mittel ca. 9,6 % der Standardabweichung der MTM-Daten
 
 
 # erzeugte Daten wieder in die Originaltabelle einfügen 
@@ -1069,12 +1395,21 @@ wide$DayOfYear <- as.numeric(format(wide$DateTime, "%j"))
 wide$Hour_sin <- sin(2 * pi * wide$Hour / 24)
 wide$Hour_cos <- cos(2 * pi * wide$Hour / 24)
 
+wide$is_weekend <- wide$Weekday %in% c("Saturday", "Sunday")#Wochenende-Flag
+wide$DayOfYear_sin <- sin(2 * pi * wide$DayOfYear / 365)#saisonaler Trend
+wide$DayOfYear_cos <- cos(2 * pi * wide$DayOfYear / 365)#kompletter zyklischer Trend
+
+wide <- wide %>%
+  mutate(
+    diff_MTN_MTS = ifelse(!is.na(MTN) & !is.na(MTS), MTN - MTS, NA)
+  )
+
 train <- wide %>%
   filter(!is.na(MTW))
 
 # Random Forest Modell erstellen
 mod_rf <- randomForest(
-  MTW ~ MTN + MTS + Hour_sin + Hour_cos + Weekday + DayOfYear,
+  MTW ~ MTN + MTS + Hour_sin + Hour_cos + Weekday + DayOfYear + DayOfYear_sin + DayOfYear_cos + is_weekend,
   data = train,
   ntree = 500,        # je mehr, desto stabiler ist das Model
   mtry = 3,           
@@ -1095,16 +1430,16 @@ wide$MTW_filled_rf <- ifelse(
 
 #RMSE berechnen aus den intern, durch das Modell berechneten MSE
 rmse_oob <- sqrt(mod_rf$mse[length(mod_rf$mse)])
-rmse_oob # = Werte weichen im Mitel ca.0,218 °C von echten Werten ab
+rmse_oob # = Werte weichen im Mitel ca.2,59 % von echten Werten ab
 
 #NRMSE berechnet auf der Basis der Spannweite der Daten
 nrmse_oob <- rmse_oob / (max(wide$MTW, na.rm = TRUE) - min(wide$MTW, na.rm = TRUE))
-nrmse_oob # = Größe des Fehlers im Verhältnis zur Variabilität der Daten - 0,007,  Fehler ist 0,7 % der gesamten Spannweite deiner Daten
+nrmse_oob # = Größe des Fehlers im Verhältnis zur Variabilität der Daten - 0,038,  Fehler ist 3,8 % der gesamten Spannweite deiner Daten
 
 #NRMSE berechnet auf der Basis der Standardabweichung der Daten
 sd_mtw <- sd(wide$MTW, na.rm = TRUE)
 nrmse_sd <- rmse_oob / sd_mtw
-nrmse_sd # 0,039 -> Modellfehler ist im Mittel ca. 3,9 % der Standardabweichung der MTM-Daten
+nrmse_sd # 0,161 -> Modellfehler ist im Mittel ca. 16,1 % der Standardabweichung der MTM-Daten
 
 # erzeugte Daten wieder in die Originaltabelle einfügen 
 mtw_filled_long_RL <- wide %>%
@@ -1150,12 +1485,23 @@ wide$DayOfYear <- as.numeric(format(wide$DateTime, "%j"))
 wide$Hour_sin <- sin(2 * pi * wide$Hour / 24)
 wide$Hour_cos <- cos(2 * pi * wide$Hour / 24)
 
+wide$is_weekend <- wide$Weekday %in% c("Saturday", "Sunday")#Wochenende-Flag
+wide$DayOfYear_sin <- sin(2 * pi * wide$DayOfYear / 365)#saisonaler Trend
+wide$DayOfYear_cos <- cos(2 * pi * wide$DayOfYear / 365)#kompletter zyklischer Trend
+
+#wide <- wide %>%
+#  mutate(
+#    diff_MTN_MTS = ifelse(!is.na(MTN) & !is.na(MTS), MTN - MTS, NA),
+#    diff_MTN_MTO = ifelse(!is.na(MTN) & !is.na(MTO), MTN - MTO, NA),
+#    diff_MTS_MTO = ifelse(!is.na(MTS) & !is.na(MTO), MTS - MTO, NA)
+#  )
+
 train <- wide %>%
   filter(!is.na(MTW))
 
 # Random Forest Modell erstellen
 mod_rf <- randomForest(
-  MTW ~ MTN + MTS + MTO + Hour_sin + Hour_cos + Weekday + DayOfYear,
+  MTW ~ MTN + MTS + MTO + Hour_sin + Hour_cos + Weekday + is_weekend + DayOfYear_sin + DayOfYear_cos + DayOfYear,
   data = train,
   ntree = 500,        # je mehr, desto stabiler ist das Model
   mtry = 3,           
@@ -1176,16 +1522,16 @@ wide$MTW_filled_rf <- ifelse(
 
 #RMSE berechnen aus den intern, durch das Modell berechneten MSE
 rmse_oob <- sqrt(mod_rf$mse[length(mod_rf$mse)])
-rmse_oob # = Werte weichen im Mitel ca.0,218 °C von echten Werten ab
+rmse_oob # = Werte weichen im Mitel ca.0,53 °C von echten Werten ab
 
 #NRMSE berechnet auf der Basis der Spannweite der Daten
 nrmse_oob <- rmse_oob / (max(wide$MTW, na.rm = TRUE) - min(wide$MTW, na.rm = TRUE))
-nrmse_oob # = Größe des Fehlers im Verhältnis zur Variabilität der Daten - 0,007,  Fehler ist 0,7 % der gesamten Spannweite deiner Daten
+nrmse_oob # = Größe des Fehlers im Verhältnis zur Variabilität der Daten - 0,024,  Fehler ist 2,4 % der gesamten Spannweite deiner Daten
 
 #NRMSE berechnet auf der Basis der Standardabweichung der Daten
 sd_mtw <- sd(wide$MTW, na.rm = TRUE)
 nrmse_sd <- rmse_oob / sd_mtw
-nrmse_sd # 0,039 -> Modellfehler ist im Mittel ca. 3,9 % der Standardabweichung der MTM-Daten
+nrmse_sd # 0,13 -> Modellfehler ist im Mittel ca. 13 % der Standardabweichung der MTM-Daten
 
 # erzeugte Daten wieder in die Originaltabelle einfügen 
 mtw_filled_long_Tau <- wide %>%
@@ -1216,14 +1562,18 @@ all_loggers_filled <- all_loggers_filled %>%
 
 ```{r}
 # Variable definieren
-var <- "Temp_sonne_C"
+var1 <- "Temp_sonne_C"
+var2 <- "Temp_schatten_C"
 
-# Datensatz vorbereiten wie vorher
+# Datensatz vorbereiten (beide Variablen reinholen)
 wide <- all_loggers %>%
-  select(DateTime, Standort, Logger_ID, all_of(var)) %>%
+  select(DateTime, Standort, Logger_ID, all_of(c(var1, var2))) %>%
   filter(Standort == "MN") %>%
-  pivot_wider(names_from = Logger_ID,
-              values_from = all_of(var)) %>%
+  pivot_wider(
+    names_from = Logger_ID,
+    values_from = all_of(c(var1, var2)),
+    names_sep = "_"
+  ) %>%
   arrange(DateTime)
 
 # Zeitliche Features hinzufügen
@@ -1232,60 +1582,71 @@ wide$Weekday <- as.factor(weekdays(wide$DateTime))
 wide$DayOfYear <- as.numeric(format(wide$DateTime, "%j"))
 wide$Hour_sin <- sin(2 * pi * wide$Hour / 24)
 wide$Hour_cos <- cos(2 * pi * wide$Hour / 24)
+wide$is_weekend <- wide$Weekday %in% c("Saturday", "Sunday")
+wide$DayOfYear_sin <- sin(2 * pi * wide$DayOfYear / 365)
+wide$DayOfYear_cos <- cos(2 * pi * wide$DayOfYear / 365)
 
-wide$is_weekend <- wide$Weekday %in% c("Saturday", "Sunday")#Wochenende-Flag
-wide$DayOfYear_sin <- sin(2 * pi * wide$DayOfYear / 365)#saisonaler Trend
-wide$DayOfYear_cos <- cos(2 * pi * wide$DayOfYear / 365)#kompletter zyklischer Trend
-
+# Differenzen wie bei dir (erweitert)
 wide <- wide %>%
   mutate(
-    diff_MNN_MNS = ifelse(!is.na(MNN) & !is.na(MNS), MNN - MNS, NA),
-    diff_MNN_MNM = ifelse(!is.na(MNN) & !is.na(MNM), MNN - MNM, NA),
-    diff_MNS_MNM = ifelse(!is.na(MNS) & !is.na(MNM), MNS - MNM, NA)
+    diff_MNN_MNS = ifelse(!is.na(Temp_sonne_C_MNN) & !is.na(Temp_sonne_C_MNS),
+                          Temp_sonne_C_MNN - Temp_sonne_C_MNS, NA),
+    diff_MNN_MNM = ifelse(!is.na(Temp_sonne_C_MNN) & !is.na(Temp_sonne_C_MNM),
+                          Temp_sonne_C_MNN - Temp_sonne_C_MNM, NA),
+    diff_MNS_MNM = ifelse(!is.na(Temp_sonne_C_MNS) & !is.na(Temp_sonne_C_MNM),
+                          Temp_sonne_C_MNS - Temp_sonne_C_MNM, NA),
+    diff_schatten_MNN_MNW = ifelse(!is.na(Temp_schatten_C_MNN) & !is.na(Temp_schatten_C_MNW),
+                                  Temp_schatten_C_MNN - Temp_schatten_C_MNW, NA)
   )
 
+# Trainingsdaten
 train <- wide %>%
-  filter(!is.na(MNW))
+  filter(!is.na(Temp_sonne_C_MNW))
 
-# Random Forest Modell erstellen
+# Random Forest Modell (manuell wie bei dir erweitert)
 mod_rf <- randomForest(
-  MNW ~ MNN + MNS + MNM + Hour_sin + Hour_cos + Weekday + DayOfYear + 
-    DayOfYear_sin + DayOfYear_cos + is_weekend + diff_MNN_MNS + diff_MNN_MNM + diff_MNS_MNM,
+  Temp_sonne_C_MNW ~ 
+    Temp_sonne_C_MNN + Temp_sonne_C_MNS + Temp_sonne_C_MNM +
+    Temp_schatten_C_MNN + Temp_schatten_C_MNW +
+    Hour_sin + Hour_cos + Weekday + DayOfYear +
+    DayOfYear_sin + DayOfYear_cos + is_weekend +
+    diff_MNN_MNS + diff_MNN_MNM + diff_MNS_MNM +
+    diff_schatten_MNN_MNW,
   data = train,
-  ntree = 500,        # je mehr, desto stabiler ist das Model
+  ntree = 500,
   mtry = 3,
-  nodesize = 5,      # minimaler Blattknoten
-  maxnodes = NULL,     # max. Blätter pro Baum
-  importance = TRUE   
+  importance = TRUE
 )
 
-# Modellübersicht -> man kann ableiten, wie wichtig die einzelnen Features waren (also: MTN, MTS, Hour_sin,Weekday, DayOfYear ...)
+# Modellübersicht
 mod_rf
 importance(mod_rf)
-# %IncMSE zeigt an, wie stark der Fehler steigt, wenn ein Feature zufällig 
 
+# Vorhersage
 pred_rf <- predict(mod_rf, newdata = wide)
 pred_rf <- round(pred_rf, 2)
+
 wide$MNW_filled_rf <- ifelse(
-  is.na(wide$MNW),
+  is.na(wide$Temp_sonne_C_MNW),
   pred_rf,
-  wide$MNW
+  wide$Temp_sonne_C_MNW
 )
 
-#RMSE berechnen aus den intern, durch das Modell berechneten MSE
+# RMSE
 rmse_oob <- sqrt(mod_rf$mse[length(mod_rf$mse)])
-rmse_oob # = Werte weichen im Mitel ca.0,218 °C von echten Werten ab
+rmse_oob # 1,14 °C
 
-#NRMSE berechnet auf der Basis der Spannweite der Daten
-nrmse_oob <- rmse_oob / (max(wide$MNW, na.rm = TRUE) - min(wide$MNW, na.rm = TRUE))
-nrmse_oob # = Größe des Fehlers im Verhältnis zur Variabilität der Daten - 0,007,  Fehler ist 0,7 % der gesamten Spannweite deiner Daten
+# NRMSE (Spannweite)
+nrmse_oob <- rmse_oob / (max(wide$Temp_sonne_C_MNW, na.rm = TRUE) - 
+                        min(wide$Temp_sonne_C_MNW, na.rm = TRUE))
+nrmse_oob # 0,023 -> 2,3 %
 
-#NRMSE berechnet auf der Basis der Standardabweichung der Daten
-sd_mnw <- sd(wide$MNW, na.rm = TRUE)
+# NRMSE (Standardabweichung)
+sd_mnw <- sd(wide$Temp_sonne_C_MNW, na.rm = TRUE)
 nrmse_sd <- rmse_oob / sd_mnw
-nrmse_sd # 0,039 -> Modellfehler ist im Mittel ca. 3,9 % der Standardabweichung der MTM-Daten
+nrmse_sd # 0,158 -> 15,8 %
 
-# erzeugte Daten wieder in die Originaltabelle einfügen 
+# Zurück ins Long-Format
 mnw_filled_long_Temp_sonne <- wide %>%
   select(DateTime, MNW_filled_rf) %>%
   rename(Temp_sonne_C = MNW_filled_rf) %>%
@@ -1294,15 +1655,17 @@ mnw_filled_long_Temp_sonne <- wide %>%
 mnw_filled_long_renamed <- mnw_filled_long_Temp_sonne %>%
   rename(Temp_sonne_C_filled = Temp_sonne_C)
 
+# In Originaldaten zurückführen
 all_loggers_filled <- all_loggers_filled %>%
   left_join(
-    mnw_filled_long_renamed %>% select(DateTime, Logger_ID, Temp_sonne_C_filled),
+    mnw_filled_long_renamed %>% 
+      select(DateTime, Logger_ID, Temp_sonne_C_filled),
     by = c("DateTime", "Logger_ID")
   ) %>%
   mutate(
     Temp_sonne_C = case_when(
       Logger_ID == "MNW" & is.na(Temp_sonne_C) ~ round(Temp_sonne_C_filled, 2),
-      TRUE ~ round(Temp_sonne_C, 2)  # auch die übrigen Werte runden
+      TRUE ~ round(Temp_sonne_C, 2)
     )
   ) %>%
   select(-Temp_sonne_C_filled)
@@ -1335,12 +1698,27 @@ wide$DayOfYear <- as.numeric(format(wide$DateTime, "%j"))
 wide$Hour_sin <- sin(2 * pi * wide$Hour / 24)
 wide$Hour_cos <- cos(2 * pi * wide$Hour / 24)
 
+wide$is_weekend <- wide$Weekday %in% c("Saturday", "Sunday")#Wochenende-Flag
+wide$DayOfYear_sin <- sin(2 * pi * wide$DayOfYear / 365)#saisonaler Trend
+wide$DayOfYear_cos <- cos(2 * pi * wide$DayOfYear / 365)#kompletter zyklischer Trend
+
+wide <- wide %>%
+  mutate(
+    diff_MNN_MNS = ifelse(!is.na(MNN) & !is.na(MNS), MNN - MNS, NA),
+    diff_MNN_MNS = ifelse(!is.na(MNN) & !is.na(MNS), MNN - MNS, NA),
+    diff_MNN_MNO = ifelse(!is.na(MNN) & !is.na(MNO), MNN - MNO, NA),
+    diff_MNN_MNM = ifelse(!is.na(MNN) & !is.na(MNM), MNN - MNM, NA),
+    diff_MNS_MNO = ifelse(!is.na(MNS) & !is.na(MNO), MNS - MNO, NA),
+    diff_MNS_MNM = ifelse(!is.na(MNS) & !is.na(MNM), MNS - MNM, NA),
+    diff_MNO_MNM = ifelse(!is.na(MNO) & !is.na(MNM), MNO - MNM, NA)
+  )
+
 train <- wide %>%
   filter(!is.na(MNW))
 
 # Random Forest Modell erstellen
 mod_rf <- randomForest(
-  MNW ~ MNN + MNS + MNM + MNO + Hour_sin + Hour_cos + Weekday + DayOfYear,
+  MNW ~ MNN + MNS + MNM + MNO + Hour_sin + Hour_cos + Weekday + DayOfYear + DayOfYear_sin + DayOfYear_cos + is_weekend + diff_MNN_MNS + diff_MNN_MNO + diff_MNN_MNM + diff_MNS_MNO + diff_MNS_MNM + diff_MNO_MNM,
   data = train,
   ntree = 500,        # je mehr, desto stabiler ist das Model
   mtry = 3,           
@@ -1362,16 +1740,16 @@ wide$MNW_filled_rf <- ifelse(
 
 #RMSE berechnen aus den intern, durch das Modell berechneten MSE
 rmse_oob <- sqrt(mod_rf$mse[length(mod_rf$mse)])
-rmse_oob # = Werte weichen im Mitel ca.0,296 °C von echten Werten ab
+rmse_oob # = Werte weichen im Mitel ca.0,25 °C von echten Werten ab
 
 #NRMSE berechnet auf der Basis der Spannweite der Daten
 nrmse_oob <- rmse_oob / (max(wide$MNW, na.rm = TRUE) - min(wide$MNW, na.rm = TRUE))
-nrmse_oob # = Größe des Fehlers im Verhältnis zur Variabilität der Daten - 0,009,  Fehler ist 0,9 % der gesamten Spannweite deiner Daten
+nrmse_oob # = Größe des Fehlers im Verhältnis zur Variabilität der Daten - 0,008,  Fehler ist 0,8 % der gesamten Spannweite deiner Daten
 
 #NRMSE berechnet auf der Basis der Standardabweichung der Daten
 sd_mnw <- sd(wide$MNW, na.rm = TRUE)
 nrmse_sd <- rmse_oob / sd_mnw
-nrmse_sd # 0,057 -> Modellfehler ist im Mittel ca. 5,7 % der Standardabweichung der MTM-Daten
+nrmse_sd # 0,049 -> Modellfehler ist im Mittel ca. 4,9 % der Standardabweichung der MTM-Daten
 
 # erzeugte Daten wieder in die Originaltabelle einfügen 
 mnw_filled_long_Temp_schatten <- wide %>%
@@ -1417,12 +1795,16 @@ wide$DayOfYear <- as.numeric(format(wide$DateTime, "%j"))
 wide$Hour_sin <- sin(2 * pi * wide$Hour / 24)
 wide$Hour_cos <- cos(2 * pi * wide$Hour / 24)
 
+wide$is_weekend <- wide$Weekday %in% c("Saturday", "Sunday")#Wochenende-Flag
+wide$DayOfYear_sin <- sin(2 * pi * wide$DayOfYear / 365)#saisonaler Trend
+wide$DayOfYear_cos <- cos(2 * pi * wide$DayOfYear / 365)#kompletter zyklischer Trend
+
 train <- wide %>%
   filter(!is.na(MNW))
 
 # Random Forest Modell erstellen
 mod_rf <- randomForest(
-  MNW ~ MNN + MNS + MNM + MNO + Hour_sin + Hour_cos + Weekday + DayOfYear,
+  MNW ~ MNN + MNS + MNM + MNO + Hour_sin + Hour_cos + Weekday + DayOfYear + DayOfYear_sin + DayOfYear_cos + is_weekend,
   data = train,
   ntree = 500,        # je mehr, desto stabiler ist das Model
   mtry = 3,           
@@ -1444,7 +1826,7 @@ wide$MNW_filled_rf <- ifelse(
 
 #RMSE berechnen aus den intern, durch das Modell berechneten MSE
 rmse_oob <- sqrt(mod_rf$mse[length(mod_rf$mse)])
-rmse_oob # = Werte weichen im Mitel ca.0,347 °C von echten Werten ab
+rmse_oob # = Werte weichen im Mitel ca.0,334 °C von echten Werten ab
 
 #NRMSE berechnet auf der Basis der Spannweite der Daten
 nrmse_oob <- rmse_oob / (max(wide$MNW, na.rm = TRUE) - min(wide$MNW, na.rm = TRUE))
@@ -1453,7 +1835,7 @@ nrmse_oob # = Größe des Fehlers im Verhältnis zur Variabilität der Daten - 0
 #NRMSE berechnet auf der Basis der Standardabweichung der Daten
 sd_mnw <- sd(wide$MNW, na.rm = TRUE)
 nrmse_sd <- rmse_oob / sd_mnw
-nrmse_sd # 0,084 -> Modellfehler ist im Mittel ca. 8,4 % der Standardabweichung der MTM-Daten
+nrmse_sd # 0,080 -> Modellfehler ist im Mittel ca. 8,0 % der Standardabweichung der MTM-Daten
 
 # erzeugte Daten wieder in die Originaltabelle einfügen 
 mnw_filled_long_Tau <- wide %>%
@@ -1499,12 +1881,16 @@ wide$DayOfYear <- as.numeric(format(wide$DateTime, "%j"))
 wide$Hour_sin <- sin(2 * pi * wide$Hour / 24)
 wide$Hour_cos <- cos(2 * pi * wide$Hour / 24)
 
+wide$is_weekend <- wide$Weekday %in% c("Saturday", "Sunday")#Wochenende-Flag
+wide$DayOfYear_sin <- sin(2 * pi * wide$DayOfYear / 365)#saisonaler Trend
+wide$DayOfYear_cos <- cos(2 * pi * wide$DayOfYear / 365)#kompletter zyklischer Trend
+
 train <- wide %>%
   filter(!is.na(MNW))
 
 # Random Forest Modell erstellen
 mod_rf <- randomForest(
-  MNW ~ MNN + MNS + MNM + MNO + Hour_sin + Hour_cos + Weekday + DayOfYear,
+  MNW ~ MNN + MNS + MNM + MNO + Hour_sin + Hour_cos + Weekday + DayOfYear + DayOfYear_sin + DayOfYear_cos + is_weekend,
   data = train,
   ntree = 500,        # je mehr, desto stabiler ist das Model
   mtry = 3,           
@@ -1526,16 +1912,16 @@ wide$MNW_filled_rf <- ifelse(
 
 #RMSE berechnen aus den intern, durch das Modell berechneten MSE
 rmse_oob <- sqrt(mod_rf$mse[length(mod_rf$mse)])
-rmse_oob # = Werte weichen im Mitel ca.1,593 % von echten Werten ab
+rmse_oob # = Werte weichen im Mitel ca.1,5 % von echten Werten ab
 
 #NRMSE berechnet auf der Basis der Spannweite der Daten
 nrmse_oob <- rmse_oob / (max(wide$MNW, na.rm = TRUE) - min(wide$MNW, na.rm = TRUE))
-nrmse_oob # = Größe des Fehlers im Verhältnis zur Variabilität der Daten - 0,024,  Fehler ist 2,4 % der gesamten Spannweite deiner Daten
+nrmse_oob # = Größe des Fehlers im Verhältnis zur Variabilität der Daten - 0,023,  Fehler ist 2,3 % der gesamten Spannweite deiner Daten
 
 #NRMSE berechnet auf der Basis der Standardabweichung der Daten
 sd_mnw <- sd(wide$MNW, na.rm = TRUE)
 nrmse_sd <- rmse_oob / sd_mnw
-nrmse_sd # 0,104 -> Modellfehler ist im Mittel ca. 10,4 % der Standardabweichung der MTM-Daten
+nrmse_sd # 0,098 -> Modellfehler ist im Mittel ca. 9,8 % der Standardabweichung der MTM-Daten
 
 # erzeugte Daten wieder in die Originaltabelle einfügen 
 mnw_filled_long_LF <- wide %>%
