@@ -101,22 +101,6 @@ MNS_lt$DateTime <- mdy_hms(MNS_lt$Date.Time..CEST.CET.)
 MNS_th$DateTime <- mdy_hms(MNS_th$Date.Time..CEST.CET.)
 ```
 
-#do not run
-
-```{r}
-#| label: alternative date conversion
-logger_names <- ls(pattern = "_lt$|_th$")
-for (obj in logger_names) 
-  df <- get(obj)
-  date_col <- names(df)[grepl("^Date.Time", names(df))]
-  df$DateTime <- mdy_hms(df[[date_col]], tz = "Europe/Berlin")
-  assign(obj, df)
-
-
-```
-
-#do not run
-
 ```{r}
 # Tabellen beider Logger pro Standort zusammenführen
 #einige Variablen in den Originaltabellen brauchen wir nicht mehr, daher bauen wir eine cleane Tabelle, die nur analyserelevante Daten beinhaltet
@@ -1127,6 +1111,146 @@ all_loggers_filled <- all_loggers_filled %>%
   select(-Licht_lux_filled)
 ```
 
+```{r}
+# Variablen definieren
+var1 <- "Licht_lux"
+var2 <- "Temp_sonne_C"
+
+# Datensatz vorbereiten
+wide <- all_loggers %>%
+  select(DateTime, Standort, Logger_ID, all_of(c(var1, var2))) %>%
+  filter(Standort == "MT") %>%
+  pivot_wider(
+    names_from = Logger_ID,
+    values_from = all_of(c(var1, var2)),
+    names_sep = "_"
+  ) %>%
+  arrange(DateTime)
+
+# Zeitliche Features hinzufügen
+wide$Hour <- as.numeric(format(wide$DateTime, "%H"))
+wide$Weekday <- as.factor(weekdays(wide$DateTime))
+wide$DayOfYear <- as.numeric(format(wide$DateTime, "%j"))
+
+wide$Hour_sin <- sin(2 * pi * wide$Hour / 24)
+wide$Hour_cos <- cos(2 * pi * wide$Hour / 24)
+
+wide$is_weekend <- wide$Weekday %in% c("Saturday", "Sunday")
+
+wide$DayOfYear_sin <- sin(2 * pi * wide$DayOfYear / 365)
+wide$DayOfYear_cos <- cos(2 * pi * wide$DayOfYear / 365)
+
+# Tag/Nacht-Flag
+wide$is_day <- wide$Hour >= 5 & wide$Hour <= 21
+
+# Clear-Sky Proxy
+wide$clear_sky <- pmax(0,
+  sin(pi * (wide$Hour - 6) / 12)
+) * (1 + 0.4 * sin(2 * pi * wide$DayOfYear / 365))
+
+# Verhältnis
+wide$light_ratio_MTN <- ifelse(
+  wide$clear_sky > 0,
+  wide$Licht_lux_MTN / wide$clear_sky,
+  0
+)
+
+wide$light_ratio_MTO <- ifelse(
+  wide$clear_sky > 0,
+  wide$Licht_lux_MTO / wide$clear_sky,
+  0
+)
+
+# Interaction Features
+wide$interaction_MTN <- wide$Licht_lux_MTN * wide$clear_sky
+wide$interaction_MTO <- wide$Licht_lux_MTO * wide$clear_sky
+
+# ✅ Log-Transformation NUR der Prädiktoren
+wide$Licht_lux_MTN_log <- log1p(wide$Licht_lux_MTN)
+wide$Licht_lux_MTO_log <- log1p(wide$Licht_lux_MTO)
+
+# Trainingsdaten (Zielvariable NICHT transformiert)
+train <- wide %>%
+  filter(!is.na(Licht_lux_MTM) &
+         !is.na(Licht_lux_MTN_log) &
+         !is.na(Licht_lux_MTO_log) &
+         !is.na(Temp_sonne_C_MTN) &
+         is_day)
+
+# Random Forest Modell (Originalskala!)
+mod_rf <- randomForest(
+  Licht_lux_MTM ~ 
+    Licht_lux_MTN_log +
+    Licht_lux_MTO_log +
+    light_ratio_MTN +
+    light_ratio_MTO +
+    interaction_MTN +       
+    interaction_MTO +       
+    Temp_sonne_C_MTN +
+    Temp_sonne_C_MTW +      
+    clear_sky +
+    is_day + Hour_sin + Hour_cos +
+    DayOfYear_sin + DayOfYear_cos,
+  data = train,
+  ntree = 500,
+  mtry = 5,
+  importance = TRUE
+)
+
+# Modellübersicht
+mod_rf
+importance(mod_rf)
+
+# ✅ Vorhersage direkt (keine Rücktransformation mehr!)
+pred_rf <- predict(mod_rf, newdata = wide)
+
+# Nacht = 0 fix
+wide$MTM_filled_rf <- ifelse(
+  wide$is_day == FALSE,
+  0,
+  ifelse(is.na(wide$Licht_lux_MTM), pred_rf, wide$Licht_lux_MTM)
+)
+
+# RMSE auf Originalskala
+rmse_oob <- sqrt(mean((wide$Licht_lux_MTM[!is.na(wide$Licht_lux_MTM)] - 
+                       pred_rf[!is.na(wide$Licht_lux_MTM)])^2))
+rmse_oob
+
+# NRMSE (Spannweite)
+nrmse_oob <- rmse_oob / (max(wide$Licht_lux_MTM, na.rm = TRUE) - 
+                        min(wide$Licht_lux_MTM, na.rm = TRUE))
+nrmse_oob
+
+# NRMSE (Standardabweichung)
+sd_lux <- sd(wide$Licht_lux_MTM, na.rm = TRUE)
+nrmse_sd <- rmse_oob / sd_lux
+nrmse_sd
+
+# Zurück ins Long-Format
+mtm_filled_long_Licht <- wide %>%
+  select(DateTime, MTM_filled_rf) %>%
+  rename(Licht_lux = MTM_filled_rf) %>%
+  mutate(Logger_ID = "MTM")
+
+mtm_filled_long_renamed <- mtm_filled_long_Licht %>%
+  rename(Licht_lux_filled = Licht_lux)
+
+# In Originaldaten zurückführen
+all_loggers_filled <- all_loggers_filled %>%
+  left_join(
+    mtm_filled_long_renamed %>% 
+      select(DateTime, Logger_ID, Licht_lux_filled),
+    by = c("DateTime", "Logger_ID")
+  ) %>%
+  mutate(
+    Licht_lux = case_when(
+      Logger_ID == "MTM" & is.na(Licht_lux) ~ round(Licht_lux_filled, 2),
+      TRUE ~ round(Licht_lux, 2)
+    )
+  ) %>%
+  select(-Licht_lux_filled)
+```
+
 \####################################################################
 
 #### MTW Temp_schatten_C
@@ -1517,135 +1641,13 @@ all_loggers_filled <- all_loggers_filled %>%
   select(-Temp_sonne_C_filled)
 ```
 
-#### MNW Licht_lux  
+#### MNW Licht_lux
 
-ich bin mir noch nict sicher welchen Code ich verwende, bei dem einen ist die Zielvariable log-transformiert und bei dem anderen nicht -\> je nachdem ob man relative oder absolute Fehler priorisiert -\> modellierung relative Tagesdynamiken (Log-Skala ggf. besser) -\> absolute Werte (z.B. für Lichtbilanz oder Beleuchtungsgrenzen - Originalskala besser)
+ich bin mir noch nicht sicher welchen Code ich verwende, bei dem einen ist die Zielvariable log-transformiert und bei dem anderen nicht -\> je nachdem ob man relative oder absolute Fehler priorisiert -\> Modellierung relativer Tagesdynamiken (Log-Skala ggf. besser) -\> absolute Werte (z.B. für Lichtbilanz oder Beleuchtungsgrenzen - Originalskala besser)
 
-log transformiertee Code: nrmse von 0,3, var explained ca. 96%
+log transformiertee Code: Abweichung: ca. 3049, nrmse von 0,3, var explained ca. 96% - Problem (hoher nrmse = Zurücktransformation führt zur Verzerrung -\> z.B. hohe Spitzen werden nicht so gut dargestellt ...)
 
-nicht log transformierter Code: nrmse von 0,23, var explained ca. 69%
-
-```{r}
-# Variablen definieren
-var1 <- "Licht_lux"
-var2 <- "Temp_sonne_C"
-
-# Datensatz vorbereiten
-wide <- all_loggers %>%
-  select(DateTime, Standort, Logger_ID, all_of(c(var1, var2))) %>%
-  filter(Standort == "MN") %>%
-  pivot_wider(
-    names_from = Logger_ID,
-    values_from = all_of(c(var1, var2)),
-    names_sep = "_"
-  ) %>%
-  arrange(DateTime)
-
-# Zeitliche Features hinzufügen
-wide$Hour <- as.numeric(format(wide$DateTime, "%H"))
-wide$DayOfYear <- as.numeric(format(wide$DateTime, "%j"))
-
-wide$Hour_sin <- sin(2 * pi * wide$Hour / 24)
-wide$Hour_cos <- cos(2 * pi * wide$Hour / 24)
-wide$DayOfYear_sin <- sin(2 * pi * wide$DayOfYear / 365)
-wide$DayOfYear_cos <- cos(2 * pi * wide$DayOfYear / 365)
-
-# Tag/Nacht-Flag
-wide$is_day <- wide$Hour >= 6 & wide$Hour <= 20
-
-# Clear-Sky / Solar-Proxy
-wide$solar_proxy <- pmax(0,
-  sin(pi * (wide$Hour - 6)/12) * (1 + 0.4 * sin(2 * pi * wide$DayOfYear / 365))
-)
-
-# Verhältnis / Interaktionen nur für relevante Logger
-wide$light_ratio_MNN <- ifelse(wide$solar_proxy > 0, wide$Licht_lux_MNN / wide$solar_proxy, 0)
-wide$interaction_MNN <- wide$Licht_lux_MNN * wide$solar_proxy
-wide$interaction_MNM <- wide$Licht_lux_MNM * wide$solar_proxy
-
-# Log-Transformation der Prädiktoren
-wide$Licht_lux_MNN_log <- log1p(wide$Licht_lux_MNN)
-wide$Licht_lux_MNM_log <- log1p(wide$Licht_lux_MNM)
-
-# Trainingsdaten
-train <- wide %>%
-  filter(!is.na(Licht_lux_MNW) & !is.na(Licht_lux_MNN_log) & !is.na(Licht_lux_MNM_log) & !is.na(Temp_sonne_C_MNN) & is_day)
-
-# Random Forest Modell
-mod_rf <- randomForest(
-  Licht_lux_MNW ~ 
-    Licht_lux_MNN_log +
-    Licht_lux_MNM_log +
-    Temp_sonne_C_MNN +
-    light_ratio_MNN +
-    interaction_MNN +
-    interaction_MNM +
-    solar_proxy +
-    is_day + Hour_sin + Hour_cos +
-    DayOfYear_sin + DayOfYear_cos,
-  data = train,
-  ntree = 500,
-  mtry = 4,
-  importance = TRUE
-)
-
-# Modellübersicht
-mod_rf
-importance(mod_rf)
-
-# Vorhersage
-pred_rf <- rep(NA, nrow(wide))
-ok_idx <- complete.cases(
-  wide[, c("Licht_lux_MNN_log","Licht_lux_MNM_log","Temp_sonne_C_MNN",
-           "light_ratio_MNN","interaction_MNN","interaction_MNM","solar_proxy",
-           "is_day","Hour_sin","Hour_cos","DayOfYear_sin","DayOfYear_cos")]
-)
-pred_rf[ok_idx] <- predict(mod_rf, newdata = wide[ok_idx, ])
-
-# Nacht = 0 fix
-wide$MNW_filled_rf <- ifelse(
-  wide$is_day == FALSE,
-  0,
-  ifelse(is.na(wide$Licht_lux_MNW), pred_rf, wide$Licht_lux_MNW)
-)
-
-# RMSE auf Originalskala
-rmse_oob <- sqrt(mean((wide$Licht_lux_MNW[!is.na(wide$Licht_lux_MNW)] - pred_rf[!is.na(wide$Licht_lux_MNW)])^2))
-rmse_oob
-
-# NRMSE (Spannweite)
-nrmse_oob <- rmse_oob / (max(wide$Licht_lux_MNW, na.rm = TRUE) - min(wide$Licht_lux_MNW, na.rm = TRUE))
-nrmse_oob
-
-# NRMSE (Standardabweichung) 
-sd_lux <- sd(wide$Licht_lux_MNW, na.rm = TRUE)
-nrmse_sd <- rmse_oob / sd_lux
-nrmse_sd
-
-# Zurück ins Long-Format
-mnw_filled_long_Licht <- wide %>%
-  select(DateTime, MNW_filled_rf) %>%
-  rename(Licht_lux = MNW_filled_rf) %>%
-  mutate(Logger_ID = "MNW")
-
-mnw_filled_long_renamed <- mnw_filled_long_Licht %>%
-  rename(Licht_lux_filled = Licht_lux)
-
-# In Originaldaten zurückführen
-all_loggers_filled <- all_loggers_filled %>%
-  left_join(
-    mnw_filled_long_renamed %>% 
-      select(DateTime, Logger_ID, Licht_lux_filled),
-    by = c("DateTime", "Logger_ID")
-  ) %>%
-  mutate(
-    Licht_lux = case_when(
-      Logger_ID == "MNW" & is.na(Licht_lux) ~ round(Licht_lux_filled, 2),
-      TRUE ~ round(Licht_lux, 2)
-    )
-  ) %>%
-  select(-Licht_lux_filled)
-```
+nicht log transformierter Code: Abweichung: ca. 2344 lux, nrmse von 0,23, var explained ca. 69%
 
 ```{r}
 # Variablen definieren
@@ -1677,7 +1679,7 @@ wide$DayOfYear_sin <- sin(2 * pi * wide$DayOfYear / 365)
 wide$DayOfYear_cos <- cos(2 * pi * wide$DayOfYear / 365)
 
 # Tag/Nacht-Flag
-wide$is_day <- wide$Hour >= 6 & wide$Hour <= 20
+wide$is_day <- wide$Hour >= 5 & wide$Hour <= 21
 
 # Clear-Sky / Solar-Proxy
 wide$clear_sky <- pmax(0,
@@ -2167,4 +2169,18 @@ all_loggers_filled <- all_loggers_filled %>%
     )
   ) %>%
   select(-relLF_percent_filled)
+```
+
+## 4.3 Erzeugte Daten auf Vollständigkeit überprüfen
+
+```{r}
+# Sind NA´s vorhanden 
+any(is.na(all_loggers_filled))
+sum(is.na(all_loggers_filled))
+colSums(is.na(all_loggers_filled))
+all_loggers_filled[!complete.cases(all_loggers_filled), ]
+
+all_loggers_filled %>%
+  group_by(Logger_ID) %>%
+  summarise(NA_count = sum(is.na(Temp_sonne_C)))
 ```
