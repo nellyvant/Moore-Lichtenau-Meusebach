@@ -312,9 +312,9 @@ Identifizieren der fehlenden Daten, Raster erstellen mit allen vorhandene und fe
 ```{r}
 # Zeitspalte korrekt formatieren
 all_loggers1 <- all_loggers %>%
-  mutate(DateTime = as.POSIXct(DateTime, format="%Y-%m-%d %H:%M:%S")) %>%
-  filter(DateTime >= as.POSIXct("2025-05-08 00:00:00") &
-         DateTime <= as.POSIXct("2025-09-30 23:59:59"))
+  mutate(DateTime = as.POSIXct(DateTime, format="%Y-%m-%d %H:%M:%S", tz="UTC")) %>%
+  filter(DateTime >= as.POSIXct("2025-05-08 00:00:00", tz="UTC") &
+         DateTime <= as.POSIXct("2025-09-30 23:59:59", tz="UTC"))
 
 # Alle Logger und Standorte explizit bestimmen
 logger_list <- all_loggers1 %>% 
@@ -1641,6 +1641,115 @@ all_loggers_filled <- all_loggers_filled %>%
   select(-Temp_sonne_C_filled)
 ```
 
+```{r}
+# Variable definieren
+var1 <- "Temp_sonne_C"
+var2 <- "Temp_schatten_C"
+
+# Datensatz vorbereiten
+wide <- all_loggers %>%
+  select(DateTime, Standort, Logger_ID, all_of(c(var1, var2))) %>%
+  filter(Standort == "MN") %>%
+  pivot_wider(
+    names_from = Logger_ID,
+    values_from = all_of(c(var1, var2)),
+    names_sep = "_"
+  ) %>%
+  arrange(DateTime)
+
+# Zeitliche Features
+wide$Hour <- as.numeric(format(wide$DateTime, "%H"))
+wide$Weekday <- as.factor(weekdays(wide$DateTime))
+wide$DayOfYear <- as.numeric(format(wide$DateTime, "%j"))
+
+wide$Hour_sin <- sin(2 * pi * wide$Hour / 24)
+wide$Hour_cos <- cos(2 * pi * wide$Hour / 24)
+wide$is_weekend <- wide$Weekday %in% c("Saturday", "Sunday")
+
+wide$DayOfYear_sin <- sin(2 * pi * wide$DayOfYear / 365)
+wide$DayOfYear_cos <- cos(2 * pi * wide$DayOfYear / 365)
+
+# Differenzen (angepasst → ohne MNW Schatten)
+wide <- wide %>%
+  mutate(
+    diff_MNN_MNS = ifelse(!is.na(Temp_sonne_C_MNN) & !is.na(Temp_sonne_C_MNS),
+                          Temp_sonne_C_MNN - Temp_sonne_C_MNS, NA),
+    diff_MNN_MNM = ifelse(!is.na(Temp_sonne_C_MNN) & !is.na(Temp_sonne_C_MNM),
+                          Temp_sonne_C_MNN - Temp_sonne_C_MNM, NA),
+    diff_MNS_MNM = ifelse(!is.na(Temp_sonne_C_MNS) & !is.na(Temp_sonne_C_MNM),
+                          Temp_sonne_C_MNS - Temp_sonne_C_MNM, NA)
+  )
+
+# Trainingsdaten
+train <- wide %>%
+  filter(!is.na(Temp_sonne_C_MNW))
+
+# Random Forest Modell (OHNE Temp_schatten_C_MNW)
+mod_rf <- randomForest(
+  Temp_sonne_C_MNW ~ 
+    Temp_sonne_C_MNN + Temp_sonne_C_MNS + Temp_sonne_C_MNM +
+    Temp_schatten_C_MNN +   # bleibt drin (gut!)
+    Hour_sin + Hour_cos + Weekday + DayOfYear +
+    DayOfYear_sin + DayOfYear_cos + is_weekend +
+    diff_MNN_MNS + diff_MNN_MNM + diff_MNS_MNM,
+  data = train,
+  ntree = 500,
+  mtry = 3,
+  importance = TRUE
+)
+
+# Modellübersicht
+mod_rf
+importance(mod_rf)
+
+pred_rf <- predict(mod_rf, newdata = wide)
+pred_rf <- round(pred_rf, 2)
+
+wide$MNW_filled_rf <- ifelse(
+  is.na(wide$Temp_sonne_C_MNW),
+  pred_rf,
+  wide$Temp_sonne_C_MNW
+)
+
+# RMSE
+rmse_oob <- sqrt(mod_rf$mse[length(mod_rf$mse)])
+rmse_oob
+
+# NRMSE (Spannweite)
+nrmse_oob <- rmse_oob / (max(wide$Temp_sonne_C_MNW, na.rm = TRUE) - 
+                        min(wide$Temp_sonne_C_MNW, na.rm = TRUE))
+nrmse_oob
+
+# NRMSE (Standardabweichung)
+sd_mnw <- sd(wide$Temp_sonne_C_MNW, na.rm = TRUE)
+nrmse_sd <- rmse_oob / sd_mnw
+nrmse_sd
+
+# Zurück ins Long-Format
+mnw_filled_long_Temp_sonne <- wide %>%
+  select(DateTime, MNW_filled_rf) %>%
+  rename(Temp_sonne_C = MNW_filled_rf) %>%
+  mutate(Logger_ID = "MNW")
+
+mnw_filled_long_renamed <- mnw_filled_long_Temp_sonne %>%
+  rename(Temp_sonne_C_filled = Temp_sonne_C)
+
+# In Originaldaten zurückführen
+all_loggers_filled <- all_loggers_filled %>%
+  left_join(
+    mnw_filled_long_renamed %>% 
+      select(DateTime, Logger_ID, Temp_sonne_C_filled),
+    by = c("DateTime", "Logger_ID")
+  ) %>%
+  mutate(
+    Temp_sonne_C = case_when(
+      Logger_ID == "MNW" & is.na(Temp_sonne_C) ~ round(Temp_sonne_C_filled, 2),
+      TRUE ~ round(Temp_sonne_C, 2)
+    )
+  ) %>%
+  select(-Temp_sonne_C_filled)
+```
+
 #### MNW Licht_lux
 
 ich bin mir noch nicht sicher welchen Code ich verwende, bei dem einen ist die Zielvariable log-transformiert und bei dem anderen nicht -\> je nachdem ob man relative oder absolute Fehler priorisiert -\> Modellierung relativer Tagesdynamiken (Log-Skala ggf. besser) -\> absolute Werte (z.B. für Lichtbilanz oder Beleuchtungsgrenzen - Originalskala besser)
@@ -2171,7 +2280,9 @@ all_loggers_filled <- all_loggers_filled %>%
   select(-relLF_percent_filled)
 ```
 
-## 4.3 Erzeugte Daten auf Vollständigkeit überprüfen
+## 4.3 Erzeugte Daten auf Vollständigkeit überprüfen und als Exceltabelle abspeichern  
+
+das Durchlaufen des Codes dauert sonst zu lange
 
 ```{r}
 # Sind NA´s vorhanden 
@@ -2183,4 +2294,24 @@ all_loggers_filled[!complete.cases(all_loggers_filled), ]
 all_loggers_filled %>%
   group_by(Logger_ID) %>%
   summarise(NA_count = sum(is.na(Temp_sonne_C)))
+
+fd <- all_loggers_filled %>%
+  pivot_longer(
+    cols = c(Licht_lux, Temp_sonne_C, Temp_schatten_C),
+    names_to = "Variable",
+    values_to = "Wert"
+  ) %>%
+  filter(is.na(Wert)) %>%
+  arrange(Logger_ID, Variable, DateTime)
+```
+
+```{r}
+install.packages("writexl")
+library(writexl)
+
+# Tabelle als Excel speichern
+write_xlsx(all_loggers_filled, path = "all_loggers_filled.xlsx")
+
+
+# ggf nochmal neu abspeichern, nachdem mnw 
 ```
