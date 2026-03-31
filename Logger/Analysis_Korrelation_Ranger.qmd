@@ -1,0 +1,1638 @@
+---
+title: "Datenanalyse_Logger"
+format: html
+editor: visual
+---
+
+# 1 genutzte Packages
+
+```{r}
+#library(tidyverse)
+library(dplyr)
+library(lubridate)
+library(tidyr)
+library(ggplot2)
+library(ranger)
+```
+
+# 2 Daten einlesen
+
+## 2.1 Licht und Temperatur (außen)
+
+```{r}
+#Lichtenau
+LM_lt <- read.csv("Licht-und-Temperatur-aussen/Lichtenau Mitte 2025-11-04 18_39_12 CET.csv")
+LO_lt <- read.csv("Licht-und-Temperatur-aussen/Lichtenau Ost 2025-10-02 14_50_43 CEST.csv")
+LW_lt <- read.csv("Licht-und-Temperatur-aussen/Lichtenau West 2025-11-04 18_36_30 CET.csv")
+LN_lt <- read.csv("Licht-und-Temperatur-aussen/Lichtenau Nord 2025-10-02 14_52_52 CEST.csv")
+LS_lt <- read.csv("Licht-und-Temperatur-aussen/Lichtenau Süd 2025-10-02 14_51_42 CEST.csv")
+#Meusebach trocken
+MTM_lt <- read.csv("Licht-und-Temperatur-aussen/Meusebach trock Mitt 2025-11-04 10_33_23 CET.csv")
+MTO_lt <- read.csv("Licht-und-Temperatur-aussen/Meusebach trock Ost 2025-11-04 10_42_29 CET.csv")
+MTW_lt <- read.csv("Licht-und-Temperatur-aussen/Meusebach trock West 2025-10-02 14_56_44 CEST.csv")
+MTN_lt <- read.csv("Licht-und-Temperatur-aussen/Meusebach trock Nord 2025-11-04 10_34_51 CET.csv")
+MTS_lt<- read.csv("Licht-und-Temperatur-aussen/Meusebach trock Süd 2025-10-02 14_54_52 CEST.csv")
+#Meusebach nass
+MNM_lt <- read.csv("Licht-und-Temperatur-aussen/Meusebach nass Mitte 2025-11-04 11_37_40 CET.csv")
+MNO_lt <- read.csv("Licht-und-Temperatur-aussen/Meusebach nass Ost  2025-10-02 14_55_48 CEST.csv")
+MNW_lt <- read.csv("Licht-und-Temperatur-aussen/Meusebach nass West 2025-11-04 11_33_52 CET.csv")
+MNN_lt <- read.csv("Licht-und-Temperatur-aussen/Meusebach nass Nord 2025-10-02 14_53_40 CEST.csv")
+MNS_lt <- read.csv("Licht-und-Temperatur-aussen/Meusebach nass Süd 2025-11-04 11_35_49 CET.csv")
+```
+
+## 2.2 Temperatur und Luftfeuchte (innen)
+
+```{r}
+#Lichtenau
+LM_th <- read.csv("Luftfeuchte-und-Temperatur-innen/Lichtenau Mitte  2025-11-04 14_05_01 CET.csv")
+LO_th <- read.csv("Luftfeuchte-und-Temperatur-innen/Lichtenau Ost 2025-10-02 14_47_35 CEST.csv")
+LW_th <- read.csv("Luftfeuchte-und-Temperatur-innen/Lichtenau West 2025-11-04 14_05_41 CET.csv")
+LN_th <- read.csv("Luftfeuchte-und-Temperatur-innen/Lichtenau Nord 2025-10-02 14_47_08 CEST.csv")
+LS_th <- read.csv("Luftfeuchte-und-Temperatur-innen/Lichtenau Süd 2025-10-02 14_46_44 CEST.csv")
+#Meusebach trocken
+MTM_th <- read.csv("Luftfeuchte-und-Temperatur-innen/Meusebach trock Mitt 2025-11-04 10_30_53 CET.csv")
+MTO_th <- read.csv("Luftfeuchte-und-Temperatur-innen/Meusebach trock Ost 2025-11-04 10_31_49 CET.csv")
+MTW_th <- read.csv("Luftfeuchte-und-Temperatur-innen/Meusebach trock West 2025-10-02 14_45_08 CEST.csv")
+MTN_th <- read.csv("Luftfeuchte-und-Temperatur-innen/Meusebach trock Nord 2025-11-04 10_32_27 CET.csv")
+MTS_th <- read.csv("Luftfeuchte-und-Temperatur-innen/Meusebach trock Süd 2025-10-02 14_43_36 CEST.csv")
+#Meusebach nass
+MNM_th <- read.csv("Luftfeuchte-und-Temperatur-innen/Meusebach nass Mitte 2025-11-04 11_36_57 CET.csv")
+MNO_th <- read.csv("Luftfeuchte-und-Temperatur-innen/Meusebach nass Ost 2025-10-02 14_45_34 CEST.csv")
+MNW_th <- read.csv("Luftfeuchte-und-Temperatur-innen/Meusebach nass West 2025-11-04 11_33_09 CET.csv")
+MNN_th <- read.csv("Luftfeuchte-und-Temperatur-innen/Meusebach nass Nord 2025-10-02 14_45_57 CEST.csv")
+MNS_th <- read.csv("Luftfeuchte-und-Temperatur-innen/Meusebach nass Süd 2025-11-04 11_35_14 CET.csv")
+```
+
+# 3 Daten bereinigen und strukturieren
+
+```{r}
+#| label: long date conversion
+#Datumsformat umwandeln
+LM_lt$DateTime <- mdy_hms(LM_lt$Date.Time..CEST.CET.)
+LM_th$DateTime <- mdy_hms(LM_th$Date.Time..CEST.CET.)
+LO_lt$DateTime <- mdy_hms(LO_lt$Date.Time..CEST.)
+LO_th$DateTime <- mdy_hms(LO_th$Date.Time..CEST.)
+LW_lt$DateTime <- mdy_hms(LW_lt$Date.Time..CEST.CET.)
+LW_th$DateTime <- mdy_hms(LW_th$Date.Time..CEST.CET.)
+LN_lt$DateTime <- mdy_hms(LN_lt$Date.Time..CEST.)
+LN_th$DateTime <- mdy_hms(LN_th$Date.Time..CEST.)
+LS_lt$DateTime <- mdy_hms(LS_lt$Date.Time..CEST.)
+LS_th$DateTime <- mdy_hms(LS_th$Date.Time..CEST.)
+
+MTM_lt$DateTime <- mdy_hms(MTM_lt$Date.Time..CEST.CET.)
+MTM_th$DateTime <- mdy_hms(MTM_th$Date.Time..CEST.CET.)
+MTO_lt$DateTime <- mdy_hms(MTO_lt$Date.Time..CEST.CET.)
+MTO_th$DateTime <- mdy_hms(MTO_th$Date.Time..CEST.CET.)
+MTW_lt$DateTime <- mdy_hms(MTW_lt$Date.Time..CEST.)
+MTW_th$DateTime <- mdy_hms(MTW_th$Date.Time..CEST.)
+MTN_lt$DateTime <- mdy_hms(MTN_lt$Date.Time..CEST.CET.)
+MTN_th$DateTime <- mdy_hms(MTN_th$Date.Time..CEST.CET.)
+MTS_lt$DateTime <- mdy_hms(MTS_lt$Date.Time..CEST.)
+MTS_th$DateTime <- mdy_hms(MTS_th$Date.Time..CEST.)
+
+MNM_lt$DateTime <- mdy_hms(MNM_lt$Date.Time..CEST.CET.)
+MNM_th$DateTime <- mdy_hms(MNM_th$Date.Time..CEST.CET.)
+MNO_lt$DateTime <- mdy_hms(MNO_lt$Date.Time..CEST.)
+MNO_th$DateTime <- mdy_hms(MNO_th$Date.Time..CEST.)
+MNW_lt$DateTime <- mdy_hms(MNW_lt$Date.Time..CEST.)
+MNW_th$DateTime <- mdy_hms(MNW_th$Date.Time..CEST.)
+MNN_lt$DateTime <- mdy_hms(MNN_lt$Date.Time..CEST.)
+MNN_th$DateTime <- mdy_hms(MNN_th$Date.Time..CEST.)
+MNS_lt$DateTime <- mdy_hms(MNS_lt$Date.Time..CEST.CET.)
+MNS_th$DateTime <- mdy_hms(MNS_th$Date.Time..CEST.CET.)
+```
+
+```{r}
+# Tabellen beider Logger pro Standort zusammenführen
+#einige Variablen in den Originaltabellen brauchen wir nicht mehr, daher bauen wir eine cleane Tabelle, die nur analyserelevante Daten beinhaltet
+LM_lt_clean <- LM_lt %>%
+  select(
+    DateTime,
+    Temp_sonne = Temperature.....C.,
+    Licht_lux  = Light....lux.
+  )
+
+LM_th_clean <- LM_th %>%
+  select(
+    DateTime,
+    Temp_schatten = Temperature.....C.,
+    relLF         = RH......,
+    Taupunkt      = Dew.Point.....C.
+  )
+# Zusammenführen der beiden Tabellen vom gleichen Standort mit join
+LM <- full_join(LM_lt_clean,LM_th_clean,by = "DateTime")
+# Einfügen einer Loggerkennung, Standortkennnung und Logger ID
+LM <- LM %>%
+  mutate(
+    Standort = "L",
+    Logger   = "M",
+    Logger_ID = "LM"
+  )
+summary(LM)
+str(LM)
+```
+
+```{r}
+#zum Zusammenführen der Tabellen wurde die folgende Fuktion erstellt
+
+join_loggers <- function(df_lt, df_th, standort, logger) {
+
+  # cleane Tabellen erstellen, weil in Originaltabellen einiges irrelevantes drin
+  lt_clean <- df_lt %>%
+    select(
+      DateTime,
+      Temp_sonne_C = Temperature.....C.,
+      Licht_lux  = Light....lux.
+    )
+
+  th_clean <- df_th %>%
+    select(
+      DateTime,
+      Temp_schatten_C = Temperature.....C.,
+      relLF_percent         = RH......,
+      Taupunkt_C      = Dew.Point.....C.
+    )
+
+  # join
+  full_join(lt_clean, th_clean, by = "DateTime") %>%
+    mutate(
+      Standort  = standort,
+      Logger    = logger,
+      Logger_ID = paste0(standort, logger)
+    )
+}
+```
+
+```{r}
+#Lichtenau Mitte
+LM <- join_loggers(
+  df_lt    = LM_lt,
+  df_th    = LM_th,
+  standort = "L",
+  logger   = "M"
+)
+#Lichtenau Ost
+LO <- join_loggers(
+  df_lt    = LO_lt,
+  df_th    = LO_th,
+  standort = "L",
+  logger   = "O"
+)
+#Lichtenau West
+LW <- join_loggers(
+  df_lt    = LW_lt,
+  df_th    = LW_th,
+  standort = "L",
+  logger   = "W"
+)
+#Lichtenau Nord
+LN <- join_loggers(
+  df_lt    = LN_lt,
+  df_th    = LN_th,
+  standort = "L",
+  logger   = "N"
+)
+#Lichtenau Süd
+LS <- join_loggers(
+  df_lt    = LS_lt,
+  df_th    = LS_th,
+  standort = "L",
+  logger   = "S"
+)
+#Meusebach trocken Mitte
+MTM <- join_loggers(
+  df_lt    = MTM_lt,
+  df_th    = MTM_th,
+  standort = "MT",
+  logger   = "M"
+)
+#Meusebach trocken Ost
+MTO <- join_loggers(
+  df_lt    = MTO_lt,
+  df_th    = MTO_th,
+  standort = "MT",
+  logger   = "O"
+)
+#Meusebach trocken West
+MTW <- join_loggers(
+  df_lt    = MTW_lt,
+  df_th    = MTW_th,
+  standort = "MT",
+  logger   = "W"
+)
+#Meusebach trocken Nord
+MTN <- join_loggers(
+  df_lt    = MTN_lt,
+  df_th    = MTN_th,
+  standort = "MT",
+  logger   = "N"
+)
+#Meusebach trocken Süd
+MTS <- join_loggers(
+  df_lt    = MTS_lt,
+  df_th    = MTS_th,
+  standort = "MT",
+  logger   = "S"
+)
+#Meusebach nass Mitte
+MNM <- join_loggers(
+  df_lt    = MNM_lt,
+  df_th    = MNM_th,
+  standort = "MN",
+  logger   = "M"
+)
+#Meusebach nass Ost
+MNO <- join_loggers(
+  df_lt    = MNO_lt,
+  df_th    = MNO_th,
+  standort = "MN",
+  logger   = "O"
+)
+#Meusebach nass West
+MNW <- join_loggers(
+  df_lt    = MNW_lt,
+  df_th    = MNW_th,
+  standort = "MN",
+  logger   = "W"
+)
+#Meusebach nass Nord
+MNN <- join_loggers(
+  df_lt    = MNN_lt,
+  df_th    = MNN_th,
+  standort = "MN",
+  logger   = "N"
+)
+#Meusebach nass Süd
+MNS <- join_loggers(
+  df_lt    = MNS_lt,
+  df_th    = MNS_th,
+  standort = "MN",
+  logger   = "S"
+)
+```
+
+```{r}
+# alle Daten vor dem 08.05.2025 00:00 Uhr entfernen
+# alle Daten nach dem 30.9.2025 23:50 Uhr entfernen
+cutoff_start <- as.POSIXct("2025-05-08 00:00:00", tz="UTC")
+cutoff_end   <- as.POSIXct("2025-09-30 23:50:00", tz="UTC")
+
+logger_names <- c("LM", "LO", "LW", "LN", "LS", "MTM", "MTO", "MTW", "MTN", "MTS", "MNM", "MNO", "MNW", "MNN", "MNS")
+
+for (logger in logger_names) {
+  assign(logger, get(logger) %>% 
+           filter(DateTime >= cutoff_start & DateTime <= cutoff_end))
+}
+```
+
+hier fehlt noch die überprüfung, ob bei der NA entfernung sachen gelöscht wurde, die eigentlich drin sien sollten, also zb wo ein logger mal aus versehen nur temp aufgezeichnet hat, aber nicht die lichtinitensität. ich denke, man könnte einfach schauen, wo die NAs sind und wenn sie nur am ende sind, dann sollte alles gut sein. wenn es NAs irgendwo mittendrin gibt, dann nicht!
+
+```{r}
+#entfernen von Zeilen ohne Messwerte (entstanden durch Auslesen der Logger)
+messwert_spalten <- c("Temp_sonne_C", "Licht_lux", "Temp_schatten_C", "relLF_percent", "Taupunkt_C")
+
+for (logger in logger_names) {
+ # Tabelle holen, filtern, wieder zurückschreiben
+  assign(logger, get(logger) %>% 
+           filter(!if_all(all_of(messwert_spalten), is.na)))
+}
+
+```
+
+```{r}
+#Zusammenführen als Masterdatensatz
+all_loggers <- bind_rows(lapply(logger_names, get))
+str(all_loggers)
+
+```
+
+# 4 Fehlende Daten per Korrelation/ Modell erzeugen
+
+Identifizieren der fehlenden Daten, Raster erstellen mit allen vorhandene und fehlenden Daten (wenn eine Messgröße nicht durch den Logger gemessen wurde, existiert die entsprechende Zeile einfach nicht –\> durch den nachfolgenden Code werden diese Zeilen hinzugefügt)
+
+```{r}
+# Zeitspalte korrekt formatieren
+all_loggers1 <- all_loggers %>%
+  mutate(DateTime = as.POSIXct(DateTime, format="%Y-%m-%d %H:%M:%S", tz="UTC")) %>%
+  filter(DateTime >= as.POSIXct("2025-05-08 00:00:00", tz="UTC") &
+         DateTime <= as.POSIXct("2025-09-30 23:59:59", tz="UTC"))
+
+# Alle Logger und Standorte explizit bestimmen
+logger_list <- all_loggers1 %>% 
+  distinct(Standort, Logger, Logger_ID)
+
+# Zeitreihe erstellen: alle 10 Minuten vom 08.05 bis 30.09.2025
+zeitpunkte <- seq(
+  from = as.POSIXct("2025-05-08 00:00:00", tz = "UTC"),
+  to   = as.POSIXct("2025-09-30 23:50:00", tz = "UTC"),
+  by   = "10 min"
+)
+
+# Kreuzprodukt
+voller_raster <- tidyr::crossing(logger_list, zeitpunkte)
+voller_raster <- voller_raster %>%
+  rename(DateTime = zeitpunkte)
+
+# Originaldaten einfügen
+all_loggers_complete <- voller_raster %>% left_join(all_loggers1, by = c("Standort", "Logger", "Logger_ID", "DateTime"))
+
+# Fehlende Werte pro Zeile zählen (mindestens eine Messgröße fehlt)
+fehlende_zeitpunkte <- all_loggers_complete %>%
+  mutate(Anzahl_NA = rowSums(is.na(select(., Temp_sonne_C, Licht_lux, Temp_schatten_C,
+                                         relLF_percent, Taupunkt_C)))) %>%
+  filter(Anzahl_NA > 0)  # Zeilen, bei denen mindestens eine Messgröße fehlt
+
+# Zusammenfassung pro Logger und Standort
+fehlende_werte_summary <- fehlende_zeitpunkte %>%
+  group_by(Standort, Logger, Logger_ID) %>%
+  summarise(
+    Temp_sonne_C_missing    = sum(is.na(Temp_sonne_C)),
+    Licht_lux_missing       = sum(is.na(Licht_lux)),
+    Temp_schatten_C_missing = sum(is.na(Temp_schatten_C)),
+    relLF_percent_missing   = sum(is.na(relLF_percent)),
+    Taupunkt_C_missing      = sum(is.na(Taupunkt_C)),
+    Gesamt_fehlend          = n(),   # alle Zeilen mit mindestens einem fehlenden Wert
+    .groups = "drop"
+  ) %>%
+  arrange(Standort, Logger, Logger_ID)
+```
+
+Korrelation - welche der fehlenden Messwerte sind mit welchen vorhandenen am stärksten korreliert
+
+```{r}
+df <- all_loggers %>%
+  filter(
+    Logger_ID == "MTM",
+    Standort == "MT"
+  ) %>%
+  select(
+    Temp_sonne_C,
+    Temp_schatten_C,
+    relLF_percent,
+    Taupunkt_C,
+    Licht_lux
+  ) %>%
+  na.omit()
+
+cor_mat <- cor(df)
+round(cor_mat, 2)
+
+```
+
+```{r}
+# Standort MN filtern
+#df_mn <- all_loggers %>%
+#  filter(Standort == "MN")
+
+# Standort MT filtern
+df_mt <- all_loggers %>%
+  filter(Standort == "MT")
+
+# Wide-Format erzeugen
+df_wide <- df_mt %>%
+  pivot_wider(
+    id_cols = DateTime,
+    names_from = Logger_ID,
+    values_from = c(
+      Temp_sonne_C,
+      Temp_schatten_C,
+      relLF_percent,
+      Taupunkt_C,
+      Licht_lux
+    )
+  )
+
+# Ziel-Logger festlegen
+target <- "MTM"
+
+# Alle anderen Logger automatisch bestimmen
+logger_ids <- unique(df_mt$Logger_ID)
+logger_ids <- logger_ids[logger_ids != target]
+
+# Korrelation berechnen
+cor_results <- lapply(logger_ids, function(id){
+
+  data.frame(
+    Logger = id,
+    cor_temp_out = cor(
+      df_wide[[paste0("Temp_sonne_C_", target)]],
+      df_wide[[paste0("Temp_sonne_C_", id)]],
+      use = "complete.obs"
+    ),
+    cor_temp_in = cor(
+      df_wide[[paste0("Temp_schatten_C_", target)]],
+      df_wide[[paste0("Temp_schatten_C_", id)]],
+      use = "complete.obs"
+    ),
+    cor_rh = cor(
+      df_wide[[paste0("relLF_percent_", target)]],
+      df_wide[[paste0("relLF_percent_", id)]],
+      use = "complete.obs"
+    ),
+    cor_tau = cor(
+      df_wide[[paste0("Taupunkt_C_", target)]],
+      df_wide[[paste0("Taupunkt_C_", id)]],
+      use = "complete.obs"
+    ),
+    cor_lux = cor(
+      df_wide[[paste0("Licht_lux_", target)]],
+      df_wide[[paste0("Licht_lux_", id)]],
+      use = "complete.obs"
+    )
+  )
+
+}) %>%
+  bind_rows()
+
+cor_results
+```
+
+```{r}
+vars <- c(
+  "Temp_sonne_C",
+  "Temp_schatten_C",
+  "relLF_percent",
+  "Taupunkt_C",
+  "Licht_lux"
+)
+
+target <- "MTW"
+other_loggers <- unique(df_mt$Logger_ID)
+
+result <- list()
+
+for(logger in other_loggers){
+
+  comb <- expand.grid(
+    MTW_var = vars,
+    Other_var = vars
+  )
+
+  comb$Other_Logger <- logger
+
+  comb$correlation <- mapply(function(v1, v2){
+
+    cor(
+      df_wide[[paste0(v1,"_",target)]],
+      df_wide[[paste0(v2,"_",logger)]],
+      use = "complete.obs"
+    )
+
+  }, comb$MTW_var, comb$Other_var)
+
+  result[[logger]] <- comb
+}
+
+cross_logger_cor <- bind_rows(result)
+
+cross_logger_cor
+
+#library(writexl)
+#write_xlsx(cross_logger_cor, "cross_logger_cor.xlsx")
+```
+
+# 5 Ranger 
+
+## MTM
+
+#### MTM Temp_Sonne_C
+
+```{r}
+# Variable definieren
+var <- "Temp_sonne_C"
+
+# Datensatz vorbereiten
+wide <- all_loggers %>%
+  select(DateTime, Standort, Logger_ID, all_of(var)) %>%
+  filter(Standort == "MT") %>%
+  pivot_wider(
+    names_from = Logger_ID,
+    values_from = all_of(var)
+  ) %>%
+  arrange(DateTime)
+
+# Zeitliche Features hinzufügen
+wide$Hour <- as.numeric(format(wide$DateTime, "%H"))
+wide$DayOfYear <- as.numeric(format(wide$DateTime, "%j"))
+wide$Hour_sin <- sin(2 * pi * wide$Hour / 24)
+wide$Hour_cos <- cos(2 * pi * wide$Hour / 24)
+wide$DayOfYear_sin <- sin(2 * pi * wide$DayOfYear / 365) # saisonaler Trend
+wide$DayOfYear_cos <- cos(2 * pi * wide$DayOfYear / 365) # kompletter zyklischer Trend
+
+# Temperatur-Zyklus
+wide$temp_cycle <- sin(pi * (wide$Hour - 6) / 12)
+wide$temp_cycle <- pmax(-1, wide$temp_cycle)
+wide$temp_cycle_season <- wide$temp_cycle * (1 + 0.3 * sin(2 * pi * wide$DayOfYear / 365))
+
+# Trainingsdaten 
+train <- wide %>%
+  filter(!is.na(MTM))
+
+# Ranger Modell erstellen
+mod_ranger <- ranger(
+  formula = MTM ~ MTN + MTS + MTO + Hour_sin + Hour_cos + DayOfYear + 
+            DayOfYear_sin + DayOfYear_cos + temp_cycle_season,
+  data = train,
+  num.trees = 500, # je mehr, desto stabiler ist das Model
+  mtry = 3,
+  importance = "permutation",
+  seed = 42
+)
+
+# Modellübersicht -> man kann ableiten, wie wichtig die einzelnen Features waren (also: MTN, MTS, Hour_sin, DayOfYear ...)
+mod_ranger
+mod_ranger$variable.importance
+# %IncMSE zeigt an, wie stark der Fehler steigt, wenn ein Feature zufällig permutiert wird -> Je höher der Wert, desto wichtiger ist das Feature für die Gesamtvorhersage
+# NodePurity sagt strukturbezogen, wie wichtig ein Feature für die Baumaufteilung ist
+
+# Vorhersage
+pred_ranger <- predict(mod_ranger, data = wide)$predictions
+wide$MTM_filled_ranger <- ifelse(
+  is.na(wide$MTM),
+  pred_ranger,
+  wide$MTM
+)
+
+# ----------------------------
+# Unabhängige Testung der Vorhersagegenauigkeit
+set.seed(42)
+valid_idx <- which(!is.na(wide$MTM)) # nur echte Messwerte
+n_reps <- 5
+rmse_vals <- numeric(n_reps)
+
+for(i in 1:n_reps){
+  
+  # Zufällig 20% als Testdaten
+  test_idx <- sample(valid_idx, size = floor(0.2 * length(valid_idx)))
+  train_idx <- setdiff(valid_idx, test_idx)
+  
+  train_data <- wide[train_idx, ]
+  test_data  <- wide[test_idx, ]
+  
+  # Ranger auf Trainingsdaten trainieren
+  mod_cv <- ranger(
+    formula = MTM ~ MTN + MTS + MTO + Hour_sin + Hour_cos + DayOfYear +
+              DayOfYear_sin + DayOfYear_cos + temp_cycle_season,
+    data = train_data,
+    num.trees = 500,
+    mtry = 3,
+    importance = "permutation",
+    seed = 42
+  )
+  
+  # Vorhersage auf Testdaten
+  pred_test <- predict(mod_cv, data = test_data)$predictions
+  
+  # RMSE für diese Wiederholung
+  rmse_vals[i] <- sqrt(mean((pred_test - test_data$MTM)^2))
+  cat("Wiederholung", i, "fertig\n")
+}
+
+# Ergebnisse zusammenfassen
+mean_rmse   <- mean(rmse_vals) # mittlere Abweichung 
+sd_rmse     <- sd(rmse_vals)
+nrmse_sd    <- mean_rmse / sd(wide$MTM, na.rm = TRUE) 
+#misst den Fehler relativ zur typischen Streuung der Daten (= wie stark das Modell im Durchschnitt vom Mittelwert abweicht, im Verhältnis zur normalen Variabilität der Messwerte)
+nrmse_range <- mean_rmse / (max(wide$MTM, na.rm = TRUE) - min(wide$MTM, na.rm = TRUE))# = Größe des Fehlers im Verhältnis zur Variabilität der Daten, Fehler beträgt x % der gesamten Spannweite der Daten
+#Spannweite meist sehr groß, da Extremwerte reinspielen → kleiner relativer Fehler
+min_val <- min(wide$MTM, na.rm = TRUE)
+max_val <- max(wide$MTM, na.rm = TRUE)
+range_val <- max_val - min_val# Spannweite der echten Daten
+
+# Ergebnisse ausgeben
+mean_rmse      # mittlere Abweichung: 1,236 °C
+sd_rmse        # Streuung: 0,056
+nrmse_sd       # NRMSE relativ zur Standardabweichung: 0,116
+nrmse_range    # NRMSE relativ zur Spannweite: 0,021 
+range_val      # Spannbreite: 58,22 
+```
+
+```{r}
+# erzeugte Daten wieder in die Originaltabelle einfügen 
+mtm_filled_long_Temp_sonne <- wide %>%
+  select(DateTime, MTM_filled_ranger) %>%
+  rename(Temp_sonne_C_filled = MTM_filled_ranger) %>%
+  mutate(Logger_ID = "MTM")
+
+all_loggers_filled <- all_loggers_complete %>%
+  left_join(mtm_filled_long_Temp_sonne,
+            by = c("DateTime", "Logger_ID")) %>%
+  mutate(
+    Temp_sonne_C = ifelse(
+      Logger_ID == "MTM" & is.na(Temp_sonne_C),
+      round(Temp_sonne_C_filled, 2),  # <-- gerundet übernehmen
+      round(Temp_sonne_C, 2)           # <-- alle anderen Werte ebenfalls runden
+    )
+  ) %>%
+  select(-Temp_sonne_C_filled)
+```
+
+#### MTM Taupunkt
+
+```{r}
+# Variable definieren
+var <- "Taupunkt_C"
+
+# Datensatz vorbereiten
+wide <- all_loggers %>%
+  select(DateTime, Standort, Logger_ID, all_of(var)) %>%
+  filter(Standort == "MT") %>%
+  pivot_wider(
+    names_from = Logger_ID,
+    values_from = all_of(var)
+  ) %>%
+  arrange(DateTime)
+
+# Zeitliche Features hinzufügen
+wide$Hour <- as.numeric(format(wide$DateTime, "%H"))
+wide$DayOfYear <- as.numeric(format(wide$DateTime, "%j"))
+
+wide$Hour_sin <- sin(2 * pi * wide$Hour / 24)
+wide$Hour_cos <- cos(2 * pi * wide$Hour / 24)
+wide$DayOfYear_sin <- sin(2 * pi * wide$DayOfYear / 365)
+wide$DayOfYear_cos <- cos(2 * pi * wide$DayOfYear / 365)
+
+# Nachbars-Mittelwert
+wide$mean_neighbors <- rowMeans(wide[, c("MTN", "MTS", "MTO")], na.rm = TRUE)
+
+# Lag-Feature (nur wenn aufeinanderfolgende Messungen <= 11 min Abstand)
+wide <- wide %>%
+  arrange(DateTime) %>%
+  mutate(
+    time_diff = as.numeric(difftime(DateTime, lag(DateTime), units = "mins")),
+    lag1_MTN = ifelse(time_diff <= 11, lag(MTN), NA)
+  )
+
+# Trainingsdaten (alle verfügbaren Messwerte)
+train <- wide %>%
+  filter(!is.na(MTM))
+
+# Ranger Modell erstellen
+mod_ranger <- ranger(
+  MTM ~ MTN + MTS + MTO +
+    mean_neighbors +
+    Hour_sin + Hour_cos +
+    DayOfYear_sin + DayOfYear_cos +
+    lag1_MTN,
+  data = train,
+  num.trees = 500,
+  mtry = 3,
+  importance = "permutation",
+  seed = 42
+)
+
+# Modellübersicht
+mod_ranger
+mod_ranger$variable.importance
+
+# Vorhersagen für alle Werte
+pred_ranger <- predict(mod_ranger, data = wide)$predictions
+wide$MTM_filled_ranger <- ifelse(
+  is.na(wide$MTM),
+  pred_ranger,
+  wide$MTM
+)
+
+# ----------------------------
+# Unabhängige Testung der Vorhersagegenauigkeit
+set.seed(42)
+valid_idx <- which(!is.na(wide$MTM))  # echte Messwerte
+n_reps <- 5
+rmse_vals <- numeric(n_reps)
+
+for(i in 1:n_reps){
+  
+  # 20% der echten Werte zufällig auf NA setzen
+  test_idx <- sample(valid_idx, size = floor(0.2 * length(valid_idx)))
+  wide_test <- wide
+  wide_test$MTM[test_idx] <- NA
+  
+  # Vorhersage mit dem bereits trainierten Modell
+  pred_test <- predict(mod_ranger, data = wide_test)$predictions
+  
+  # RMSE auf den „versteckten“ Testwerten
+  rmse_vals[i] <- sqrt(mean((pred_test[test_idx] - wide$MTM[test_idx])^2))
+  cat("Wiederholung", i, "fertig\n")
+}
+
+# Ergebnisse zusammenfassen
+mean_rmse   <- mean(rmse_vals)
+sd_rmse     <- sd(rmse_vals)
+nrmse_sd    <- mean_rmse / sd(wide$MTM, na.rm = TRUE) # relativ zur Standardabweichung
+nrmse_range <- mean_rmse / (max(wide$MTM, na.rm = TRUE) - min(wide$MTM, na.rm = TRUE)) # relativ zur Spannweite
+min_val <- min(wide$MTM, na.rm = TRUE)
+max_val <- max(wide$MTM, na.rm = TRUE)
+range_val <- max_val - min_val# Spannweite der echten Daten
+
+# Ergebnisse ausgeben
+mean_rmse      # mittlere Abweichung: 0,2 °C
+sd_rmse        # Streuung: 0,001
+nrmse_sd       # NRMSE relativ zur Standardabweichung: 0,059 -> 5,9 %
+nrmse_range    # NRMSE relativ zur Spannweite: 0,008 -> 0,8 %
+range_val      # Spannbreite: 24,36
+
+# ----------------------------
+# Vorhersagen zurückführen
+mtm_filled_long_Tau <- wide %>%
+  select(DateTime, MTM_filled_ranger) %>%
+  rename(Taupunkt_C = MTM_filled_ranger) %>%
+  mutate(Logger_ID = "MTM")
+
+mtm_filled_long_renamed <- mtm_filled_long_Tau %>%
+  rename(Taupunkt_C_filled = Taupunkt_C)
+
+all_loggers_filled <- all_loggers_filled %>%
+  left_join(
+    mtm_filled_long_renamed %>% select(DateTime, Logger_ID, Taupunkt_C_filled),
+    by = c("DateTime", "Logger_ID")
+  ) %>%
+  mutate(
+    Taupunkt_C = case_when(
+      Logger_ID == "MTM" & is.na(Taupunkt_C) ~ round(Taupunkt_C_filled, 2),
+      TRUE ~ round(Taupunkt_C, 2)
+    )
+  ) %>%
+  select(-Taupunkt_C_filled)
+```
+
+#### MTM Relative Luftfeuchtigkeit
+
+```{r}
+# Variable definieren
+var <- "relLF_percent"
+
+# Datensatz vorbereiten
+wide <- all_loggers %>%
+  select(DateTime, Standort, Logger_ID, all_of(var)) %>%
+  filter(Standort == "MT") %>%
+  pivot_wider(names_from = Logger_ID,
+              values_from = all_of(var)) %>%
+  arrange(DateTime)
+
+# Zeitliche Features hinzufügen
+wide$Hour <- as.numeric(format(wide$DateTime, "%H"))
+wide$DayOfYear <- as.numeric(format(wide$DateTime, "%j"))
+wide$Hour_sin <- sin(2 * pi * wide$Hour / 24)
+wide$Hour_cos <- cos(2 * pi * wide$Hour / 24)
+wide$DayOfYear_sin <- sin(2 * pi * wide$DayOfYear / 365)
+wide$DayOfYear_cos <- cos(2 * pi * wide$DayOfYear / 365)
+
+# Nachbars-Mittelwert
+wide$mean_neighbors <- rowMeans(wide[, c("MTN", "MTS", "MTO")], na.rm = TRUE)
+
+# Lag-Feature (nur wenn aufeinanderfolgende Messungen <= 11 min Abstand)
+wide <- wide %>%
+  arrange(DateTime) %>%
+  mutate(
+    time_diff = as.numeric(difftime(DateTime, lag(DateTime), units = "mins")),
+    lag1_MTN = ifelse(time_diff <= 11, lag(MTN), NA)
+  )
+
+# Trainingsdaten (alle verfügbaren Messwerte)
+train <- wide %>%
+  filter(!is.na(MTM))
+
+# ----------------------------
+# Ranger Modell erstellen
+mod_ranger <- ranger(
+  MTM ~ MTN + MTS + MTO +
+    mean_neighbors +
+    Hour_sin + Hour_cos +
+    DayOfYear_sin + DayOfYear_cos +
+    lag1_MTN,
+  data = train,
+  num.trees = 500,
+  mtry = 3,
+  importance = "permutation",
+  seed = 42
+)
+
+# Modellübersicht
+mod_ranger
+mod_ranger$variable.importance
+
+# Vorhersagen für alle Werte
+pred_ranger <- predict(mod_ranger, data = wide)$predictions
+wide$MTM_filled_ranger <- ifelse(
+  is.na(wide$MTM),
+  pred_ranger,
+  wide$MTM
+)
+
+# ----------------------------
+# Unabhängige Testung der Vorhersagegenauigkeit
+set.seed(42)
+valid_idx <- which(!is.na(wide$MTM))  # echte Messwerte
+n_reps <- 5
+rmse_vals <- numeric(n_reps)
+
+for(i in 1:n_reps){
+  
+  # 20% der echten Werte zufällig auf NA setzen
+  test_idx <- sample(valid_idx, size = floor(0.2 * length(valid_idx)))
+  wide_test <- wide
+  wide_test$MTM[test_idx] <- NA
+  
+  # Vorhersage mit dem bereits trainierten Modell
+  pred_test <- predict(mod_ranger, data = wide_test)$predictions
+  
+  # RMSE auf den „versteckten“ Testwerten
+  rmse_vals[i] <- sqrt(mean((pred_test[test_idx] - wide$MTM[test_idx])^2))
+  cat("Wiederholung", i, "fertig\n")
+}
+
+# Ergebnisse zusammenfassen
+mean_rmse   <- mean(rmse_vals)
+sd_rmse     <- sd(rmse_vals)
+nrmse_sd    <- mean_rmse / sd(wide$MTM, na.rm = TRUE)        # relativ zur Standardabweichung
+nrmse_range <- mean_rmse / (max(wide$MTM, na.rm = TRUE) - min(wide$MTM, na.rm = TRUE)) # relativ zur Spannweite
+min_val <- min(wide$MTM, na.rm = TRUE)
+max_val <- max(wide$MTM, na.rm = TRUE)
+range_val <- max_val - min_val# Spannweite der echten Daten
+
+# Ergebnisse ausgeben
+mean_rmse      # mittlere Abweichung: 0,8 %
+sd_rmse        # Streuung:  0,007
+nrmse_sd       # NRMSE relativ zur Standardabweichung: 0,044 -> 4,36
+nrmse_range    # NRMSE relativ zur Spannweite: 0,010 -> 1,04%
+range_val      # Spannweite: 77,11
+
+# ----------------------------
+# Vorhersagen zurückführen
+mtm_filled_long_LF <- wide %>%
+  select(DateTime, MTM_filled_ranger) %>%
+  rename(relLF_percent = MTM_filled_ranger) %>%
+  mutate(Logger_ID = "MTM")
+
+mtm_filled_long_renamed <- mtm_filled_long_LF %>%
+  rename(relLF_percent_filled = relLF_percent)
+
+all_loggers_filled <- all_loggers_filled %>%
+  left_join(
+    mtm_filled_long_renamed %>% select(DateTime, Logger_ID, relLF_percent_filled),
+    by = c("DateTime", "Logger_ID")
+  ) %>%
+  mutate(
+    relLF_percent = case_when(
+      Logger_ID == "MTM" & is.na(relLF_percent) ~ round(relLF_percent_filled, 2),
+      TRUE ~ round(relLF_percent, 2)
+    )
+  ) %>%
+  select(-relLF_percent_filled)
+```
+
+#### MTM Temp_Schatten_C
+
+```{r}
+# Variable definieren
+var <- "Temp_schatten_C"
+
+# Datensatz vorbereiten
+wide <- all_loggers %>%
+  select(DateTime, Standort, Logger_ID, all_of(var)) %>%
+  filter(Standort == "MT") %>%
+  pivot_wider(names_from = Logger_ID,
+              values_from = all_of(var)) %>%
+  arrange(DateTime)
+
+# Zeitliche Features hinzufügen
+wide$Hour <- as.numeric(format(wide$DateTime, "%H"))
+wide$DayOfYear <- as.numeric(format(wide$DateTime, "%j"))
+wide$Hour_sin <- sin(2 * pi * wide$Hour / 24)
+wide$Hour_cos <- cos(2 * pi * wide$Hour / 24)
+wide$DayOfYear_sin <- sin(2 * pi * wide$DayOfYear / 365)
+wide$DayOfYear_cos <- cos(2 * pi * wide$DayOfYear / 365)
+
+# Temperatur-Zyklus
+wide$temp_cycle <- sin(pi * (wide$Hour - 6) / 12)
+wide$temp_cycle <- pmax(-1, wide$temp_cycle)
+wide$temp_cycle_season <- wide$temp_cycle * (1 + 0.3 * sin(2 * pi * wide$DayOfYear / 365))
+
+# Differenzen zwischen den Loggern
+wide <- wide %>%
+  mutate(
+    diff_MTN_MTS = ifelse(!is.na(MTN) & !is.na(MTS), MTN - MTS, NA),
+    diff_MTN_MTO = ifelse(!is.na(MTN) & !is.na(MTO), MTN - MTO, NA),
+    diff_MTS_MTO = ifelse(!is.na(MTS) & !is.na(MTO), MTS - MTO, NA)
+  )
+
+# Nachbars-Mittelwert
+wide$mean_neighbors <- rowMeans(wide[, c("MTN", "MTS", "MTO")], na.rm = TRUE)
+
+# Lag-Feature für MTN (nur wenn aufeinanderfolgende Messungen <= 11 min Abstand)
+wide <- wide %>%
+  arrange(DateTime) %>%
+  mutate(
+    time_diff = as.numeric(difftime(DateTime, lag(DateTime), units = "mins")),
+    lag1_MTN = ifelse(time_diff <= 11, lag(MTN), NA)
+  )
+
+# Trainingsdaten (alle verfügbaren echten Messwerte)
+train <- wide %>%
+  filter(!is.na(MTM))
+
+# Ranger-Modell erstellen
+mod_ranger <- ranger(
+  MTM ~ MTN + MTS + MTO +
+    mean_neighbors +
+    lag1_MTN +
+    Hour_sin + Hour_cos +
+    DayOfYear + DayOfYear_sin + DayOfYear_cos +
+    temp_cycle_season +
+    diff_MTN_MTS + diff_MTN_MTO + diff_MTS_MTO,
+  data = train,
+  num.trees = 500,
+  mtry = 3,
+  importance = "permutation",
+  seed = 42
+)
+
+# Modellübersicht
+mod_ranger
+mod_ranger$variable.importance
+
+# Vorhersagen für alle Werte
+pred_ranger <- predict(mod_ranger, data = wide)$predictions
+wide$MTM_filled_ranger <- ifelse(
+  is.na(wide$MTM),
+  pred_ranger,
+  wide$MTM
+)
+
+# ----------------------------
+# Unabhängige Testung der Vorhersagegenauigkeit
+set.seed(42)
+valid_idx <- which(!is.na(wide$MTM))  # echte Messwerte
+n_reps <- 5
+rmse_vals <- numeric(n_reps)
+
+for(i in 1:n_reps){
+  
+  # 20% der echten Werte zufällig auf NA setzen
+  test_idx <- sample(valid_idx, size = floor(0.2 * length(valid_idx)))
+  wide_test <- wide
+  wide_test$MTM[test_idx] <- NA
+  
+  # Vorhersage mit dem bereits trainierten Modell
+  pred_test <- predict(mod_ranger, data = wide_test)$predictions
+  
+  # RMSE auf den „versteckten“ Testwerten
+  rmse_vals[i] <- sqrt(mean((pred_test[test_idx] - wide$MTM[test_idx])^2))
+  cat("Wiederholung", i, "fertig\n")
+}
+
+# Ergebnisse zusammenfassen
+mean_rmse   <- mean(rmse_vals)
+sd_rmse     <- sd(rmse_vals)
+nrmse_sd    <- mean_rmse / sd(wide$MTM, na.rm = TRUE)        # relativ zur Standardabweichung
+nrmse_range <- mean_rmse / (max(wide$MTM, na.rm = TRUE) - min(wide$MTM, na.rm = TRUE)) # relativ zur Spannweite
+min_val <- min(wide$MTM, na.rm = TRUE)
+max_val <- max(wide$MTM, na.rm = TRUE)
+range_val <- max_val - min_val# Spannweite der echten Daten
+
+# Ergebnisse ausgeben
+mean_rmse      # mittlere Abweichung: 0,095 
+sd_rmse        # Streuung über Wiederholungen: 0,003
+nrmse_sd       # NRMSE relativ zur Standardabweichung: 0,017 -> 1,69 %
+nrmse_range    # NRMSE relativ zur Spannweite: 0,002 -> 0,29 %
+range_val      # Spannweite: 32,79
+
+# ----------------------------
+# Vorhersagen zurückführen
+mtm_filled_long_Temp_schatten <- wide %>%
+  select(DateTime, MTM_filled_ranger) %>%
+  rename(Temp_schatten_C = MTM_filled_ranger) %>%
+  mutate(Logger_ID = "MTM")
+
+mtm_filled_long_renamed <- mtm_filled_long_Temp_schatten %>%
+  rename(Temp_schatten_C_filled = Temp_schatten_C)
+
+all_loggers_filled <- all_loggers_filled %>%
+  left_join(
+    mtm_filled_long_renamed %>% select(DateTime, Logger_ID, Temp_schatten_C_filled),
+    by = c("DateTime", "Logger_ID")
+  ) %>%
+  mutate(
+    Temp_schatten_C = case_when(
+      Logger_ID == "MTM" & is.na(Temp_schatten_C) ~ round(Temp_schatten_C_filled, 2),
+      TRUE ~ round(Temp_schatten_C, 2)
+    )
+  ) %>%
+  select(-Temp_schatten_C_filled)
+```
+
+#### MTM Licht_lux
+
+```{r}
+
+```
+
+## MTW
+
+#### MTW Temp_Schatten_C
+
+```{r}
+# Variable definieren
+var <- "Temp_schatten_C"
+
+# Datensatz vorbereiten
+wide <- all_loggers %>%
+  select(DateTime, Standort, Logger_ID, all_of(var)) %>%
+  filter(Standort == "MT") %>%
+  pivot_wider(names_from = Logger_ID,
+              values_from = all_of(var)) %>%
+  arrange(DateTime)
+
+# Zeitliche Features hinzufügen
+wide$Hour <- as.numeric(format(wide$DateTime, "%H"))
+wide$DayOfYear <- as.numeric(format(wide$DateTime, "%j"))
+wide$Hour_sin <- sin(2 * pi * wide$Hour / 24)
+wide$Hour_cos <- cos(2 * pi * wide$Hour / 24)
+wide$DayOfYear_sin <- sin(2 * pi * wide$DayOfYear / 365)
+wide$DayOfYear_cos <- cos(2 * pi * wide$DayOfYear / 365)
+
+# Temperatur-Zyklus
+wide$temp_cycle <- sin(pi * (wide$Hour - 6) / 12)
+wide$temp_cycle <- pmax(-1, wide$temp_cycle)
+wide$temp_cycle_season <- wide$temp_cycle * (1 + 0.3 * sin(2 * pi * wide$DayOfYear / 365))
+
+# Differenz-Feature
+wide <- wide %>%
+  mutate(
+    diff_MTN_MTS = ifelse(!is.na(MTN) & !is.na(MTS), MTN - MTS, NA)
+  )
+
+# Nachbars-Mittelwert
+wide$mean_neighbors <- rowMeans(wide[, c("MTN", "MTS")], na.rm = TRUE)
+
+# Lag-Feature für MTN (nur wenn aufeinanderfolgende Messungen <= 11 min Abstand)
+wide <- wide %>%
+  arrange(DateTime) %>%
+  mutate(
+    time_diff = as.numeric(difftime(DateTime, lag(DateTime), units = "mins")),
+    lag1_MTN = ifelse(time_diff <= 11, lag(MTN), NA)
+  )
+
+# Trainingsdaten
+train <- wide %>%
+  filter(!is.na(MTW))
+
+# ----------------------------
+# Ranger-Modell erstellen
+mod_ranger <- ranger(
+  MTW ~ MTN + MTS +
+    mean_neighbors +
+    lag1_MTN +
+    Hour_sin + Hour_cos +
+    DayOfYear + DayOfYear_sin + DayOfYear_cos +
+    temp_cycle_season +
+    diff_MTN_MTS,
+  data = train,
+  num.trees = 500,
+  mtry = 3,
+  importance = "permutation",
+  seed = 42
+)
+
+# Modellübersicht
+mod_ranger
+mod_ranger$variable.importance
+
+# Vorhersagen für alle Werte
+pred_ranger <- predict(mod_ranger, data = wide)$predictions
+wide$MTW_filled_ranger <- ifelse(
+  is.na(wide$MTW),
+  pred_ranger,
+  wide$MTW
+)
+
+# ----------------------------
+# Unabhängige Testung der Vorhersagegenauigkeit
+set.seed(42)
+valid_idx <- which(!is.na(wide$MTW))  # echte Messwerte
+n_reps <- 5
+rmse_vals <- numeric(n_reps)
+
+for(i in 1:n_reps){
+  
+  # 20% der echten Werte zufällig auf NA setzen
+  test_idx <- sample(valid_idx, size = floor(0.2 * length(valid_idx)))
+  wide_test <- wide
+  wide_test$MTW[test_idx] <- NA
+  
+  # Vorhersage mit dem bereits trainierten Modell
+  pred_test <- predict(mod_ranger, data = wide_test)$predictions
+  
+  # RMSE auf den „versteckten“ Testwerten
+  rmse_vals[i] <- sqrt(mean((pred_test[test_idx] - wide$MTW[test_idx])^2))
+  cat("Wiederholung", i, "fertig\n")
+}
+
+# Ergebnisse zusammenfassen
+mean_rmse   <- mean(rmse_vals)
+sd_rmse     <- sd(rmse_vals)
+nrmse_sd    <- mean_rmse / sd(wide$MTW, na.rm = TRUE)        # relativ zur Standardabweichung
+nrmse_range <- mean_rmse / (max(wide$MTW, na.rm = TRUE) - min(wide$MTW, na.rm = TRUE)) # relativ zur Spannweite
+min_val <- min(wide$MTW, na.rm = TRUE)
+max_val <- max(wide$MTW, na.rm = TRUE)
+range_val <- max_val - min_val# Spannweite der echten Daten
+
+# Ergebnisse ausgeben
+mean_rmse      # mittlere Abweichung: 0,143 °C
+sd_rmse        # Streuung über Wiederholungen: 0,005
+nrmse_sd       # NRMSE relativ zur Standardabweichung: 0,027 -> 2,7 %
+nrmse_range    # NRMSE relativ zur Spannweite: 0,004 -> 0,45 %
+range_val      # Spannweite: 32,79
+
+# ----------------------------
+# Vorhersagen zurückführen
+mtw_filled_long_Temp_schatten <- wide %>%
+  select(DateTime, MTW_filled_ranger) %>%
+  rename(Temp_schatten_C = MTW_filled_ranger) %>%
+  mutate(Logger_ID = "MTW")
+
+mtw_filled_long_renamed <- mtw_filled_long_Temp_schatten %>%
+  rename(Temp_schatten_C_filled = Temp_schatten_C)
+
+all_loggers_filled <- all_loggers_filled %>%
+  left_join(
+    mtw_filled_long_renamed %>% select(DateTime, Logger_ID, Temp_schatten_C_filled),
+    by = c("DateTime", "Logger_ID")
+  ) %>%
+  mutate(
+    Temp_schatten_C = case_when(
+      Logger_ID == "MTW" & is.na(Temp_schatten_C) ~ round(Temp_schatten_C_filled, 2),
+      TRUE ~ round(Temp_schatten_C, 2)
+    )
+  ) %>%
+  select(-Temp_schatten_C_filled)
+```
+
+#### MTW Relative Luftfeuchtigkeit
+
+```{r}
+# Variable definieren
+var <- "relLF_percent"
+
+# Datensatz vorbereiten
+wide <- all_loggers %>%
+  select(DateTime, Standort, Logger_ID, all_of(var)) %>%
+  filter(Standort == "MT") %>%
+  pivot_wider(names_from = Logger_ID,
+              values_from = all_of(var)) %>%
+  arrange(DateTime)
+
+# Zeitliche Features hinzufügen
+wide$Hour <- as.numeric(format(wide$DateTime, "%H"))
+wide$DayOfYear <- as.numeric(format(wide$DateTime, "%j"))
+wide$Hour_sin <- sin(2 * pi * wide$Hour / 24)
+wide$Hour_cos <- cos(2 * pi * wide$Hour / 24)
+wide$DayOfYear_sin <- sin(2 * pi * wide$DayOfYear / 365)
+wide$DayOfYear_cos <- cos(2 * pi * wide$DayOfYear / 365)
+
+# Differenz-Feature
+wide <- wide %>%
+  mutate(
+    diff_MTN_MTS = ifelse(!is.na(MTN) & !is.na(MTS), MTN - MTS, NA)
+  )
+
+# Nachbars-Mittelwert
+wide$mean_neighbors <- rowMeans(wide[, c("MTN", "MTS")], na.rm = TRUE)
+
+# Lag-Feature für MTN (nur wenn aufeinanderfolgende Messungen <= 11 min Abstand)
+wide <- wide %>%
+  arrange(DateTime) %>%
+  mutate(
+    time_diff = as.numeric(difftime(DateTime, lag(DateTime), units = "mins")),
+    lag1_MTN = ifelse(time_diff <= 11, lag(MTN), NA)
+  )
+
+# Trainingsdaten
+train <- wide %>%
+  filter(!is.na(MTW))
+
+# ----------------------------
+# Ranger-Modell erstellen
+mod_ranger <- ranger(
+  MTW ~ MTN + MTS +
+    mean_neighbors +
+    lag1_MTN +
+    Hour_sin + Hour_cos +
+    DayOfYear + DayOfYear_sin + DayOfYear_cos +
+    diff_MTN_MTS,
+  data = train,
+  num.trees = 500,
+  mtry = 3,
+  importance = "permutation",
+  seed = 42
+)
+
+# Modellübersicht
+mod_ranger
+mod_ranger$variable.importance
+
+# Vorhersagen für alle Werte
+pred_ranger <- predict(mod_ranger, data = wide)$predictions
+wide$MTW_filled_ranger <- ifelse(
+  is.na(wide$MTW),
+  pred_ranger,
+  wide$MTW
+)
+
+# ----------------------------
+# Unabhängige Testung der Vorhersagegenauigkeit
+set.seed(42)
+valid_idx <- which(!is.na(wide$MTW))  # echte Messwerte
+n_reps <- 5
+rmse_vals <- numeric(n_reps)
+
+for(i in 1:n_reps){
+  
+  # 20% der echten Werte zufällig auf NA setzen
+  test_idx <- sample(valid_idx, size = floor(0.2 * length(valid_idx)))
+  wide_test <- wide
+  wide_test$MTW[test_idx] <- NA
+  
+  # Vorhersage mit dem bereits trainierten Modell
+  pred_test <- predict(mod_ranger, data = wide_test)$predictions
+  
+  # RMSE auf den „versteckten“ Testwerten
+  rmse_vals[i] <- sqrt(mean((pred_test[test_idx] - wide$MTW[test_idx])^2))
+  cat("Wiederholung", i, "fertig\n")
+}
+
+# Ergebnisse zusammenfassen
+mean_rmse   <- mean(rmse_vals)
+sd_rmse     <- sd(rmse_vals)
+nrmse_sd    <- mean_rmse / sd(wide$MTW, na.rm = TRUE)        # relativ zur Standardabweichung
+nrmse_range <- mean_rmse / (max(wide$MTW, na.rm = TRUE) - min(wide$MTW, na.rm = TRUE)) # relativ zur Spannweite
+min_val <- min(wide$MTW, na.rm = TRUE)
+max_val <- max(wide$MTW, na.rm = TRUE)
+range_val <- max_val - min_val # Spannweite der echten Daten
+
+# Ergebnisse ausgeben
+mean_rmse      # mittlere Abweichung: 0,904 %
+sd_rmse        # Streuung über Wiederholungen: 0,016
+nrmse_sd       # NRMSE relativ zur Standardabweichung: 0,056 -> 5,6 %
+nrmse_range    # NRMSE relativ zur Spannweite: 0,013 -> 1,31%
+range_val      # Spannweite der echten Messwerte: 77,11
+
+# ----------------------------
+# Vorhersagen zurückführen
+mtw_filled_long_RL <- wide %>%
+  select(DateTime, MTW_filled_ranger) %>%
+  rename(relLF_percent = MTW_filled_ranger) %>%
+  mutate(Logger_ID = "MTW")
+
+mtw_filled_long_renamed <- mtw_filled_long_RL %>%
+  rename(relLF_percent_filled = relLF_percent)
+
+all_loggers_filled <- all_loggers_filled %>%
+  left_join(
+    mtw_filled_long_renamed %>% select(DateTime, Logger_ID, relLF_percent_filled),
+    by = c("DateTime", "Logger_ID")
+  ) %>%
+  mutate(
+    relLF_percent = case_when(
+      Logger_ID == "MTW" & is.na(relLF_percent) ~ round(relLF_percent_filled, 2),
+      TRUE ~ round(relLF_percent, 2)  
+    )
+  ) %>%
+  select(-relLF_percent_filled)
+```
+
+#### MTW Taupunkt
+
+```{r}
+# Variable definieren
+var <- "Taupunkt_C"
+
+# Datensatz vorbereiten
+wide <- all_loggers %>%
+  select(DateTime, Standort, Logger_ID, all_of(var)) %>%
+  filter(Standort == "MT") %>%
+  pivot_wider(names_from = Logger_ID,
+              values_from = all_of(var)) %>%
+  arrange(DateTime)
+
+# Zeitliche Features hinzufügen
+wide$Hour <- as.numeric(format(wide$DateTime, "%H"))
+wide$DayOfYear <- as.numeric(format(wide$DateTime, "%j"))
+wide$Hour_sin <- sin(2 * pi * wide$Hour / 24)
+wide$Hour_cos <- cos(2 * pi * wide$Hour / 24)
+wide$DayOfYear_sin <- sin(2 * pi * wide$DayOfYear / 365)
+wide$DayOfYear_cos <- cos(2 * pi * wide$DayOfYear / 365)
+
+# Nachbars-Mittelwert
+wide$mean_neighbors <- rowMeans(wide[, c("MTN", "MTS", "MTO")], na.rm = TRUE)
+
+# Lag-Feature für MTN (nur wenn aufeinanderfolgende Messungen <= 11 min Abstand)
+wide <- wide %>%
+  arrange(DateTime) %>%
+  mutate(
+    time_diff = as.numeric(difftime(DateTime, lag(DateTime), units = "mins")),
+    lag1_MTN = ifelse(time_diff <= 11, lag(MTN), NA)
+  )
+
+# Trainingsdaten
+train <- wide %>%
+  filter(!is.na(MTW))
+
+# ----------------------------
+# Ranger-Modell erstellen
+mod_ranger <- ranger(
+  MTW ~ MTN + MTS + MTO +
+    mean_neighbors +
+    lag1_MTN +
+    Hour_sin + Hour_cos +
+    DayOfYear + DayOfYear_sin + DayOfYear_cos,
+  data = train,
+  num.trees = 500,
+  mtry = 3,
+  importance = "permutation",
+  seed = 42
+)
+
+# Modellübersicht
+mod_ranger
+mod_ranger$variable.importance
+
+# Vorhersagen für alle Werte
+pred_ranger <- predict(mod_ranger, data = wide)$predictions
+wide$MTW_filled_ranger <- ifelse(
+  is.na(wide$MTW),
+  pred_ranger,
+  wide$MTW
+)
+
+# ----------------------------
+# Unabhängige Testung der Vorhersagegenauigkeit
+set.seed(42)
+valid_idx <- which(!is.na(wide$MTW))  # echte Messwerte
+n_reps <- 5
+rmse_vals <- numeric(n_reps)
+
+for(i in 1:n_reps){
+  
+  # 20% der echten Werte zufällig auf NA setzen
+  test_idx <- sample(valid_idx, size = floor(0.2 * length(valid_idx)))
+  wide_test <- wide
+  wide_test$MTW[test_idx] <- NA
+  
+  # Vorhersage mit dem bereits trainierten Modell
+  pred_test <- predict(mod_ranger, data = wide_test)$predictions
+  
+  # RMSE auf den „versteckten“ Testwerten
+  rmse_vals[i] <- sqrt(mean((pred_test[test_idx] - wide$MTW[test_idx])^2))
+  cat("Wiederholung", i, "fertig\n")
+}
+
+# Ergebnisse zusammenfassen
+mean_rmse   <- mean(rmse_vals)
+sd_rmse     <- sd(rmse_vals)
+nrmse_sd    <- mean_rmse / sd(wide$MTW, na.rm = TRUE)        # relativ zur Standardabweichung
+nrmse_range <- mean_rmse / (max(wide$MTW, na.rm = TRUE) - min(wide$MTW, na.rm = TRUE)) # relativ zur Spannweite
+min_val <- min(wide$MTW, na.rm = TRUE)
+max_val <- max(wide$MTW, na.rm = TRUE)
+range_val <- max_val - min_val # Spannweite der echten Daten
+
+# Ergebnisse ausgeben
+mean_rmse      # mittlere Abweichung: 0,19 °C
+sd_rmse        # Streuung über Wiederholungen: 0,008
+nrmse_sd       # NRMSE relativ zur Standardabweichung: 0,047 -> 4,7 %
+nrmse_range    # NRMSE relativ zur Spannweite: 0,009 -> 0,87 %
+range_val      # Spannweite der echten Messwerte: 24,36
+
+# ----------------------------
+# Vorhersagen zurückführen
+mtw_filled_long_Tau <- wide %>%
+  select(DateTime, MTW_filled_ranger) %>%
+  rename(Taupunkt_C = MTW_filled_ranger) %>%
+  mutate(Logger_ID = "MTW")
+
+mtw_filled_long_renamed <- mtw_filled_long_Tau %>%
+  rename(Taupunkt_C_filled = Taupunkt_C)
+
+all_loggers_filled <- all_loggers_filled %>%
+  left_join(
+    mtw_filled_long_renamed %>% select(DateTime, Logger_ID, Taupunkt_C_filled),
+    by = c("DateTime", "Logger_ID")
+  ) %>%
+  mutate(
+    Taupunkt_C = case_when(
+      Logger_ID == "MTW" & is.na(Taupunkt_C) ~ round(Taupunkt_C_filled, 2),
+      TRUE ~ round(Taupunkt_C, 2)  
+    )
+  ) %>%
+  select(-Taupunkt_C_filled)
+```
+
+## MNW
+
+#### MNW Temp_Sonne_C
+
+```{r}
+# Variable definieren
+var1 <- "Temp_sonne_C"
+var2 <- "Temp_schatten_C"
+
+# Datensatz vorbereiten
+wide <- all_loggers %>%
+  select(DateTime, Standort, Logger_ID, all_of(c(var1, var2))) %>%
+  filter(Standort == "MN") %>%
+  pivot_wider(
+    names_from = Logger_ID,
+    values_from = all_of(c(var1, var2)),
+    names_sep = "_"
+  ) %>%
+  arrange(DateTime)
+
+# Zeitliche Features
+wide$Hour <- as.numeric(format(wide$DateTime, "%H"))
+wide$DayOfYear <- as.numeric(format(wide$DateTime, "%j"))
+wide$Hour_sin <- sin(2 * pi * wide$Hour / 24)
+wide$Hour_cos <- cos(2 * pi * wide$Hour / 24)
+wide$DayOfYear_sin <- sin(2 * pi * wide$DayOfYear / 365)
+wide$DayOfYear_cos <- cos(2 * pi * wide$DayOfYear / 365)
+
+# Temperatur-Zyklus
+wide$temp_cycle <- sin(pi * (wide$Hour - 6) / 12)
+wide$temp_cycle <- pmax(-1, wide$temp_cycle)
+wide$temp_cycle_season <- wide$temp_cycle * (1 + 0.3 * sin(2 * pi * wide$DayOfYear / 365))
+
+# Differenzen
+wide <- wide %>%
+  mutate(
+    diff_MNN_MNS = ifelse(!is.na(Temp_sonne_C_MNN) & !is.na(Temp_sonne_C_MNS),
+                          Temp_sonne_C_MNN - Temp_sonne_C_MNS, NA),
+    diff_MNN_MNM = ifelse(!is.na(Temp_sonne_C_MNN) & !is.na(Temp_sonne_C_MNM),
+                          Temp_sonne_C_MNN - Temp_sonne_C_MNM, NA),
+    diff_MNS_MNM = ifelse(!is.na(Temp_sonne_C_MNS) & !is.na(Temp_sonne_C_MNM),
+                          Temp_sonne_C_MNS - Temp_sonne_C_MNM, NA)
+  )
+
+# Nachbars-Mittelwert (über MNN, MNS, MNM)
+wide$mean_neighbors <- rowMeans(wide[, c("Temp_sonne_C_MNN", "Temp_sonne_C_MNS", "Temp_sonne_C_MNM")], na.rm = TRUE)
+
+# Lag-Feature für MNN
+wide <- wide %>%
+  arrange(DateTime) %>%
+  mutate(
+    time_diff = as.numeric(difftime(DateTime, lag(DateTime), units = "mins")),
+    lag1_MNN = ifelse(time_diff <= 11, lag(Temp_sonne_C_MNN), NA)
+  )
+
+# Trainingsdaten
+train <- wide %>%
+  filter(!is.na(Temp_sonne_C_MNW))
+
+# ----------------------------
+# Ranger-Modell erstellen
+mod_ranger <- ranger(
+  Temp_sonne_C_MNW ~ 
+    Temp_sonne_C_MNN + Temp_sonne_C_MNM +
+    Temp_schatten_C_MNN +
+    mean_neighbors + lag1_MNN +
+    Hour_sin + Hour_cos +
+    DayOfYear + DayOfYear_sin + DayOfYear_cos +
+    temp_cycle_season +
+    diff_MNN_MNS + diff_MNN_MNM + diff_MNS_MNM,
+  data = train,
+  num.trees = 500,
+  mtry = 3,
+  importance = "permutation",
+  seed = 42
+)
+
+# Modellübersicht
+mod_ranger
+mod_ranger$variable.importance
+
+# Vorhersage für alle Werte
+pred_ranger <- predict(mod_ranger, data = wide)$predictions
+wide$MNW_filled_ranger <- ifelse(
+  is.na(wide$Temp_sonne_C_MNW),
+  pred_ranger,
+  wide$Temp_sonne_C_MNW
+)
+
+# ----------------------------
+# Unabhängige Testung der Vorhersagegenauigkeit
+# Unabhängige Testung der Vorhersagegenauigkeit
+set.seed(42)
+valid_idx <- which(!is.na(wide$Temp_sonne_C_MNW))  # echte Messwerte
+n_reps <- 5
+rmse_vals <- numeric(n_reps)
+
+for(i in 1:n_reps){
+  
+  # 20% der echten Werte zufällig auf NA setzen
+  test_idx <- sample(valid_idx, size = floor(0.2 * length(valid_idx)))
+  wide_test <- wide
+  wide_test$Temp_sonne_C_MNW[test_idx] <- NA
+  
+  # Vorhersage mit dem bereits trainierten Modell
+  pred_test <- predict(mod_ranger, data = wide_test)$predictions
+  
+  # RMSE auf den „versteckten“ Testwerten
+  rmse_vals[i] <- sqrt(mean((pred_test[test_idx] - wide$Temp_sonne_C_MNW[test_idx])^2))
+  cat("Wiederholung", i, "fertig\n")
+}
+
+# Ergebnisse zusammenfassen
+mean_rmse   <- mean(rmse_vals)
+sd_rmse     <- sd(rmse_vals)
+nrmse_sd    <- mean_rmse / sd(wide$MNW, na.rm = TRUE)        # relativ zur Standardabweichung
+nrmse_range <- mean_rmse / (max(wide$MNW, na.rm = TRUE) - min(wide$MNW, na.rm = TRUE)) # relativ zur Spannweite
+min_val <- min(wide$MNW, na.rm = TRUE)
+max_val <- max(wide$MNW, na.rm = TRUE)
+range_val <- max_val - min_val # Spannweite der echten Daten
+
+# Ergebnisse ausgeben
+mean_rmse      # mittlere Abweichung: 0,19 °C
+sd_rmse        # Streuung über Wiederholungen: 0,008
+nrmse_sd       # NRMSE relativ zur Standardabweichung: 0,047 -> 4,7 %
+nrmse_range    # NRMSE relativ zur Spannweite: 0,009 -> 0,87 %
+range_val      # Spannweite der echten Messwerte: 24,36
+
+
+# ----------------------------
+# Ergebnisse zurückführen
+mnw_filled_long_Temp_sonne <- wide %>%
+  select(DateTime, MNW_filled_ranger) %>%
+  rename(Temp_sonne_C = MNW_filled_ranger) %>%
+  mutate(Logger_ID = "MNW")
+
+mnw_filled_long_renamed <- mnw_filled_long_Temp_sonne %>%
+  rename(Temp_sonne_C_filled = Temp_sonne_C)
+
+all_loggers_filled <- all_loggers_filled %>%
+  left_join(
+    mnw_filled_long_renamed %>% select(DateTime, Logger_ID, Temp_sonne_C_filled),
+    by = c("DateTime", "Logger_ID")
+  ) %>%
+  mutate(
+    Temp_sonne_C = case_when(
+      Logger_ID == "MNW" & is.na(Temp_sonne_C) ~ round(Temp_sonne_C_filled, 2),
+      TRUE ~ round(Temp_sonne_C, 2)
+    )
+  ) %>%
+  select(-Temp_sonne_C_filled)
+
+```
+
+#### MNW Licht_lux
+
+```{r}
+```
+
+#### MNW Temp_Schatten_C
+
+```{r}
+```
+
+#### MNW Relative Luftfeuchtigkeit
+
+```{r}
+```
+
+#### MNW Taupunkt
+
+```{r}
+```
+
+# 6 Erzeugte Daten auf Vollständigkeit überprüfen und als Exceltabelle abspeichern
+
+das Durchlaufen des Codes dauert sonst zu lange
+
+```{r}
+# Sind NA´s vorhanden 
+any(is.na(all_loggers_filled))
+sum(is.na(all_loggers_filled))
+colSums(is.na(all_loggers_filled))
+all_loggers_filled[!complete.cases(all_loggers_filled), ]
+
+all_loggers_filled %>%
+  group_by(Logger_ID) %>%
+  summarise(NA_count = sum(is.na(Temp_sonne_C)))
+
+fd <- all_loggers_filled %>%
+  pivot_longer(
+    cols = c(Licht_lux, Temp_sonne_C, Temp_schatten_C),
+    names_to = "Variable",
+    values_to = "Wert"
+  ) %>%
+  filter(is.na(Wert)) %>%
+  arrange(Logger_ID, Variable, DateTime)
+```
+
+```{r}
+#install.packages("writexl")
+library(writexl)
+
+# Tabelle als Excel speichern
+#write_xlsx(all_loggers_filled, path = "all_loggers_filled.xlsx")
+
+
+# ggf nochmal neu abspeichern, nachdem mnw 
+```
