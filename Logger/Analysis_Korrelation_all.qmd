@@ -323,7 +323,7 @@ str(all_loggers)
 
 # 4 Fehlende Daten per Korrelation/ Modell erzeugen
 
-Identifizieren der fehlenden Daten, Raster erstellen mit allen vorhandene und fehlenden Daten (wenn eine Messgröße nicht durch den Logger gemessen wurde, existiert die entsprechende Zeile einfach nicht –\> durch den nachfolgenden Code werden diese Zeilen hinzugefügt)
+Identifizieren der fehlenden Daten, Raster erstellen mit allen vorhandene und fehlenden Daten (wenn eine Messgröße nicht durch den Logger gemessen wurde, existiert die entsprechende Zeile einfach nicht --\> durch den nachfolgenden Code werden diese Zeilen hinzugefügt)
 
 ```{r}
 # Zeitspalte korrekt formatieren
