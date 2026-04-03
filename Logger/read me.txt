@@ -28,9 +28,9 @@ Analysis_Korrelation_Ranger
 - nutzt Random Forest
 - effizientere Berechnung -> manchmal leicht andere Modelle
 - Fokus auf Geschwindigkeit und große Datensätze -> pro Modell ca. 1 Minute!
-- annähern exakt gleiche Vorhersagen 
+- annähern exakt gleiche Vorhersagen, mit Ausnahme der Licht-Modelle (0,1 schlechter, wenn überhaupt -> hier wird eine korrekte Überprüfung durchgeführt und bei dem Random Forest Modell habe ich es nur vereinfacht gemacht, da eine komplette Berechnung nochmal das 2 bis 3 fache an Zeit gekostet hätte = diese Datei hat die wissenschaftlich korrekte Überprüfung) 
 
 Ergebnis:
--> weiter arbeiten mit Ranger, aktuell beste Option (gibt auch theoretisch bessere (XGBoost))
--> anhand der mit Ranger erzeugten Daten Tabelle erstellen -> all_loggers_filled (= enthält keine NA-Werte mehr)
--> anhand der mit Ranger erzeugten Daten Abweichungen von echten Werte berechnen -> Modellierte_Messdaten_Fehlerstatistik
+-> weiter arbeiten mit Random Forest, aktuell beste Option (gibt auch theoretisch bessere (XGBoost))
+-> anhand der mit Random Forest erzeugten Daten Tabelle erstellen -> all_loggers_filled (= enthält keine NA-Werte mehr)
+-> anhand der mit Random Forest erzeugten Daten Abweichungen von echten Werte berechnen -> Modellierte_Messdaten_Fehlerstatistik

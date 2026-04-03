@@ -4,7 +4,7 @@ format: html
 editor: visual
 ---
 
-# 1 genutzte Packages
+# 1. Genutzte Packages
 
 ```{r}
 #library(tidyverse)
@@ -15,7 +15,7 @@ library(ggplot2)
 library(ranger)
 ```
 
-# 2 Daten einlesen
+# 2. Daten einlesen
 
 ## 2.1 Licht und Temperatur (außen)
 
@@ -63,7 +63,7 @@ MNN_th <- read.csv("Luftfeuchte-und-Temperatur-innen/Meusebach nass Nord 2025-10
 MNS_th <- read.csv("Luftfeuchte-und-Temperatur-innen/Meusebach nass Süd 2025-11-04 11_35_14 CET.csv")
 ```
 
-# 3 Daten bereinigen und strukturieren
+# 3. Daten bereinigen & strukturieren
 
 ```{r}
 #| label: long date conversion
@@ -306,7 +306,7 @@ str(all_loggers)
 
 ```
 
-# 4 Fehlende Daten per Korrelation/ Modell erzeugen
+# 4. Fehlende Daten identifizieren & Korrelationszusammenhänge 
 
 Identifizieren der fehlenden Daten, Raster erstellen mit allen vorhandene und fehlenden Daten (wenn eine Messgröße nicht durch den Logger gemessen wurde, existiert die entsprechende Zeile einfach nicht –\> durch den nachfolgenden Code werden diese Zeilen hinzugefügt)
 
@@ -491,7 +491,7 @@ cross_logger_cor
 #write_xlsx(cross_logger_cor, "cross_logger_cor.xlsx")
 ```
 
-# 5 Ranger 
+# 5 Ranger-Modell
 
 ## MTM
 
@@ -524,6 +524,17 @@ wide$temp_cycle <- sin(pi * (wide$Hour - 6) / 12)
 wide$temp_cycle <- pmax(-1, wide$temp_cycle)
 wide$temp_cycle_season <- wide$temp_cycle * (1 + 0.3 * sin(2 * pi * wide$DayOfYear / 365))
 
+# Nachbars-Mittelwert
+wide$mean_neighbors <- rowMeans(wide[, c("MTN", "MTS", "MTO")], na.rm = TRUE)
+
+# Lag-Feature (nur wenn aufeinanderfolgende Messungen <= 11 min Abstand)
+wide <- wide %>%
+  arrange(DateTime) %>%
+  mutate(
+    time_diff = as.numeric(difftime(DateTime, lag(DateTime), units = "mins")),
+    lag1_MTN = ifelse(time_diff <= 11, lag(MTN), NA)
+  )
+
 # Trainingsdaten 
 train <- wide %>%
   filter(!is.na(MTM))
@@ -542,8 +553,6 @@ mod_ranger <- ranger(
 # Modellübersicht -> man kann ableiten, wie wichtig die einzelnen Features waren (also: MTN, MTS, Hour_sin, DayOfYear ...)
 mod_ranger
 mod_ranger$variable.importance
-# %IncMSE zeigt an, wie stark der Fehler steigt, wenn ein Feature zufällig permutiert wird -> Je höher der Wert, desto wichtiger ist das Feature für die Gesamtvorhersage
-# NodePurity sagt strukturbezogen, wie wichtig ein Feature für die Baumaufteilung ist
 
 # Vorhersage
 pred_ranger <- predict(mod_ranger, data = wide)$predictions
@@ -562,7 +571,7 @@ rmse_vals <- numeric(n_reps)
 
 for(i in 1:n_reps){
   
-  # Zufällig 20% als Testdaten
+  # Zufällig 20% als Testdaten (auf Null setzten)
   test_idx <- sample(valid_idx, size = floor(0.2 * length(valid_idx)))
   train_idx <- setdiff(valid_idx, test_idx)
   
@@ -571,8 +580,7 @@ for(i in 1:n_reps){
   
   # Ranger auf Trainingsdaten trainieren
   mod_cv <- ranger(
-    formula = MTM ~ MTN + MTS + MTO + Hour_sin + Hour_cos + DayOfYear +
-              DayOfYear_sin + DayOfYear_cos + temp_cycle_season,
+    formula = MTM ~ MTN + MTS + MTO + Hour_sin + Hour_cos + DayOfYear + DayOfYear_sin + DayOfYear_cos + temp_cycle_season,
     data = train_data,
     num.trees = 500,
     mtry = 3,
@@ -652,17 +660,6 @@ wide$Hour_cos <- cos(2 * pi * wide$Hour / 24)
 wide$DayOfYear_sin <- sin(2 * pi * wide$DayOfYear / 365)
 wide$DayOfYear_cos <- cos(2 * pi * wide$DayOfYear / 365)
 
-# Nachbars-Mittelwert
-wide$mean_neighbors <- rowMeans(wide[, c("MTN", "MTS", "MTO")], na.rm = TRUE)
-
-# Lag-Feature (nur wenn aufeinanderfolgende Messungen <= 11 min Abstand)
-wide <- wide %>%
-  arrange(DateTime) %>%
-  mutate(
-    time_diff = as.numeric(difftime(DateTime, lag(DateTime), units = "mins")),
-    lag1_MTN = ifelse(time_diff <= 11, lag(MTN), NA)
-  )
-
 # Trainingsdaten (alle verfügbaren Messwerte)
 train <- wide %>%
   filter(!is.na(MTM))
@@ -670,10 +667,8 @@ train <- wide %>%
 # Ranger Modell erstellen
 mod_ranger <- ranger(
   MTM ~ MTN + MTS + MTO +
-    mean_neighbors +
     Hour_sin + Hour_cos +
-    DayOfYear_sin + DayOfYear_cos +
-    lag1_MTN,
+    DayOfYear_sin + DayOfYear_cos,
   data = train,
   num.trees = 500,
   mtry = 3,
@@ -695,23 +690,39 @@ wide$MTM_filled_ranger <- ifelse(
 
 # ----------------------------
 # Unabhängige Testung der Vorhersagegenauigkeit
+
 set.seed(42)
-valid_idx <- which(!is.na(wide$MTM))  # echte Messwerte
+valid_idx <- which(!is.na(wide$MTM))  # nur echte Messwerte
 n_reps <- 5
 rmse_vals <- numeric(n_reps)
 
 for(i in 1:n_reps){
   
-  # 20% der echten Werte zufällig auf NA setzen
+  # 20% der echten Werte zufällig als Testdaten auswählen
   test_idx <- sample(valid_idx, size = floor(0.2 * length(valid_idx)))
-  wide_test <- wide
-  wide_test$MTM[test_idx] <- NA
+  train_idx <- setdiff(valid_idx, test_idx)
   
-  # Vorhersage mit dem bereits trainierten Modell
-  pred_test <- predict(mod_ranger, data = wide_test)$predictions
+  # Trainings- und Testdaten aufteilen
+  train_data <- wide[train_idx, ]
+  test_data  <- wide[test_idx, ]
   
-  # RMSE auf den „versteckten“ Testwerten
-  rmse_vals[i] <- sqrt(mean((pred_test[test_idx] - wide$MTM[test_idx])^2))
+  # Ranger-Modell auf Trainingsdaten trainieren
+  mod_cv <- ranger(
+    formula = MTM ~ MTN + MTS + MTO + Hour_sin + Hour_cos + 
+      DayOfYear + DayOfYear_sin + DayOfYear_cos,
+    data = train_data,
+    num.trees = 500,
+    mtry = 3,
+    importance = "permutation",
+    seed = 42
+  )
+  
+  # Vorhersage auf Testdaten
+  pred_test <- predict(mod_cv, data = test_data)$predictions
+  
+  # RMSE für diese Wiederholung berechnen
+  rmse_vals[i] <- sqrt(mean((pred_test - test_data$MTM)^2))
+  
   cat("Wiederholung", i, "fertig\n")
 }
 
@@ -725,10 +736,10 @@ max_val <- max(wide$MTM, na.rm = TRUE)
 range_val <- max_val - min_val# Spannweite der echten Daten
 
 # Ergebnisse ausgeben
-mean_rmse      # mittlere Abweichung: 0,2 °C
-sd_rmse        # Streuung: 0,001
-nrmse_sd       # NRMSE relativ zur Standardabweichung: 0,059 -> 5,9 %
-nrmse_range    # NRMSE relativ zur Spannweite: 0,008 -> 0,8 %
+mean_rmse      # mittlere Abweichung: 0,45 °C
+sd_rmse        # Streuung: 0,0034
+nrmse_sd       # NRMSE relativ zur Standardabweichung: 0,133 -> 13,3%
+nrmse_range    # NRMSE relativ zur Spannweite: 0,018 -> 1,84%
 range_val      # Spannbreite: 24,36
 
 # ----------------------------
@@ -777,17 +788,6 @@ wide$Hour_cos <- cos(2 * pi * wide$Hour / 24)
 wide$DayOfYear_sin <- sin(2 * pi * wide$DayOfYear / 365)
 wide$DayOfYear_cos <- cos(2 * pi * wide$DayOfYear / 365)
 
-# Nachbars-Mittelwert
-wide$mean_neighbors <- rowMeans(wide[, c("MTN", "MTS", "MTO")], na.rm = TRUE)
-
-# Lag-Feature (nur wenn aufeinanderfolgende Messungen <= 11 min Abstand)
-wide <- wide %>%
-  arrange(DateTime) %>%
-  mutate(
-    time_diff = as.numeric(difftime(DateTime, lag(DateTime), units = "mins")),
-    lag1_MTN = ifelse(time_diff <= 11, lag(MTN), NA)
-  )
-
 # Trainingsdaten (alle verfügbaren Messwerte)
 train <- wide %>%
   filter(!is.na(MTM))
@@ -796,10 +796,8 @@ train <- wide %>%
 # Ranger Modell erstellen
 mod_ranger <- ranger(
   MTM ~ MTN + MTS + MTO +
-    mean_neighbors +
     Hour_sin + Hour_cos +
-    DayOfYear_sin + DayOfYear_cos +
-    lag1_MTN,
+    DayOfYear_sin + DayOfYear_cos,
   data = train,
   num.trees = 500,
   mtry = 3,
@@ -821,23 +819,39 @@ wide$MTM_filled_ranger <- ifelse(
 
 # ----------------------------
 # Unabhängige Testung der Vorhersagegenauigkeit
+
 set.seed(42)
-valid_idx <- which(!is.na(wide$MTM))  # echte Messwerte
+valid_idx <- which(!is.na(wide$MTM))  # nur echte Messwerte
 n_reps <- 5
 rmse_vals <- numeric(n_reps)
 
 for(i in 1:n_reps){
   
-  # 20% der echten Werte zufällig auf NA setzen
+  # 20% der echten Werte zufällig als Testdaten auswählen
   test_idx <- sample(valid_idx, size = floor(0.2 * length(valid_idx)))
-  wide_test <- wide
-  wide_test$MTM[test_idx] <- NA
+  train_idx <- setdiff(valid_idx, test_idx)
   
-  # Vorhersage mit dem bereits trainierten Modell
-  pred_test <- predict(mod_ranger, data = wide_test)$predictions
+  # Trainings- und Testdaten aufteilen
+  train_data <- wide[train_idx, ]
+  test_data  <- wide[test_idx, ]
   
-  # RMSE auf den „versteckten“ Testwerten
-  rmse_vals[i] <- sqrt(mean((pred_test[test_idx] - wide$MTM[test_idx])^2))
+  # Ranger-Modell auf Trainingsdaten trainieren
+  mod_cv <- ranger(
+    formula = MTM ~ MTN + MTS + MTO + Hour_sin + Hour_cos + 
+    DayOfYear + DayOfYear_sin + DayOfYear_cos,
+    data = train_data,
+    num.trees = 500,
+    mtry = 3,
+    importance = "permutation",
+    seed = 42
+  )
+  
+  # Vorhersage auf Testdaten
+  pred_test <- predict(mod_cv, data = test_data)$predictions
+  
+  # RMSE für diese Wiederholung berechnen
+  rmse_vals[i] <- sqrt(mean((pred_test - test_data$MTM)^2))
+  
   cat("Wiederholung", i, "fertig\n")
 }
 
@@ -851,10 +865,10 @@ max_val <- max(wide$MTM, na.rm = TRUE)
 range_val <- max_val - min_val# Spannweite der echten Daten
 
 # Ergebnisse ausgeben
-mean_rmse      # mittlere Abweichung: 0,8 %
-sd_rmse        # Streuung:  0,007
-nrmse_sd       # NRMSE relativ zur Standardabweichung: 0,044 -> 4,36
-nrmse_range    # NRMSE relativ zur Spannweite: 0,010 -> 1,04%
+mean_rmse      # mittlere Abweichung: 1,788 %
+sd_rmse        # Streuung: 0,016
+nrmse_sd       # NRMSE relativ zur Standardabweichung: 0,097 -> 9,7%
+nrmse_range    # NRMSE relativ zur Spannweite: 0,023 -> 2,32 %
 range_val      # Spannweite: 77,11
 
 # ----------------------------
@@ -916,17 +930,6 @@ wide <- wide %>%
     diff_MTS_MTO = ifelse(!is.na(MTS) & !is.na(MTO), MTS - MTO, NA)
   )
 
-# Nachbars-Mittelwert
-wide$mean_neighbors <- rowMeans(wide[, c("MTN", "MTS", "MTO")], na.rm = TRUE)
-
-# Lag-Feature für MTN (nur wenn aufeinanderfolgende Messungen <= 11 min Abstand)
-wide <- wide %>%
-  arrange(DateTime) %>%
-  mutate(
-    time_diff = as.numeric(difftime(DateTime, lag(DateTime), units = "mins")),
-    lag1_MTN = ifelse(time_diff <= 11, lag(MTN), NA)
-  )
-
 # Trainingsdaten (alle verfügbaren echten Messwerte)
 train <- wide %>%
   filter(!is.na(MTM))
@@ -934,8 +937,6 @@ train <- wide %>%
 # Ranger-Modell erstellen
 mod_ranger <- ranger(
   MTM ~ MTN + MTS + MTO +
-    mean_neighbors +
-    lag1_MTN +
     Hour_sin + Hour_cos +
     DayOfYear + DayOfYear_sin + DayOfYear_cos +
     temp_cycle_season +
@@ -961,23 +962,38 @@ wide$MTM_filled_ranger <- ifelse(
 
 # ----------------------------
 # Unabhängige Testung der Vorhersagegenauigkeit
+
 set.seed(42)
-valid_idx <- which(!is.na(wide$MTM))  # echte Messwerte
+valid_idx <- which(!is.na(wide$MTM))  # nur echte Messwerte
 n_reps <- 5
 rmse_vals <- numeric(n_reps)
 
 for(i in 1:n_reps){
   
-  # 20% der echten Werte zufällig auf NA setzen
+  # 20% der echten Werte zufällig als Testdaten auswählen
   test_idx <- sample(valid_idx, size = floor(0.2 * length(valid_idx)))
-  wide_test <- wide
-  wide_test$MTM[test_idx] <- NA
+  train_idx <- setdiff(valid_idx, test_idx)
   
-  # Vorhersage mit dem bereits trainierten Modell
-  pred_test <- predict(mod_ranger, data = wide_test)$predictions
+  # Trainings- und Testdaten aufteilen
+  train_data <- wide[train_idx, ]
+  test_data  <- wide[test_idx, ]
   
-  # RMSE auf den „versteckten“ Testwerten
-  rmse_vals[i] <- sqrt(mean((pred_test[test_idx] - wide$MTM[test_idx])^2))
+  # Ranger-Modell auf Trainingsdaten trainieren
+  mod_cv <- ranger(
+    formula = MTM ~ MTN + MTS + MTO + Hour_sin + Hour_cos + DayOfYear + DayOfYear_sin + DayOfYear_cos + temp_cycle_season,
+    data = train_data,
+    num.trees = 500,
+    mtry = 3,
+    importance = "permutation",
+    seed = 42
+  )
+  
+  # Vorhersage auf Testdaten
+  pred_test <- predict(mod_cv, data = test_data)$predictions
+  
+  # RMSE für diese Wiederholung berechnen
+  rmse_vals[i] <- sqrt(mean((pred_test - test_data$MTM)^2))
+  
   cat("Wiederholung", i, "fertig\n")
 }
 
@@ -991,10 +1007,10 @@ max_val <- max(wide$MTM, na.rm = TRUE)
 range_val <- max_val - min_val# Spannweite der echten Daten
 
 # Ergebnisse ausgeben
-mean_rmse      # mittlere Abweichung: 0,095 
-sd_rmse        # Streuung über Wiederholungen: 0,003
-nrmse_sd       # NRMSE relativ zur Standardabweichung: 0,017 -> 1,69 %
-nrmse_range    # NRMSE relativ zur Spannweite: 0,002 -> 0,29 %
+mean_rmse      # mittlere Abweichung: 0,21 °C
+sd_rmse        # Streuung über Wiederholungen: 0,007 
+nrmse_sd       # NRMSE relativ zur Standardabweichung: 0,037 -> 3,71%
+nrmse_range    # NRMSE relativ zur Spannweite: 0,0064 -> 0,64%
 range_val      # Spannweite: 32,79
 
 # ----------------------------
@@ -1056,21 +1072,10 @@ wide$temp_cycle <- sin(pi * (wide$Hour - 6) / 12)
 wide$temp_cycle <- pmax(-1, wide$temp_cycle)
 wide$temp_cycle_season <- wide$temp_cycle * (1 + 0.3 * sin(2 * pi * wide$DayOfYear / 365))
 
-# Differenz-Feature
+# Differenz-Feature (manchmal bringt es eine Verbesserung)
 wide <- wide %>%
   mutate(
     diff_MTN_MTS = ifelse(!is.na(MTN) & !is.na(MTS), MTN - MTS, NA)
-  )
-
-# Nachbars-Mittelwert
-wide$mean_neighbors <- rowMeans(wide[, c("MTN", "MTS")], na.rm = TRUE)
-
-# Lag-Feature für MTN (nur wenn aufeinanderfolgende Messungen <= 11 min Abstand)
-wide <- wide %>%
-  arrange(DateTime) %>%
-  mutate(
-    time_diff = as.numeric(difftime(DateTime, lag(DateTime), units = "mins")),
-    lag1_MTN = ifelse(time_diff <= 11, lag(MTN), NA)
   )
 
 # Trainingsdaten
@@ -1081,12 +1086,10 @@ train <- wide %>%
 # Ranger-Modell erstellen
 mod_ranger <- ranger(
   MTW ~ MTN + MTS +
-    mean_neighbors +
-    lag1_MTN +
     Hour_sin + Hour_cos +
+    #diff_MTN_MTS +
     DayOfYear + DayOfYear_sin + DayOfYear_cos +
-    temp_cycle_season +
-    diff_MTN_MTS,
+    temp_cycle_season,
   data = train,
   num.trees = 500,
   mtry = 3,
@@ -1108,23 +1111,41 @@ wide$MTW_filled_ranger <- ifelse(
 
 # ----------------------------
 # Unabhängige Testung der Vorhersagegenauigkeit
+
 set.seed(42)
-valid_idx <- which(!is.na(wide$MTW))  # echte Messwerte
+valid_idx <- which(!is.na(wide$MTW))  # nur echte Messwerte
 n_reps <- 5
 rmse_vals <- numeric(n_reps)
 
 for(i in 1:n_reps){
   
-  # 20% der echten Werte zufällig auf NA setzen
+  # 20% der echten Werte zufällig als Testdaten auswählen
   test_idx <- sample(valid_idx, size = floor(0.2 * length(valid_idx)))
-  wide_test <- wide
-  wide_test$MTW[test_idx] <- NA
+  train_idx <- setdiff(valid_idx, test_idx)
   
-  # Vorhersage mit dem bereits trainierten Modell
-  pred_test <- predict(mod_ranger, data = wide_test)$predictions
+  # Trainings- und Testdaten aufteilen
+  train_data <- wide[train_idx, ]
+  test_data  <- wide[test_idx, ]
   
-  # RMSE auf den „versteckten“ Testwerten
-  rmse_vals[i] <- sqrt(mean((pred_test[test_idx] - wide$MTW[test_idx])^2))
+  # Ranger-Modell auf Trainingsdaten trainieren
+  mod_cv <- ranger(
+    formula = MTW ~ MTN + MTS + Hour_sin + Hour_cos + DayOfYear + 
+      DayOfYear_sin + DayOfYear_cos + 
+      #diff_MTN_MTS + 
+      temp_cycle_season,
+    data = train_data,
+    num.trees = 500,
+    mtry = 3,
+    importance = "permutation",
+    seed = 42
+  )
+  
+  # Vorhersage auf Testdaten
+  pred_test <- predict(mod_cv, data = test_data)$predictions
+  
+  # RMSE für diese Wiederholung berechnen
+  rmse_vals[i] <- sqrt(mean((pred_test - test_data$MTW)^2))
+  
   cat("Wiederholung", i, "fertig\n")
 }
 
@@ -1138,11 +1159,11 @@ max_val <- max(wide$MTW, na.rm = TRUE)
 range_val <- max_val - min_val# Spannweite der echten Daten
 
 # Ergebnisse ausgeben
-mean_rmse      # mittlere Abweichung: 0,143 °C
-sd_rmse        # Streuung über Wiederholungen: 0,005
-nrmse_sd       # NRMSE relativ zur Standardabweichung: 0,027 -> 2,7 %
-nrmse_range    # NRMSE relativ zur Spannweite: 0,004 -> 0,45 %
-range_val      # Spannweite: 32,79
+mean_rmse      # mittlere Abweichung: 0,292 °C 
+sd_rmse        # Streuung über Wiederholungen: 0,009
+nrmse_sd       # NRMSE relativ zur Standardabweichung: 0,056 -> 5,56%
+nrmse_range    # NRMSE relativ zur Spannweite: 0,009 -> 0,92%
+range_val      # Spannweite: 31,79
 
 # ----------------------------
 # Vorhersagen zurückführen
@@ -1190,23 +1211,6 @@ wide$Hour_cos <- cos(2 * pi * wide$Hour / 24)
 wide$DayOfYear_sin <- sin(2 * pi * wide$DayOfYear / 365)
 wide$DayOfYear_cos <- cos(2 * pi * wide$DayOfYear / 365)
 
-# Differenz-Feature
-wide <- wide %>%
-  mutate(
-    diff_MTN_MTS = ifelse(!is.na(MTN) & !is.na(MTS), MTN - MTS, NA)
-  )
-
-# Nachbars-Mittelwert
-wide$mean_neighbors <- rowMeans(wide[, c("MTN", "MTS")], na.rm = TRUE)
-
-# Lag-Feature für MTN (nur wenn aufeinanderfolgende Messungen <= 11 min Abstand)
-wide <- wide %>%
-  arrange(DateTime) %>%
-  mutate(
-    time_diff = as.numeric(difftime(DateTime, lag(DateTime), units = "mins")),
-    lag1_MTN = ifelse(time_diff <= 11, lag(MTN), NA)
-  )
-
 # Trainingsdaten
 train <- wide %>%
   filter(!is.na(MTW))
@@ -1215,11 +1219,8 @@ train <- wide %>%
 # Ranger-Modell erstellen
 mod_ranger <- ranger(
   MTW ~ MTN + MTS +
-    mean_neighbors +
-    lag1_MTN +
     Hour_sin + Hour_cos +
-    DayOfYear + DayOfYear_sin + DayOfYear_cos +
-    diff_MTN_MTS,
+    DayOfYear + DayOfYear_sin + DayOfYear_cos,
   data = train,
   num.trees = 500,
   mtry = 3,
@@ -1241,23 +1242,39 @@ wide$MTW_filled_ranger <- ifelse(
 
 # ----------------------------
 # Unabhängige Testung der Vorhersagegenauigkeit
+
 set.seed(42)
-valid_idx <- which(!is.na(wide$MTW))  # echte Messwerte
+valid_idx <- which(!is.na(wide$MTW))  # nur echte Messwerte
 n_reps <- 5
 rmse_vals <- numeric(n_reps)
 
 for(i in 1:n_reps){
   
-  # 20% der echten Werte zufällig auf NA setzen
+  # 20% der echten Werte zufällig als Testdaten auswählen
   test_idx <- sample(valid_idx, size = floor(0.2 * length(valid_idx)))
-  wide_test <- wide
-  wide_test$MTW[test_idx] <- NA
+  train_idx <- setdiff(valid_idx, test_idx)
   
-  # Vorhersage mit dem bereits trainierten Modell
-  pred_test <- predict(mod_ranger, data = wide_test)$predictions
+  # Trainings- und Testdaten aufteilen
+  train_data <- wide[train_idx, ]
+  test_data  <- wide[test_idx, ]
   
-  # RMSE auf den „versteckten“ Testwerten
-  rmse_vals[i] <- sqrt(mean((pred_test[test_idx] - wide$MTW[test_idx])^2))
+  # Ranger-Modell auf Trainingsdaten trainieren
+  mod_cv <- ranger(
+    formula = MTW ~ MTN + MTS + Hour_sin + Hour_cos + DayOfYear 
+    + DayOfYear_sin + DayOfYear_cos,
+    data = train_data,
+    num.trees = 500,
+    mtry = 3,
+    importance = "permutation",
+    seed = 42
+  )
+  
+  # Vorhersage auf Testdaten
+  pred_test <- predict(mod_cv, data = test_data)$predictions
+  
+  # RMSE für diese Wiederholung berechnen
+  rmse_vals[i] <- sqrt(mean((pred_test - test_data$MTW)^2))
+  
   cat("Wiederholung", i, "fertig\n")
 }
 
@@ -1271,11 +1288,11 @@ max_val <- max(wide$MTW, na.rm = TRUE)
 range_val <- max_val - min_val # Spannweite der echten Daten
 
 # Ergebnisse ausgeben
-mean_rmse      # mittlere Abweichung: 0,904 %
-sd_rmse        # Streuung über Wiederholungen: 0,016
-nrmse_sd       # NRMSE relativ zur Standardabweichung: 0,056 -> 5,6 %
-nrmse_range    # NRMSE relativ zur Spannweite: 0,013 -> 1,31%
-range_val      # Spannweite der echten Messwerte: 77,11
+mean_rmse      # mittlere Abweichung: 1,85 %
+sd_rmse        # Streuung über Wiederholungen: 0,035
+nrmse_sd       # NRMSE relativ zur Standardabweichung: 0,115 -> 11,5%
+nrmse_range    # NRMSE relativ zur Spannweite: 0,027 -> 2,7%
+range_val      # Spannweite der echten Messwerte: 68,53
 
 # ----------------------------
 # Vorhersagen zurückführen
@@ -1342,8 +1359,6 @@ train <- wide %>%
 # Ranger-Modell erstellen
 mod_ranger <- ranger(
   MTW ~ MTN + MTS + MTO +
-    mean_neighbors +
-    lag1_MTN +
     Hour_sin + Hour_cos +
     DayOfYear + DayOfYear_sin + DayOfYear_cos,
   data = train,
@@ -1367,23 +1382,38 @@ wide$MTW_filled_ranger <- ifelse(
 
 # ----------------------------
 # Unabhängige Testung der Vorhersagegenauigkeit
+
 set.seed(42)
-valid_idx <- which(!is.na(wide$MTW))  # echte Messwerte
+valid_idx <- which(!is.na(wide$MTW))  # nur echte Messwerte
 n_reps <- 5
 rmse_vals <- numeric(n_reps)
 
 for(i in 1:n_reps){
   
-  # 20% der echten Werte zufällig auf NA setzen
+  # 20% der echten Werte zufällig als Testdaten auswählen
   test_idx <- sample(valid_idx, size = floor(0.2 * length(valid_idx)))
-  wide_test <- wide
-  wide_test$MTW[test_idx] <- NA
+  train_idx <- setdiff(valid_idx, test_idx)
   
-  # Vorhersage mit dem bereits trainierten Modell
-  pred_test <- predict(mod_ranger, data = wide_test)$predictions
+  # Trainings- und Testdaten aufteilen
+  train_data <- wide[train_idx, ]
+  test_data  <- wide[test_idx, ]
   
-  # RMSE auf den „versteckten“ Testwerten
-  rmse_vals[i] <- sqrt(mean((pred_test[test_idx] - wide$MTW[test_idx])^2))
+  # Ranger-Modell auf Trainingsdaten trainieren
+  mod_cv <- ranger(
+    formula = MTW ~ MTN + MTS + Hour_sin + Hour_cos + DayOfYear + DayOfYear_sin + DayOfYear_cos,
+    data = train_data,
+    num.trees = 500,
+    mtry = 3,
+    importance = "permutation",
+    seed = 42
+  )
+  
+  # Vorhersage auf Testdaten
+  pred_test <- predict(mod_cv, data = test_data)$predictions
+  
+  # RMSE für diese Wiederholung berechnen
+  rmse_vals[i] <- sqrt(mean((pred_test - test_data$MTW)^2))
+  
   cat("Wiederholung", i, "fertig\n")
 }
 
@@ -1397,11 +1427,11 @@ max_val <- max(wide$MTW, na.rm = TRUE)
 range_val <- max_val - min_val # Spannweite der echten Daten
 
 # Ergebnisse ausgeben
-mean_rmse      # mittlere Abweichung: 0,19 °C
-sd_rmse        # Streuung über Wiederholungen: 0,008
-nrmse_sd       # NRMSE relativ zur Standardabweichung: 0,047 -> 4,7 %
-nrmse_range    # NRMSE relativ zur Spannweite: 0,009 -> 0,87 %
-range_val      # Spannweite der echten Messwerte: 24,36
+mean_rmse      # mittlere Abweichung: 0,417 °C
+sd_rmse        # Streuung über Wiederholungen: 0,016
+nrmse_sd       # NRMSE relativ zur Standardabweichung: 0,102 -> 10,2%
+nrmse_range    # NRMSE relativ zur Spannweite: 0,018 -> 1,87%
+range_val      # Spannweite der echten Messwerte: 22,3
 
 # ----------------------------
 # Vorhersagen zurückführen
@@ -1492,7 +1522,7 @@ mod_ranger <- ranger(
   Temp_sonne_C_MNW ~ 
     Temp_sonne_C_MNN + Temp_sonne_C_MNM +
     Temp_schatten_C_MNN +
-    mean_neighbors + lag1_MNN +
+    #mean_neighbors + lag1_MNN +
     Hour_sin + Hour_cos +
     DayOfYear + DayOfYear_sin + DayOfYear_cos +
     temp_cycle_season +
@@ -1518,43 +1548,63 @@ wide$MNW_filled_ranger <- ifelse(
 
 # ----------------------------
 # Unabhängige Testung der Vorhersagegenauigkeit
-# Unabhängige Testung der Vorhersagegenauigkeit
+
 set.seed(42)
-valid_idx <- which(!is.na(wide$Temp_sonne_C_MNW))  # echte Messwerte
+valid_idx <- which(!is.na(wide$Temp_sonne_C_MNW))  # nur echte Messwerte
 n_reps <- 5
 rmse_vals <- numeric(n_reps)
 
 for(i in 1:n_reps){
   
-  # 20% der echten Werte zufällig auf NA setzen
+  # 20% der echten Werte zufällig als Testdaten auswählen
   test_idx <- sample(valid_idx, size = floor(0.2 * length(valid_idx)))
-  wide_test <- wide
-  wide_test$Temp_sonne_C_MNW[test_idx] <- NA
+  train_idx <- setdiff(valid_idx, test_idx)
   
-  # Vorhersage mit dem bereits trainierten Modell
-  pred_test <- predict(mod_ranger, data = wide_test)$predictions
+  # Trainings- und Testdaten aufteilen
+  train_data <- wide[train_idx, ]
+  test_data  <- wide[test_idx, ]
   
-  # RMSE auf den „versteckten“ Testwerten
-  rmse_vals[i] <- sqrt(mean((pred_test[test_idx] - wide$Temp_sonne_C_MNW[test_idx])^2))
+  # Ranger-Modell auf Trainingsdaten trainieren
+  mod_cv <- ranger(
+    formula = Temp_sonne_C_MNW ~ 
+    Temp_sonne_C_MNN + Temp_sonne_C_MNM +
+    Temp_schatten_C_MNN +
+    #mean_neighbors + lag1_MNN +
+    Hour_sin + Hour_cos +
+    DayOfYear + DayOfYear_sin + DayOfYear_cos +
+    temp_cycle_season +
+    diff_MNN_MNS + diff_MNN_MNM + diff_MNS_MNM,
+    data = train_data,
+    num.trees = 500,
+    mtry = 3,
+    importance = "permutation",
+    seed = 42
+  )
+  
+  # Vorhersage auf Testdaten
+  pred_test <- predict(mod_cv, data = test_data)$predictions
+  
+  # RMSE für diese Wiederholung berechnen
+  rmse_vals[i] <- sqrt(mean((pred_test - test_data$Temp_sonne_C_MNW)^2))
+  
   cat("Wiederholung", i, "fertig\n")
 }
 
 # Ergebnisse zusammenfassen
 mean_rmse   <- mean(rmse_vals)
 sd_rmse     <- sd(rmse_vals)
-nrmse_sd    <- mean_rmse / sd(wide$MNW, na.rm = TRUE)        # relativ zur Standardabweichung
-nrmse_range <- mean_rmse / (max(wide$MNW, na.rm = TRUE) - min(wide$MNW, na.rm = TRUE)) # relativ zur Spannweite
-min_val <- min(wide$MNW, na.rm = TRUE)
-max_val <- max(wide$MNW, na.rm = TRUE)
+nrmse_sd    <- mean_rmse / sd(wide$Temp_sonne_C_MNW, na.rm = TRUE)        # relativ zur Standardabweichung
+nrmse_range <- mean_rmse / (max(wide$Temp_sonne_C_MNW, na.rm = TRUE) - min(wide$Temp_sonne_C_MNW, na.rm = TRUE)) # relativ zur Spannweite
+min_val <- min(wide$Temp_sonne_C_MNW, na.rm = TRUE)
+max_val <- max(wide$Temp_sonne_C_MNW, na.rm = TRUE)
 range_val <- max_val - min_val # Spannweite der echten Daten
 
 # Ergebnisse ausgeben
-mean_rmse      # mittlere Abweichung: 0,19 °C
-sd_rmse        # Streuung über Wiederholungen: 0,008
-nrmse_sd       # NRMSE relativ zur Standardabweichung: 0,047 -> 4,7 %
-nrmse_range    # NRMSE relativ zur Spannweite: 0,009 -> 0,87 %
-range_val      # Spannweite der echten Messwerte: 24,36
-
+mean_rmse      # mittlere Abweichung: 1,33 °C
+sd_rmse        # Streuung über Wiederholungen: 0,08
+nrmse_sd       # NRMSE relativ zur Standardabweichung: 0,185 -> 18,5%
+nrmse_range    # NRMSE relativ zur Spannweite: 0,027 -> 2,7%
+range_val      # Spannweite der echten Messwerte: 48,86
 
 # ----------------------------
 # Ergebnisse zurückführen
@@ -1584,21 +1634,739 @@ all_loggers_filled <- all_loggers_filled %>%
 #### MNW Licht_lux
 
 ```{r}
+# Variablen definieren
+var1 <- "Licht_lux"
+var2 <- "Temp_sonne_C"
+
+# Datensatz vorbereiten
+wide <- all_loggers %>%
+  select(DateTime, Standort, Logger_ID, all_of(c(var1, var2))) %>%
+  filter(Standort == "MN") %>%
+  pivot_wider(
+    names_from = Logger_ID,
+    values_from = all_of(c(var1, var2)),
+    names_sep = "_"
+  ) %>%
+  arrange(DateTime)
+
+# Zeitliche Features
+wide$Hour <- as.numeric(format(wide$DateTime, "%H"))
+wide$DayOfYear <- as.numeric(format(wide$DateTime, "%j"))
+wide$Hour_sin <- sin(2 * pi * wide$Hour / 24)
+wide$Hour_cos <- cos(2 * pi * wide$Hour / 24)
+wide$DayOfYear_sin <- sin(2 * pi * wide$DayOfYear / 365)
+wide$DayOfYear_cos <- cos(2 * pi * wide$DayOfYear / 365)
+
+# Tag/Nacht-Flag
+wide$is_day <- wide$Hour >= 6 & wide$Hour <= 20
+
+# Clear-Sky / Solar-Proxy
+wide$clear_sky <- pmax(0, sin(pi * (wide$Hour - 6) / 12)) * 
+                  (1 + 0.4 * sin(2 * pi * wide$DayOfYear / 365))
+
+# Interaktionen & Verhältnisse
+wide$light_ratio_MNN <- ifelse(wide$clear_sky > 0, wide$Licht_lux_MNN / wide$clear_sky, 0)
+wide$interaction_MNN <- wide$Licht_lux_MNN * wide$clear_sky
+wide$interaction_MNM <- wide$Licht_lux_MNM * wide$clear_sky
+
+# Log-Transformation für Prädiktoren
+#wide$Licht_lux_MNN_log <- log1p(wide$Licht_lux_MNN)
+#wide$Licht_lux_MNM_log <- log1p(wide$Licht_lux_MNM)
+
+# Trainingsdaten: nur Tageslicht und vollständige Werte
+train <- wide %>%
+  filter(!is.na(Licht_lux_MNW) &
+         !is.na(Licht_lux_MNN) &
+         !is.na(Licht_lux_MNM) &
+         !is.na(Temp_sonne_C_MNN)
+         is_day)
+
+# Ranger-Modell erstellen
+mod_ranger <- ranger(
+  Licht_lux_MNW ~ 
+    Licht_lux_MNN_log +
+    Licht_lux_MNM_log +
+    Temp_sonne_C_MNN +
+    light_ratio_MNN +
+    interaction_MNN +
+    interaction_MNM +
+    clear_sky +
+    is_day + Hour_sin + Hour_cos +
+    DayOfYear_sin + DayOfYear_cos,
+  data = train,
+  num.trees = 500,
+  mtry = 4,
+  importance = "permutation",
+  seed = 42
+)
+
+# Modellübersicht
+mod_ranger
+mod_ranger$variable.importance
+
+# Vorhersage für alle Werte
+pred_ranger <- predict(mod_ranger, data = wide)$predictions
+
+# Nacht = 0 fix, sonst Modellvorhersage oder Originalwert
+wide$MNW_filled_ranger <- ifelse(
+  wide$is_day == FALSE,
+  0,
+  ifelse(is.na(wide$Licht_lux_MNW), pred_ranger, wide$Licht_lux_MNW)
+)
+
+# ----------------------------
+# Unabhängige Testung der Vorhersagegenauigkeit
+set.seed(42)
+valid_idx <- which(!is.na(wide$Licht_lux_MNW) & wide$is_day)
+n_reps <- 5
+rmse_vals <- numeric(n_reps)
+
+for(i in 1:n_reps){
+  test_idx <- sample(valid_idx, size = floor(0.2 * length(valid_idx)))
+  train_idx <- setdiff(valid_idx, test_idx)
+  
+  train_data <- wide[train_idx, ]
+  test_data  <- wide[test_idx, ]
+  
+  mod_cv <- ranger(
+    Licht_lux_MNW ~ 
+      Licht_lux_MNN_log +
+      Licht_lux_MNM_log +
+      Temp_sonne_C_MNN +
+      light_ratio_MNN +
+      interaction_MNN +
+      interaction_MNM +
+      clear_sky +
+      is_day + Hour_sin + Hour_cos +
+      DayOfYear_sin + DayOfYear_cos,
+    data = train_data,
+    num.trees = 500,
+    mtry = 4,
+    importance = "permutation",
+    seed = 42
+  )
+  
+  pred_test <- predict(mod_cv, data = test_data)$predictions
+  rmse_vals[i] <- sqrt(mean((pred_test - test_data$Licht_lux_MNW)^2))
+  cat("Wiederholung", i, "fertig\n")
+}
+
+mean_rmse   <- mean(rmse_vals)
+sd_rmse     <- sd(rmse_vals)
+nrmse_sd    <- mean_rmse / sd(wide$Licht_lux_MNW, na.rm = TRUE)
+nrmse_range <- mean_rmse / (max(wide$Licht_lux_MNW, na.rm = TRUE) - min(wide$Licht_lux_MNW, na.rm = TRUE))
+range_val   <- max(wide$Licht_lux_MNW, na.rm = TRUE) - min(wide$Licht_lux_MNW, na.rm = TRUE)
+
+# Ergebnisse ausgeben
+mean_rmse      # mittlere Abweichung: 
+sd_rmse        # Streuung über Wiederholungen: 
+nrmse_sd       # NRMSE relativ zur Standardabweichung: 
+nrmse_range    # NRMSE relativ zur Spannweite: 
+range_val      # Spannweite der echten Messwerte: 
+
+# ----------------------------
+# Ergebnisse zurückführen
+mnw_filled_long_Licht <- wide %>%
+  select(DateTime, MNW_filled_ranger) %>%
+  rename(Licht_lux = MNW_filled_ranger) %>%
+  mutate(Logger_ID = "MNW")
+
+mnw_filled_long_renamed <- mnw_filled_long_Licht %>%
+  rename(Licht_lux_filled = Licht_lux)
+
+all_loggers_filled <- all_loggers_filled %>%
+  left_join(
+    mnw_filled_long_renamed %>% select(DateTime, Logger_ID, Licht_lux_filled),
+    by = c("DateTime", "Logger_ID")
+  ) %>%
+  mutate(
+    Licht_lux = case_when(
+      Logger_ID == "MNW" & is.na(Licht_lux) ~ round(Licht_lux_filled, 2),
+      TRUE ~ round(Licht_lux, 2)
+    )
+  ) %>%
+  select(-Licht_lux_filled)
+```
+
+```{r}
+# Variablen definieren
+var1 <- "Licht_lux"
+var2 <- "Temp_sonne_C"
+
+# Datensatz vorbereiten
+wide <- all_loggers %>%
+  select(DateTime, Standort, Logger_ID, all_of(c(var1, var2))) %>%
+  filter(Standort == "MN") %>%
+  pivot_wider(
+    names_from = Logger_ID,
+    values_from = all_of(c(var1, var2)),
+    names_sep = "_"
+  ) %>%
+  arrange(DateTime)
+
+# Zeitliche Features
+wide$Hour <- as.numeric(format(wide$DateTime, "%H"))
+wide$DayOfYear <- as.numeric(format(wide$DateTime, "%j"))
+wide$Hour_sin <- sin(2 * pi * wide$Hour / 24)
+wide$Hour_cos <- cos(2 * pi * wide$Hour / 24)
+wide$DayOfYear_sin <- sin(2 * pi * wide$DayOfYear / 365)
+wide$DayOfYear_cos <- cos(2 * pi * wide$DayOfYear / 365)
+
+# Tag/Nacht-Flag für spätere Vorhersage
+wide$is_day <- wide$Hour >= 6 & wide$Hour <= 20
+
+# Clear-Sky / Solar-Proxy
+wide$clear_sky <- pmax(0, sin(pi * (wide$Hour - 6) / 12)) *
+                  (1 + 0.4 * sin(2 * pi * wide$DayOfYear / 365))
+
+# Interaktions-/Verhältnis-Features (nur zur Orientierung)
+wide$light_ratio_MNN <- ifelse(wide$clear_sky > 0, wide$Licht_lux_MNN / wide$clear_sky, 0)
+wide$interaction_MNN <- wide$Licht_lux_MNN * wide$clear_sky
+wide$interaction_MNM <- wide$Licht_lux_MNM * wide$clear_sky
+
+# Trainingsdaten: nur vollständige Werte (nicht auf Tageslicht filtern!)
+train <- wide %>%
+  filter(!is.na(Licht_lux_MNW) &
+         !is.na(Licht_lux_MNN) &
+         !is.na(Licht_lux_MNM) &
+         !is.na(Temp_sonne_C_MNN))
+
+# Ranger-Modell erstellen
+mod_ranger <- ranger(
+  formula = Licht_lux_MNW ~ 
+    Licht_lux_MNN + Licht_lux_MNM +
+    Temp_sonne_C_MNN +
+    light_ratio_MNN + interaction_MNN + interaction_MNM +
+    clear_sky + is_day +
+    Hour_sin + Hour_cos +
+    DayOfYear_sin + DayOfYear_cos,
+  data = train,
+  num.trees = 500,
+  mtry = 4,
+  importance = "permutation",
+  seed = 42
+)
+
+# Modellübersicht
+mod_ranger
+mod_ranger$variable.importance
+
+# Vorhersage für alle Werte
+pred_ranger <- predict(mod_ranger, data = wide)$predictions
+
+# Nachtwerte = 0, Tageswerte = Modellvorhersage
+wide$MNW_filled_ranger <- ifelse(
+  wide$is_day == FALSE,
+  0,
+  ifelse(is.na(wide$Licht_lux_MNW), pred_ranger, wide$Licht_lux_MNW)
+)
+
+# ----------------------------
+# Unabhängige Testung der Vorhersagegenauigkeit
+set.seed(42)
+valid_idx <- which(!is.na(wide$Licht_lux_MNW))  # nur echte Messwerte
+n_reps <- 5
+rmse_vals <- numeric(n_reps)
+
+for(i in 1:n_reps){
+  # 20% der echten Werte zufällig als Testdaten auswählen
+  test_idx <- sample(valid_idx, size = floor(0.2 * length(valid_idx)))
+  train_idx <- setdiff(valid_idx, test_idx)
+  
+  # Trainings- und Testdaten aufteilen
+  train_data <- wide[train_idx, ]
+  test_data  <- wide[test_idx, ]
+  
+  # Ranger-Modell auf Trainingsdaten trainieren
+  mod_cv <- ranger(
+    formula = Licht_lux_MNW ~ 
+      Licht_lux_MNN + Licht_lux_MNM +
+      Temp_sonne_C_MNN +
+      light_ratio_MNN + interaction_MNN + interaction_MNM +
+      clear_sky + is_day +
+      Hour_sin + Hour_cos +
+      DayOfYear_sin + DayOfYear_cos,
+    data = train_data,
+    num.trees = 500,
+    mtry = 4,
+    importance = "permutation",
+    seed = 42
+  )
+  
+  # Vorhersage auf Testdaten
+  pred_test <- predict(mod_cv, data = test_data)$predictions
+  # Nacht = 0
+  pred_test[test_data$is_day == FALSE] <- 0
+  
+  # RMSE für diese Wiederholung berechnen
+  rmse_vals[i] <- sqrt(mean((pred_test - test_data$Licht_lux_MNW)^2))
+  cat("Wiederholung", i, "fertig\n")
+}
+
+# Ergebnisse zusammenfassen
+mean_rmse   <- mean(rmse_vals)
+sd_rmse     <- sd(rmse_vals)
+nrmse_sd    <- mean_rmse / sd(wide$Licht_lux_MNW, na.rm = TRUE)
+nrmse_range <- mean_rmse / (max(wide$Licht_lux_MNW, na.rm = TRUE) - min(wide$Licht_lux_MNW, na.rm = TRUE))
+range_val   <- max(wide$Licht_lux_MNW, na.rm = TRUE) - min(wide$Licht_lux_MNW, na.rm = TRUE)
+
+mean_rmse
+sd_rmse
+nrmse_sd
+nrmse_range
+range_val
+
+# ----------------------------
+# Ergebnisse zurückführen in Originaldaten
+mnw_filled_long_Licht <- wide %>%
+  select(DateTime, MNW_filled_ranger) %>%
+  rename(Licht_lux = MNW_filled_ranger) %>%
+  mutate(Logger_ID = "MNW")
+
+mnw_filled_long_renamed <- mnw_filled_long_Licht %>%
+  rename(Licht_lux_filled = Licht_lux)
+
+all_loggers_filled <- all_loggers_filled %>%
+  left_join(
+    mnw_filled_long_renamed %>% select(DateTime, Logger_ID, Licht_lux_filled),
+    by = c("DateTime", "Logger_ID")
+  ) %>%
+  mutate(
+    Licht_lux = case_when(
+      Logger_ID == "MNW" & is.na(Licht_lux) ~ round(Licht_lux_filled, 2),
+      TRUE ~ round(Licht_lux, 2)
+    )
+  ) %>%
+  select(-Licht_lux_filled)
 ```
 
 #### MNW Temp_Schatten_C
 
 ```{r}
+# Variable definieren
+var <- "Temp_schatten_C"
+
+# Datensatz vorbereiten
+wide <- all_loggers %>%
+  select(DateTime, Standort, Logger_ID, all_of(var)) %>%
+  filter(Standort == "MN") %>%
+  pivot_wider(names_from = Logger_ID,
+              values_from = all_of(var)) %>%
+  arrange(DateTime)
+
+# Zeitliche Features
+wide$Hour <- as.numeric(format(wide$DateTime, "%H"))
+wide$DayOfYear <- as.numeric(format(wide$DateTime, "%j"))
+wide$Hour_sin <- sin(2 * pi * wide$Hour / 24)
+wide$Hour_cos <- cos(2 * pi * wide$Hour / 24)
+wide$DayOfYear_sin <- sin(2 * pi * wide$DayOfYear / 365)
+wide$DayOfYear_cos <- cos(2 * pi * wide$DayOfYear / 365)
+
+# Differenzen zwischen Loggern
+wide <- wide %>%
+  mutate(
+    diff_MNN_MNS = ifelse(!is.na(MNN) & !is.na(MNS), MNN - MNS, NA),
+    diff_MNN_MNO = ifelse(!is.na(MNN) & !is.na(MNO), MNN - MNO, NA),
+    diff_MNN_MNM = ifelse(!is.na(MNN) & !is.na(MNM), MNN - MNM, NA),
+    diff_MNS_MNO = ifelse(!is.na(MNS) & !is.na(MNO), MNS - MNO, NA),
+    diff_MNS_MNM = ifelse(!is.na(MNS) & !is.na(MNM), MNS - MNM, NA),
+    diff_MNO_MNM = ifelse(!is.na(MNO) & !is.na(MNM), MNO - MNM, NA)
+  )
+
+# Trainingsdaten
+train <- wide %>%
+  filter(!is.na(MNW))
+
+# Ranger-Modell erstellen
+mod_ranger <- ranger(
+  MNW ~ MNN + MNS + MNO + MNM +
+    Hour_sin + Hour_cos +
+    DayOfYear + DayOfYear_sin + DayOfYear_cos + 
+    diff_MNN_MNS + diff_MNN_MNO + diff_MNN_MNM +
+    diff_MNS_MNO + diff_MNS_MNM + diff_MNO_MNM,
+  data = train,
+  num.trees = 500,
+  mtry = 3,
+  importance = "permutation",
+  seed = 42
+)
+
+# Modellübersicht
+mod_ranger
+mod_ranger$variable.importance
+
+# Vorhersage für alle Werte
+pred_ranger <- predict(mod_ranger, data = wide)$predictions
+wide$MNW_filled_ranger <- ifelse(
+  is.na(wide$MNW),
+  pred_ranger,
+  wide$MNW
+)
+
+# ----------------------------
+# Unabhängige Testung der Vorhersagegenauigkeit
+
+set.seed(42)
+valid_idx <- which(!is.na(wide$MNW))  # nur echte Messwerte
+n_reps <- 5
+rmse_vals <- numeric(n_reps)
+
+for(i in 1:n_reps){
+  
+  # 20% der echten Werte zufällig als Testdaten auswählen
+  test_idx <- sample(valid_idx, size = floor(0.2 * length(valid_idx)))
+  train_idx <- setdiff(valid_idx, test_idx)
+  
+  # Trainings- und Testdaten aufteilen
+  train_data <- wide[train_idx, ]
+  test_data  <- wide[test_idx, ]
+  
+  # Ranger-Modell auf Trainingsdaten trainieren
+  mod_cv <- ranger(
+    formula = MNW ~ MNN + MNS + MNO + MNM +
+      Hour_sin + Hour_cos +
+      DayOfYear + DayOfYear_sin + DayOfYear_cos +
+      diff_MNN_MNS + diff_MNN_MNO + diff_MNN_MNM +
+      diff_MNS_MNO + diff_MNS_MNM + diff_MNO_MNM,
+    data = train_data,
+    num.trees = 500,
+    mtry = 3,
+    importance = "permutation",
+    seed = 42
+  )
+  
+  # Vorhersage auf Testdaten
+  pred_test <- predict(mod_cv, data = test_data)$predictions
+  
+  # RMSE für diese Wiederholung berechnen
+  rmse_vals[i] <- sqrt(mean((pred_test - test_data$MNW)^2))
+  
+  cat("Wiederholung", i, "fertig\n")
+}
+
+# Ergebnisse zusammenfassen
+mean_rmse   <- mean(rmse_vals)
+sd_rmse     <- sd(rmse_vals)
+nrmse_sd    <- mean_rmse / sd(wide$MNW, na.rm = TRUE)        # relativ zur Standardabweichung
+nrmse_range <- mean_rmse / (max(wide$MNW, na.rm = TRUE) - min(wide$MNW, na.rm = TRUE)) # relativ zur Spannweite
+min_val <- min(wide$MNW, na.rm = TRUE)
+max_val <- max(wide$MNW, na.rm = TRUE)
+range_val <- max_val - min_val # Spannweite der echten Daten
+
+#Ergebnisse ausgeben
+mean_rmse      # mittlere Abweichung: 0,28 °C
+sd_rmse        # Streuung über Wiederholungen: 0,018
+nrmse_sd       # NRMSE relativ zur Standardabweichung: 0,054 -> 5,45%
+nrmse_range    # NRMSE relativ zur Spannweite: 0,009 -> 0,9%
+range_val      # Spannweite der echten Messwerte: 31,34
+
+# ----------------------------
+# Ergebnisse zurückführen
+mnw_filled_long_Temp_schatten <- wide %>%
+  select(DateTime, MNW_filled_ranger) %>%
+  rename(Temp_schatten_C = MNW_filled_ranger) %>%
+  mutate(Logger_ID = "MNW")
+
+mnw_filled_long_renamed <- mnw_filled_long_Temp_schatten %>%
+  rename(Temp_schatten_C_filled = Temp_schatten_C)
+
+all_loggers_filled <- all_loggers_filled %>%
+  left_join(
+    mnw_filled_long_renamed %>% select(DateTime, Logger_ID, Temp_schatten_C_filled),
+    by = c("DateTime", "Logger_ID")
+  ) %>%
+  mutate(
+    Temp_schatten_C = case_when(
+      Logger_ID == "MNW" & is.na(Temp_schatten_C) ~ round(Temp_schatten_C_filled, 2),
+      TRUE ~ round(Temp_schatten_C, 2)
+    )
+  ) %>%
+  select(-Temp_schatten_C_filled)
 ```
 
 #### MNW Relative Luftfeuchtigkeit
 
 ```{r}
+# Variable definieren
+var <- "relLF_percent"
+
+# Datensatz vorbereiten
+wide <- all_loggers %>%
+  select(DateTime, Standort, Logger_ID, all_of(var)) %>%
+  filter(Standort == "MN") %>%
+  pivot_wider(names_from = Logger_ID,
+              values_from = all_of(var)) %>%
+  arrange(DateTime)
+
+# Zeitliche Features
+wide$Hour <- as.numeric(format(wide$DateTime, "%H"))
+wide$DayOfYear <- as.numeric(format(wide$DateTime, "%j"))
+wide$Hour_sin <- sin(2 * pi * wide$Hour / 24)
+wide$Hour_cos <- cos(2 * pi * wide$Hour / 24)
+wide$DayOfYear_sin <- sin(2 * pi * wide$DayOfYear / 365)
+wide$DayOfYear_cos <- cos(2 * pi * wide$DayOfYear / 365)
+
+# Differenzen zwischen Loggern (optional, kann helfen)
+wide <- wide %>%
+  mutate(
+    diff_MNN_MNS = ifelse(!is.na(MNN) & !is.na(MNS), MNN - MNS, NA),
+    diff_MNN_MNO = ifelse(!is.na(MNN) & !is.na(MNO), MNN - MNO, NA),
+    diff_MNN_MNM = ifelse(!is.na(MNN) & !is.na(MNM), MNN - MNM, NA),
+    diff_MNS_MNO = ifelse(!is.na(MNS) & !is.na(MNO), MNS - MNO, NA),
+    diff_MNS_MNM = ifelse(!is.na(MNS) & !is.na(MNM), MNS - MNM, NA),
+    diff_MNO_MNM = ifelse(!is.na(MNO) & !is.na(MNM), MNO - MNM, NA)
+  )
+
+# Trainingsdaten
+train <- wide %>%
+  filter(!is.na(MNW))
+
+# Ranger-Modell erstellen
+mod_ranger <- ranger(
+  MNW ~ MNN + MNS + MNM + MNO +
+    Hour_sin + Hour_cos +
+    DayOfYear + DayOfYear_sin + DayOfYear_cos,
+    #diff_MNN_MNS + diff_MNN_MNO + diff_MNN_MNM +
+    #diff_MNS_MNO + diff_MNS_MNM + diff_MNO_MNM,
+  data = train,
+  num.trees = 500,
+  mtry = 3,
+  importance = "permutation",
+  seed = 42
+)
+
+# Modellübersicht
+mod_ranger
+mod_ranger$variable.importance
+
+# Vorhersage für alle Werte
+pred_ranger <- predict(mod_ranger, data = wide)$predictions
+wide$MNW_filled_ranger <- ifelse(
+  is.na(wide$MNW),
+  pred_ranger,
+  wide$MNW
+)
+
+# ----------------------------
+# Unabhängige Testung der Vorhersagegenauigkeit
+
+set.seed(42)
+valid_idx <- which(!is.na(wide$MNW))  # nur echte Messwerte
+n_reps <- 5
+rmse_vals <- numeric(n_reps)
+
+for(i in 1:n_reps){
+  
+  # 20% der echten Werte zufällig als Testdaten auswählen
+  test_idx <- sample(valid_idx, size = floor(0.2 * length(valid_idx)))
+  train_idx <- setdiff(valid_idx, test_idx)
+  
+  # Trainings- und Testdaten aufteilen
+  train_data <- wide[train_idx, ]
+  test_data  <- wide[test_idx, ]
+  
+  # Ranger-Modell auf Trainingsdaten trainieren
+  mod_cv <- ranger(
+    formula = MNW ~ MNN + MNS + MNM + MNO +
+      Hour_sin + Hour_cos +
+      DayOfYear + DayOfYear_sin + DayOfYear_cos,
+      #diff_MNN_MNS + diff_MNN_MNO + diff_MNN_MNM +
+      #diff_MNS_MNO + diff_MNS_MNM + diff_MNO_MNM,
+    data = train_data,
+    num.trees = 500,
+    mtry = 3,
+    importance = "permutation",
+    seed = 42
+  )
+  
+  # Vorhersage auf Testdaten
+  pred_test <- predict(mod_cv, data = test_data)$predictions
+  
+  # RMSE für diese Wiederholung berechnen
+  rmse_vals[i] <- sqrt(mean((pred_test - test_data$MNW)^2))
+  
+  cat("Wiederholung", i, "fertig\n")
+}
+
+# Ergebnisse zusammenfassen
+mean_rmse   <- mean(rmse_vals)
+sd_rmse     <- sd(rmse_vals)
+nrmse_sd    <- mean_rmse / sd(wide$MNW, na.rm = TRUE)
+nrmse_range <- mean_rmse / (max(wide$MNW, na.rm = TRUE) - min(wide$MNW, na.rm = TRUE))
+range_val   <- max(wide$MNW, na.rm = TRUE) - min(wide$MNW, na.rm = TRUE)
+
+#Ergebnisse ausgeben
+mean_rmse      # mittlere Abweichung: 1,56 %
+sd_rmse        # Streuung über Wiederholungen: 0,026
+nrmse_sd       # NRMSE relativ zur Standardabweichung: 0,10 -> 10,14%
+nrmse_range    # NRMSE relativ zur Spannweite: 0,023 -> 2,34%
+range_val      # Spannweite der echten Messwerte: 66,65
+
+# ----------------------------
+# Ergebnisse zurückführen
+mnw_filled_long_LF <- wide %>%
+  select(DateTime, MNW_filled_ranger) %>%
+  rename(relLF_percent = MNW_filled_ranger) %>%
+  mutate(Logger_ID = "MNW")
+
+mnw_filled_long_renamed <- mnw_filled_long_LF %>%
+  rename(relLF_percent_filled = relLF_percent)
+
+all_loggers_filled <- all_loggers_filled %>%
+  left_join(
+    mnw_filled_long_renamed %>% select(DateTime, Logger_ID, relLF_percent_filled),
+    by = c("DateTime", "Logger_ID")
+  ) %>%
+  mutate(
+    relLF_percent = case_when(
+      Logger_ID == "MNW" & is.na(relLF_percent) ~ round(relLF_percent_filled, 2),
+      TRUE ~ round(relLF_percent, 2)
+    )
+  ) %>%
+  select(-relLF_percent_filled)
 ```
 
 #### MNW Taupunkt
 
 ```{r}
+# Variable definieren
+var <- "Taupunkt_C"
+
+# Datensatz vorbereiten
+wide <- all_loggers %>%
+  select(DateTime, Standort, Logger_ID, all_of(var)) %>%
+  filter(Standort == "MN") %>%
+  pivot_wider(names_from = Logger_ID,
+              values_from = all_of(var)) %>%
+  arrange(DateTime)
+
+# Zeitliche Features
+wide$Hour <- as.numeric(format(wide$DateTime, "%H"))
+wide$DayOfYear <- as.numeric(format(wide$DateTime, "%j"))
+wide$Hour_sin <- sin(2 * pi * wide$Hour / 24)
+wide$Hour_cos <- cos(2 * pi * wide$Hour / 24)
+wide$DayOfYear_sin <- sin(2 * pi * wide$DayOfYear / 365)
+wide$DayOfYear_cos <- cos(2 * pi * wide$DayOfYear / 365)
+
+# Differenzen zwischen Loggern
+wide <- wide %>%
+  mutate(
+    diff_MNN_MNS = ifelse(!is.na(MNN) & !is.na(MNS), MNN - MNS, NA),
+    diff_MNN_MNO = ifelse(!is.na(MNN) & !is.na(MNO), MNN - MNO, NA),
+    diff_MNN_MNM = ifelse(!is.na(MNN) & !is.na(MNM), MNN - MNM, NA),
+    diff_MNS_MNO = ifelse(!is.na(MNS) & !is.na(MNO), MNS - MNO, NA),
+    diff_MNS_MNM = ifelse(!is.na(MNS) & !is.na(MNM), MNS - MNM, NA),
+    diff_MNO_MNM = ifelse(!is.na(MNO) & !is.na(MNM), MNO - MNM, NA)
+  )
+
+# Trainingsdaten
+train <- wide %>%
+  filter(!is.na(MNW))
+
+# Ranger-Modell erstellen
+mod_ranger <- ranger(
+  MNW ~ MNN + MNS + MNO + MNM +
+    Hour_sin + Hour_cos +
+    DayOfYear + DayOfYear_sin + DayOfYear_cos, 
+    #diff_MNN_MNS + diff_MNN_MNO + diff_MNN_MNM +
+    #diff_MNS_MNO + diff_MNS_MNM + diff_MNO_MNM,
+  data = train,
+  num.trees = 500,
+  mtry = 3,
+  importance = "permutation",
+  seed = 42
+)
+
+# Modellübersicht
+mod_ranger
+mod_ranger$variable.importance
+
+# Vorhersage für alle Werte
+pred_ranger <- predict(mod_ranger, data = wide)$predictions
+wide$MNW_filled_ranger <- ifelse(
+  is.na(wide$MNW),
+  pred_ranger,
+  wide$MNW
+)
+
+# ----------------------------
+# Unabhängige Testung der Vorhersagegenauigkeit
+
+set.seed(42)
+valid_idx <- which(!is.na(wide$MNW))  # nur echte Messwerte
+n_reps <- 5
+rmse_vals <- numeric(n_reps)
+
+for(i in 1:n_reps){
+  
+  # 20% der echten Werte zufällig als Testdaten auswählen
+  test_idx <- sample(valid_idx, size = floor(0.2 * length(valid_idx)))
+  train_idx <- setdiff(valid_idx, test_idx)
+  
+  # Trainings- und Testdaten aufteilen
+  train_data <- wide[train_idx, ]
+  test_data  <- wide[test_idx, ]
+  
+  # Ranger-Modell auf Trainingsdaten trainieren
+  mod_cv <- ranger(
+    formula = MNW ~ MNN + MNS + MNO + MNM +
+      Hour_sin + Hour_cos +
+      DayOfYear + DayOfYear_sin + DayOfYear_cos, 
+      #diff_MNN_MNS + diff_MNN_MNO + diff_MNN_MNM +
+      #diff_MNS_MNO + diff_MNS_MNM + diff_MNO_MNM,
+    data = train_data,
+    num.trees = 500,
+    mtry = 3,
+    importance = "permutation",
+    seed = 42
+  )
+  
+  # Vorhersage auf Testdaten
+  pred_test <- predict(mod_cv, data = test_data)$predictions
+  
+  # RMSE für diese Wiederholung berechnen
+  rmse_vals[i] <- sqrt(mean((pred_test - test_data$MNW)^2))
+  
+  cat("Wiederholung", i, "fertig\n")
+}
+
+# Ergebnisse zusammenfassen
+mean_rmse   <- mean(rmse_vals)
+sd_rmse     <- sd(rmse_vals)
+nrmse_sd    <- mean_rmse / sd(wide$MNW, na.rm = TRUE)
+nrmse_range <- mean_rmse / (max(wide$MNW, na.rm = TRUE) - min(wide$MNW, na.rm = TRUE))
+range_val <- max(wide$MNW, na.rm = TRUE) - min(wide$MNW, na.rm = TRUE)
+
+#Ergebnisse ausgeben
+mean_rmse      # mittlere Abweichung: 0,34 °C
+sd_rmse        # Streuung über Wiederholungen: 0,009
+nrmse_sd       # NRMSE relativ zur Standardabweichung: 0,082 -> 8,25%
+nrmse_range    # NRMSE relativ zur Spannweite: 0,015 -> 1,52%
+range_val      # Spannweite der echten Messwerte: 22,52
+
+# ----------------------------
+# Ergebnisse zurückführen
+mnw_filled_long_Tau <- wide %>%
+  select(DateTime, MNW_filled_ranger) %>%
+  rename(Taupunkt_C = MNW_filled_ranger) %>%
+  mutate(Logger_ID = "MNW")
+
+mnw_filled_long_renamed <- mnw_filled_long_Tau %>%
+  rename(Taupunkt_C_filled = Taupunkt_C)
+
+all_loggers_filled <- all_loggers_filled %>%
+  left_join(
+    mnw_filled_long_renamed %>% select(DateTime, Logger_ID, Taupunkt_C_filled),
+    by = c("DateTime", "Logger_ID")
+  ) %>%
+  mutate(
+    Taupunkt_C = case_when(
+      Logger_ID == "MNW" & is.na(Taupunkt_C) ~ round(Taupunkt_C_filled, 2),
+      TRUE ~ round(Taupunkt_C, 2)
+    )
+  ) %>%
+  select(-Taupunkt_C_filled)
+# ----------------------------
 ```
 
 # 6 Erzeugte Daten auf Vollständigkeit überprüfen und als Exceltabelle abspeichern
