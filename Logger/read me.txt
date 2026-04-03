@@ -17,6 +17,7 @@ Analysis_Korrelation_all:
 	   -> flexibel und berücksichtigt Unsicherheit, aber abhängig von Modellwahl und weniger gut bei starken Nichtlinearitäten
 	   -> habe ich nicht zufriedenstellend hinbekommen 
 - Ergebnis dieses Versuchs: Random Forest liefert die besten Schätzungen -> mit diesem Modell weiter arbeiten
+-> im Grunde kann diese R_Datei gelöscht werden
 
 Analysis_Korrelation_Random_Forest
 - Random Forest Modell für alle fehlenden Messwerte durchgeführt
@@ -27,7 +28,7 @@ Analysis_Korrelation_Ranger
 - nutzt Random Forest
 - effizientere Berechnung -> manchmal leicht andere Modelle
 - Fokus auf Geschwindigkeit und große Datensätze -> pro Modell ca. 1 Minute!
-- leicht bessere Vorhersagen 
+- annähern exakt gleiche Vorhersagen 
 
 Ergebnis:
 -> weiter arbeiten mit Ranger, aktuell beste Option (gibt auch theoretisch bessere (XGBoost))
