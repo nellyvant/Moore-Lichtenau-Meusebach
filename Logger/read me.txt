@@ -1,0 +1,35 @@
+Dateien dich sich in diesem Ordner befinden: 
+
+Analysis_Korrelation_all:
+- erster Versuch die Daten per Modell zu erzeugen
+- enthält folgende Modell:
+	1. Lineares Modell: gut für einfache Beziehungen, schlecht bei komplexen/nichtlinearen Mustern 
+	   -> liefert schlechte Werte bei uns
+	2. Random Forest: Ensemble aus vielen Entscheidungsbäumen 
+	   -> bildet nichtlineare Zusammenhänge und Wechselwirkungen ab, robust gegenüber Ausreißern
+	3. MissForest: nutzt Random Forest zur iterativen Imputation fehlender Werte 
+	   -> funktioniert gut bei gemischten Daten = kann fehlende Messgrößen in mehreren Loggern pro Standort erkennen und schätzen
+	   -> aber dadurch ungenauere Vorhersage
+	4. MissRanger: ähnlich zu MissForest, basiert auf schnellerer Random-Forest-Implementierung 
+	   -> effizienter, aber kann instabiler und ungenauer sein 
+	   -> berechnet alle fehlenden Messwerte für alle Logger an einem Standort, extrem ungenau/ unrealistisch, lange Laufzeit!
+	5. Mice-Modell: schätzt fehlende Werte schrittweise in mehreren Durchläufen mit Regressionsmodellen (je Variable ein Modell) 
+	   -> flexibel und berücksichtigt Unsicherheit, aber abhängig von Modellwahl und weniger gut bei starken Nichtlinearitäten
+	   -> habe ich nicht zufriedenstellend hinbekommen 
+- Ergebnis dieses Versuchs: Random Forest liefert die besten Schätzungen -> mit diesem Modell weiter arbeiten
+
+Analysis_Korrelation_Random_Forest
+- Random Forest Modell für alle fehlenden Messwerte durchgeführt
+- mit Hilfe des intern, durch das Modell berechneten MSE wurde der RMSE/NRMSE abgeschätzt berechnet = wie stark die erzeugten Daten von den echten Werten abweichen = wie gut das Modell ist
+- Laufzeit pro Modell ca. 5-7 Minuten (13 Modelle) -> lange Laufzeit von über einer Stunde 
+
+Analysis_Korrelation_Ranger
+- nutzt Random Forest
+- effizientere Berechnung -> manchmal leicht andere Modelle
+- Fokus auf Geschwindigkeit und große Datensätze -> pro Modell ca. 1 Minute!
+- leicht bessere Vorhersagen 
+
+Ergebnis:
+-> weiter arbeiten mit Ranger, aktuell beste Option (gibt auch theoretisch bessere (XGBoost))
+-> anhand der mit Ranger erzeugten Daten Tabelle erstellen -> all_loggers_filled (= enthält keine NA-Werte mehr)
+-> anhand der mit Ranger erzeugten Daten Abweichungen von echten Werte berechnen -> Modellierte_Messdaten_Fehlerstatistik
