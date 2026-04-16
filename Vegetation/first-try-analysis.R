@@ -23,6 +23,13 @@ data[art_cols] <- lapply(data[art_cols], function(x) {
 summary(data[art_cols])
 str(data)
 
+
+
+#new try einlesen 16.4.26
+#einlesen
+data <- read.csv("Vegetationsaufnahmen_R - Kopie.csv")
+str(data)
+
 #name als rowname festelgen -> tabelle wird zur matrix
 rownames(data) <- data$Name
 data$Name <- NULL
@@ -62,6 +69,8 @@ layer_cover <- data_long %>%
 library(vegan)
 
 data_species <- data[art_cols]
+row_sums <- rowSums(data_species); which(row_sums == 0)
+data_species <- data_species[row_sums > 0, ]
 data_hell <- decostand(data_species, method = "hellinger")
 
 #pca
@@ -69,12 +78,38 @@ data_hell <- decostand(data_species, method = "hellinger")
 pca <- rda(data_hell)
 plot(pca)
 
+library(vegan)
+library(ggplot2)
+
+scores <- scores(pca, display = "sites")
+
+scores_df <- as.data.frame(scores)
+scores_df$Name <- rownames(scores_df)
+scores_df$site <- data$site[match(scores_df$Name, data$Name)]
+
+ggplot(scores_df, aes(PC1, PC2, color = site)) +
+  geom_point(size = 3) +
+  geom_text(aes(label = Name), size = 3, vjust = -1)
+
 #dca
 dca <- decorana(data_species)
 plot(dca)
 
-#cluster analyse
-dist_matrix <- vegdist(data_hell, method = "bray")
-cluster <- hclust(dist_matrix)
+dca_scores <- scores(dca, display = "sites")
+dca_df <- as.data.frame(dca_scores)
+dca_df$Name <- rownames(dca_df)
+dca_df$site <- data$site[match(dca_df$Name, data$Name)]
+ggplot(dca_df, aes(x = DCA1, y = DCA2, color = site)) +
+  geom_point(size = 3) +
+  geom_text(aes(label = Name), size = 3, vjust = -1) +
+  theme_minimal()
 
-plot(cluster)
+
+
+species_scores <- scores(dca, display = "species")
+species_df <- as.data.frame(species_scores)
+species_df$Art <- rownames(species_df)
+species_df[order(abs(species_df$DCA1), decreasing = TRUE), ]
+
+
+#next goal: zeigerwerte raussuchen und in die pca/dca als pfeile anzeigen lassen
