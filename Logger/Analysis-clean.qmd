@@ -751,7 +751,7 @@ ggplot(summary_daily_area,aes(x = Datum, y = Temp_area_schatten_mean, color = St
 #ggsave("area_mean_temp_in_year.png", width = 20, height = 6) 
 ```
 
-##### *Mögliche Analyse*: 
+##### *Mögliche Analyse*:
 
 Wie oft bzw. wann war der Taupunkt \>= Lufttemperatur -\> Bildung von Tau möglich
 
@@ -885,7 +885,7 @@ summary_daily_logger %>%
 
 ```
 
-##### *Mögliche Analyse:* 
+##### *Mögliche Analyse:*
 
 Vapor pressure deficit berechnen -\> hohes VPD bringt hohe Verdunstung (besonders bei heller Beleuchtung) -\> Sphagnum kann mehr Wasser verdampfen als einfache Waseroberfläche [Lafleur (1990)](https://www.sciencedirect.com/science/article/pii/S0022169496031496#BIB13)distinguishes between wetlands with transpiring and non-transpiring covers. The latter are often dominated by non-vascular *Sphagnum* species, for which evaporation may exceed open water rates under similar meteorological conditions ([Nicols and Brown, 1980](https://www.sciencedirect.com/science/article/pii/S0022169496031496#BIB25)).
 
@@ -986,6 +986,6 @@ ggplot() +
 #theme_classic im zweiten plot, während theme_bw im ersten
 ```
 
-##### *Mögliche Analyse:* 
+##### *Mögliche Analyse:*
 
 PCA für jeden Standort einzeln

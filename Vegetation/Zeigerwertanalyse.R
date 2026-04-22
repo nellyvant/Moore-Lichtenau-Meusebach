@@ -23,63 +23,81 @@ artenliste <- read.csv("artenliste.csv", header=T)
 zeiger_selected <- zeigerwerte %>%
   select(id,light,temperature,continental,wetness,alkalinity,nitrogen,salinity)
 
-#Tabellen zusammenführen
+#Tabellen zusammenführen und aufräumen
 zeigerwerte_filled <- artenliste %>%
   left_join(zeiger_selected, by = "id")
+zeigerwerte_filled <- zeigerwerte_filled %>%
+  rename(Art = id)
+zeigerwerte_filled <- zeigerwerte_filled %>%
+  select(-layer)
+zeigerwerte_filled %>%
+  count(Art) %>%
+  filter(n > 1)
+zeigerwerte_filled <- zeigerwerte_filled %>%
+  distinct(Art, .keep_all = TRUE)
+sum(is.na(zeigerwerte_filled$temperature))  
+#es gibt 2 Zeilen mit NAs -> das sind aber Betula_HL, was nicht bis zur Art bestimmt wurde und Lycogala epidendrum, ein Schleimpilz
+zeigerwerte_filled <- zeigerwerte_filled %>%
+  drop_na()
+str(zeigerwerte_filled); summary(zeigerwerte_filled)
+write_xlsx(zeigerwerte_filled, "Zeigerwerte-gefüllt.xlsx")
 
+####gewichtete Zeigerwerte berechnen####
+vegdata <- read.csv("Vegetationsaufnahmen_R - Kopie.csv")
+rownames(vegdata) <- vegdata$Name
+vegdata$Name <- NULL
+ncol(vegdata)
 
-#bin bis hierher gekommen
-#es stimmen wohl noch nciht alle artnamen in artenliste und zeigerwerte überein, weshalb es noch NAs gibt. das muss ich nochmal händisch überprüfen oder die zeigerwerte eben händisch nachtragen, wenn nix hilft
-
-
-
-#anschauen obs geklappt hat und wie viele NAs es gibt
-head(landoltdaten_filled)
-sum(is.na(landoltdaten_filled$Temperaturzahl))  
-#es gibt 28 Zeilen mit NAs -> händisch nachtragen und dann ordentlich definieren/ im Vortrag erwähnen das wirs so gemacht haben
-
-
-
-#Als Excel speichern, um damit anschließend die gewichteten Zeigerwerte zuberechnen
-write_xlsx(landoltdaten_filled, "Landolt-Zeigerwerte-gefüllt.xlsx")
-
-#jetzt: händisch fehlende Zeigerwerte eintragen und dann anschließend gewichtete Zeigerwerte berechnen
-
-
-####gewichtete Landolt-Zeigerwerte berechnen####
-
-landoltdata <- read_xlsx("Landolt-Zeigerwerte-gefüllt-nachbearbeitet.xlsx")
-vegdata <- read_xlsx("Vegetationsaufnahmen.xlsx")
 str(vegdata)
 
 #Problem jetzt ist, dass meine Daten im wide-format sind und nicht im long-format. Ich brauche die Daten allerdings im Longformat damit die Zuordnung besser klappt und ich die gewichteten Zeigerwerte ermitteln kann.
 
-vegetation_long <- vegdata %>%
-  pivot_longer(cols = -c(Name),  
-               names_to = "Species",        
-               values_to = "Coverage") %>%
-  filter(Coverage > 0)
+art_cols <- grep("_", names(vegdata), value = TRUE)
+veg_long <- vegdata %>%
+  rownames_to_column("Name") %>%
+  pivot_longer(cols = all_of(art_cols),
+               names_to = "Art_full",
+               values_to = "Deckung") %>%
+  filter(Deckung > 0) %>%
+  tidyr::separate(Art_full, into = c("Art", "Schicht"),
+                  sep = "_(?=[^_]+$)")
+
 
 #Zeilen die Null sind werden entfernt, was den Datensatz erheblich kürzer machen sollte
 
-str(vegetation_long)
-
+str(veg_long)
+#die Artnamen in der veglong und zeigerwerte_filled stimmen nicht überein, sodass der join nicht funktioniert. Deshalb wird die veglong als .xlsx gespeichert und in Excel mit Suchen & Ersetzen mit den Artnamen entsprechend artenliste.csv bearbeitet und anschließend wieder eingelesen
+write_xlsx(veg_long, "Veglong.xlsx")
+vegdata2 <- read_csv("Veglong_artnamen_bearbeitet_neu.csv")
+str(vegdata2)
+vegdata2$Deckung <- as.numeric(gsub(",", ".", vegdata2$Deckung))
 #okay jetzt ist alles im long-Format und ich kann schauen, dass ich die gewichteten Zeigerwerte ermittel und in eine neue Excel-Tabelle überführe!((:
 
 #gemeinsame Tabelle erstellen mit Vegetationsaufnahme und den Zeigerwerten
-combined_data <- left_join(vegetation_long, landoltdata, by = "Species")
-
+zeigerdata <- read_xlsx("Zeigerwerte-gefüllt.xlsx")
+str(zeigerdata)
+zeigerdata <- zeigerdata %>%
+  mutate(across(c(light, temperature, continental, wetness, alkalinity, nitrogen, salinity), as.numeric))
+combined_data <- left_join(vegdata2, zeigerdata, by = "Art")
+str(combined_data)
 weighted_values <- combined_data %>%
-  group_by(Name) %>%
+  group_by(plot.ID, Name, site) %>%
   summarise(
-    Weighted_Light = sum(Coverage * Lichtzahl, na.rm = TRUE) / sum(Coverage, na.rm = TRUE),
-    Weighted_Temp = sum(Coverage * Temperaturzahl, na.rm = TRUE) / sum(Coverage, na.rm = TRUE),
-    Weighted_Moisture = sum(Coverage * Feuchtezahl, na.rm = TRUE) / sum(Coverage, na.rm = TRUE),
-    Weighted_Nutrient = sum(Coverage * Naehrstoffzahl, na.rm = TRUE) / sum(Coverage, na.rm = TRUE)
+    Weighted_light = sum(Deckung * light, na.rm = TRUE) / sum(Deckung, na.rm = TRUE),
+    Weighted_temperature = sum(Deckung * temperature, na.rm = TRUE) / sum(Deckung, na.rm = TRUE),
+    Weighted_wetness = sum(Deckung * wetness, na.rm = TRUE) / sum(Deckung, na.rm = TRUE),
+    Weighted_nitrogen = sum(Deckung * nitrogen, na.rm = TRUE) / sum(Deckung, na.rm = TRUE),
+    Weighted_continental = sum(Deckung * continental, na.rm = TRUE) / sum(Deckung, na.rm = TRUE),
+    Weighted_alkalinity = sum(Deckung * alkalinity, na.rm = TRUE) / sum(Deckung, na.rm = TRUE),
+    Weighted_salinity = sum(Deckung * salinity, na.rm = TRUE) / sum(Deckung, na.rm = TRUE),
+    .groups = "drop"
   )
 
 #Tabelle mit gewichteten Zeigerwerten exportieren
-write_xlsx(weighted_values, "Landolt_gewichtet.xlsx")
+write_xlsx(weighted_values, "Zeigerwerte_gewichtet.xlsx")
+
+# bis hier bin ich gekommen
+#für berechnungen von evenness, shannon und richness muss ich schauen, dass dopplungen aufgrund von layer berücksichtigt werden. es gibt ja teils Art1_HL und Art1_SL oder so
 
 
 ####species richness, Shannon Index, relative Häufigkeit und species evenness bestimmen####

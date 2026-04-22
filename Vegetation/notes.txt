@@ -6,10 +6,11 @@ Betula im HL daher kein Teil der Zeigerwerte. Es kommen Betula pendula und Betul
 Aufgrund des häufigen Vorkommen von Betula im HL könnte man beide Szenarien mal durchrechnen also angenommen Betula_HL =Betula pubescens und Betual_HL =Beula pendula.
 Dafür müsste im Dokument: artenliste.csv Betula_HL umbenannt werden und das Skript Zeigerwerte.R ausfegührt werden
 
-Fuscocephaloziopsis connivens wurde mit altem Artnamen Cephalozia connivens angegeben, da sie unter diesem Namen in der Zeigerwerttabelle war
 
 Zeigerwerttabelle stammt von: https://ipt.gbif.org/resource?r=zeigerwerte
 
+Artname in meiner Vegetationsaufnahme = Art nach Benennung in GBIF-Tabelle für Zeigerwerte
+Fuscocephaloziopsis connivens = Cephalozia connivens
 Hypnum cupressiforme = Hypnum cupressiforme Hedw. ssp. cupr. var. cupressiforme
 Luzula multiflora = Luzula campestris multiflora
 Schedonorus giganteus = Festuca gigantea
