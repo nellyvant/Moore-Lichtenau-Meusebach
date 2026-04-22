@@ -255,6 +255,18 @@ WT_var_mp
 # welcher Standort hat die meisten trocken gefallenen Tage, welcher die wenigsten (= Beständigkeit des Gewässers/Wasserspiegel)
 
 # auch daraus kann man ggf ableiten, welches Gewässer das Wasser besser hält und Faktoren ableiten, warum es bei den anderen nicht so ist -> naturschutzfachliche Maßnahmen ggf ableiten/überdenken
+
+WT_trocken_mp <- Wassertiefen %>%
+  group_by(Standort, Messpunkt) %>%
+  summarise(
+    trockene_Tage = sum(Wassertiefe <= 1, na.rm = TRUE),
+    gesamt_Messungen = n(),
+    anteil_trocken = trockene_Tage / gesamt_Messungen
+  ) %>%
+  arrange(Standort, desc(trockene_Tage))
+
+WT_trocken_mp
+
 ```
 
 # 6 Zusatz
@@ -356,6 +368,20 @@ ggplot(Wassertiefen, aes(x = Wassertiefe, fill = Standort)) +
        x = "Wasserstand (cm)",
        y = "Anzahl der Messungen")
 
+# Histogramm zur Häufigkeit der Wasserstände je Standort ohne Messpunkt 4 bei Lihtenau 
+ggplot(
+  Wassertiefen %>%
+    filter(!(Standort == "L" & Messpunkt == 4)),
+  aes(x = Wassertiefe, fill = Standort)
+) +
+  geom_histogram(binwidth = 5, alpha = 0.7) +
+  facet_wrap(~Standort) +
+  theme_minimal() +
+  labs(
+    title = "Verteilung der Wasserstände pro Standort",
+    x = "Wasserstand (cm)",
+    y = "Anzahl der Messungen"
+  )
 ```
 
 ```{r}
@@ -365,14 +391,14 @@ Wassertiefen$Messpunkt <- as.factor(Wassertiefen$Messpunkt)
 
 standort_L <- Wassertiefen %>% 
   filter(Standort == "L")
-#standort_L <- Wassertiefen %>%
-#  filter(Standort == "L", Messpunkt != "4")
+standort_L <- Wassertiefen %>%
+  filter(Standort == "L", Messpunkt != "4")#ohne Messpunkt 4 (verzerrt Daten)
 standort_MN <- Wassertiefen %>% 
   filter(Standort == "MN")
 standort_MT <- Wassertiefen %>% 
   filter(Standort == "MT")
 
-ggplot(standort_MN, aes(x = Wassertiefe, fill = Messpunkt)) +
+ggplot(standort_MT, aes(x = Wassertiefe, fill = Messpunkt)) +
   geom_histogram(binwidth = 5, alpha = 0.7) +
   facet_wrap(~Messpunkt) +
   theme_minimal() +
@@ -380,4 +406,31 @@ ggplot(standort_MN, aes(x = Wassertiefe, fill = Messpunkt)) +
        x = "Wasserstand (cm)",
        y = "Anzahl Messungen")
 
+```
+
+```{r}
+Wassertiefen %>%
+  filter(!(Standort == "L" & Messpunkt == "4")) %>%
+  ggplot(aes(x = Wassertiefe, fill = Standort)) +
+  geom_histogram(binwidth = 5, alpha = 0.7) +
+  facet_grid(Standort ~ Messpunkt) +
+  theme_minimal() +
+  labs(
+    title = "Histogramm der Wasserstände nach Standort und Messpunkt",
+    x = "Wasserstand (cm)",
+    y = "Anzahl Messungen",
+    fill = "Fläche"
+  ) +
+  scale_fill_manual(
+    values = c(
+      "L" = "#1b9e77",
+      "MT" = "#d95f02",
+      "MN" = "#7570b3"
+    ),
+    labels = c(
+      "L" = "Lichtenau",
+      "MT" = "Meusebach trocken",
+      "MN" = "Meusebach nass"
+    )
+  )
 ```
