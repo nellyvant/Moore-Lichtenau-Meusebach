@@ -74,7 +74,7 @@ vegdata2$Deckung <- as.numeric(gsub(",", ".", vegdata2$Deckung))
 #okay jetzt ist alles im long-Format und ich kann schauen, dass ich die gewichteten Zeigerwerte ermittel und in eine neue Excel-Tabelle überführe!((:
 
 #gemeinsame Tabelle erstellen mit Vegetationsaufnahme und den Zeigerwerten
-zeigerdata <- read_xlsx("Zeigerwerte-gefüllt.xlsx")
+zeigerdata <- read_xlsx("Zeigerwerte-gefüllt-clean.xlsx")
 str(zeigerdata)
 zeigerdata <- zeigerdata %>%
   mutate(across(c(light, temperature, continental, wetness, alkalinity, nitrogen, salinity), as.numeric))
@@ -102,15 +102,16 @@ write_xlsx(weighted_values, "Zeigerwerte_gewichtet.xlsx")
 
 ####species richness, Shannon Index, relative Häufigkeit und species evenness bestimmen####
 
-comm_matrix <- vegetation_long %>%
-  select(Name, Species, Coverage) %>%
+comm_matrix <- veg_long %>%
+  group_by(Name, Art) %>%
+  summarise(Deckung = sum(Deckung), .groups = "drop") %>%
   tidyr::pivot_wider(
-    names_from = Species,
-    values_from = Coverage,
+    names_from = Art,
+    values_from = Deckung,
     values_fill = 0
   ) %>%
   tibble::column_to_rownames("Name")
-
+str(comm_matrix)
 
 #berechnen von species richness, shannon Index, relativer Häufigkeit und Evenness
 

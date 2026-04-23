@@ -1,0 +1,242 @@
+---
+title: "Vegetation Analysis"
+author: "Nele Herzig"
+format: html
+editor: visual
+---
+
+# 1 Packages
+
+```{r}
+library(tidyverse)
+library(readxl)
+library(writexl)
+library(vegan)
+library(ggplot2)
+```
+
+# 2 Daten einlesen und vorbereiten
+
+```{r} #| label: read data}
+# Zeigerwerte von GBIF
+zeigerwerte <- read.table("dwca-zeigerwerte-v1.2/ellenberg.txt",sep = "\t", header = TRUE)
+# Liste meiner Arten, Artnamen für GBIF-Artnamen angepasst
+artenliste <- read.csv("artenliste.csv", header=T)
+# meine Vegetationsaufnahmen
+vegdata <- read.csv("Vegetationsaufnahmen_R - Kopie.csv")
+```
+
+GBIF-Zeigerwerte https://ipt.gbif.org/resource?r=zeigerwerte (aufgerufen am 23.4.2026)
+
+```{r} #| label: clean data and convert to long format}
+rownames(vegdata) <- vegdata$Name
+vegdata$Name <- NULL
+ncol(vegdata)
+str(vegdata)
+
+art_cols <- grep("_", names(vegdata), value = TRUE)
+veg_long <- vegdata %>%
+  rownames_to_column("Name") %>%
+  pivot_longer(cols = all_of(art_cols),
+               names_to = "Art_full",
+               values_to = "Deckung") %>%
+  filter(Deckung > 0) %>%
+  tidyr::separate(Art_full, into = c("Art", "Schicht"),
+                  sep = "_(?=[^_]+$)")
+#Zeilen, mit 0 wurden entfernt -> verkürzt Datensatz
+str(veg_long)
+write_xlsx(veg_long, "Veglong.xlsx")
+```
+
+Die Tabelle Veglong.xlsx wird in Excel weiter bearbeitet. Die Artnamen werden mit Suchen&Ersetzen verändert, sodass sie mit den Artnamen in artenliste.csv übereinstimmen. Das garantiert, dass der join später funktioniert. Die bearbeitete Datei wird als Veglong_artnamen_bearbeitet_neu.csv später wieder eingelesen.
+
+```{r} #| label: fill indicator values for species inventory}
+zeiger_selected <- zeigerwerte %>%
+  select(id,light,temperature,continental,wetness,alkalinity,nitrogen,salinity)
+
+# Tabellen zusammenführen
+zeigerwerte_filled <- artenliste %>%
+  left_join(zeiger_selected, by = "id")
+# Tabelle aufräumen
+zeigerwerte_filled <- zeigerwerte_filled %>%
+  rename(Art = id)
+zeigerwerte_filled <- zeigerwerte_filled %>%
+  select(-layer)
+zeigerwerte_filled %>%
+  count(Art) %>%
+  filter(n > 1)
+zeigerwerte_filled <- zeigerwerte_filled %>%
+  distinct(Art, .keep_all = TRUE)
+
+sum(is.na(zeigerwerte_filled$temperature))  
+#es gibt 2 Zeilen mit NAs -> das sind aber Betula_HL, was nicht bis zur Art bestimmt wurde und Lycogala epidendrum, ein Schleimpilz
+zeigerwerte_filled <- zeigerwerte_filled %>%
+  drop_na()
+
+str(zeigerwerte_filled); summary(zeigerwerte_filled)
+write_xlsx(zeigerwerte_filled, "Zeigerwerte-gefüllt.xlsx")
+```
+
+Die Tabelle Zeigerwerte-gefüllt.xlsx wird in excel weiter bearbeitet. Es werden Sonderzeichen, wie () und \~ entfernt. Außerdem werden Einträge mit "x" entfernt. Hier liegt kein Zeigerwert vor und "x" wird als NA behandelt. Anschließend wird die Tabelle als Zeigerwerte-gefüllt-clean.xlsx wieder eingelesen.
+
+## 2.1 Einlesen der bearbeiteten Daten
+
+```{r}
+vegdata2 <- read_csv("Veglong_artnamen_bearbeitet_neu.csv")
+str(vegdata2)
+vegdata2$Deckung <- as.numeric(gsub(",", ".", vegdata2$Deckung))
+
+zeigerdata <- read_xlsx("Zeigerwerte-gefüllt-clean.xlsx")
+str(zeigerdata)
+zeigerdata <- zeigerdata %>%
+  mutate(across(c(light, temperature, continental, wetness, alkalinity, nitrogen, salinity), as.numeric))
+```
+
+# 3 Gewichtete Zeigerwerte berechnen
+
+```{r}
+combined_data <- left_join(vegdata2, zeigerdata, by = "Art")
+str(combined_data)
+
+weighted_values <- combined_data %>%
+  group_by(plot.ID, Name, site) %>%
+  summarise(
+    Weighted_light = sum(Deckung * light, na.rm = TRUE) / sum(Deckung, na.rm = TRUE),
+    Weighted_temperature = sum(Deckung * temperature, na.rm = TRUE) / sum(Deckung, na.rm = TRUE),
+    Weighted_wetness = sum(Deckung * wetness, na.rm = TRUE) / sum(Deckung, na.rm = TRUE),
+    Weighted_nitrogen = sum(Deckung * nitrogen, na.rm = TRUE) / sum(Deckung, na.rm = TRUE),
+    Weighted_continental = sum(Deckung * continental, na.rm = TRUE) / sum(Deckung, na.rm = TRUE),
+    Weighted_alkalinity = sum(Deckung * alkalinity, na.rm = TRUE) / sum(Deckung, na.rm = TRUE),
+    Weighted_salinity = sum(Deckung * salinity, na.rm = TRUE) / sum(Deckung, na.rm = TRUE),
+    .groups = "drop"
+  )
+
+write_xlsx(weighted_values, "Zeigerwerte_gewichtet.xlsx")
+```
+
+kann ich damit einfach eine DCA machen und schauen welche plots halt nach zeigerwert am ähnöichsten sind?? und bruche ich dafür die gewichteten zeigerwerte oder die normalen??
+
+# 4 Diversitätsmaße berechnen
+
+```{r}
+####species richness, Shannon Index, relative Häufigkeit und species evenness bestimmen####
+
+comm_matrix <- veg_long %>%
+  group_by(Name, Art) %>%
+  summarise(Deckung = sum(Deckung), .groups = "drop") %>%
+  tidyr::pivot_wider(
+    names_from = Art,
+    values_from = Deckung,
+    values_fill = 0
+  ) %>%
+  tibble::column_to_rownames("Name")
+str(comm_matrix)
+
+#berechnen von species richness, shannon Index, relativer Häufigkeit und Evenness
+
+species_richness <- specnumber(comm_matrix)
+shannon_index <- diversity(comm_matrix, index = "shannon")
+relative_freq <- decostand(comm_matrix, method = "total")
+species_evenness <- shannon_index / log(specnumber(comm_matrix))
+
+# Ergebnisse in ein Dataframe packen:
+
+results <- data.frame(
+  Plot = rownames(comm_matrix),
+  Richness = species_richness,
+  Shannon = shannon_index,
+  Evenness = species_evenness
+)
+
+print(results)
+
+#als Excel speichern
+write_xlsx(results, "Ergebnisse_species_richness.xlsx")
+
+```
+
+## 4.1 blibla
+
+hier sollte ich vielleicht noch was mit den diversitätsmaßen anfangen, einen plot oder wie sich das über ein transekt verändert auch in abhängigkeit von umwelt (zeigerwerte und logger)
+
+# 5 DCA
+
+```{r}
+dca <- decorana(comm_matrix)
+plot(dca)
+dca
+# Achsenlänge DCA1
+diff(range(dca$rproj[,1]))
+
+# Achsenlänge DCA2
+diff(range(dca$rproj[,2]))
+
+#Arten und ihren Einfluss auf DCA herausfinden
+species_scores <- scores(dca, display = "species")
+species_df <- as.data.frame(species_scores)
+species_df$Art <- rownames(species_df)
+DCA1 <- species_df[order(species_df$DCA1, decreasing = TRUE), ]
+DCA2 <- species_df[order(species_df$DCA2, decreasing = TRUE), ]
+print(DCA1)
+print(DCA2)
+```
+
+## 5.1 Achsen
+
+[DCA1]{.underline}
+
+-   Achsenlänge 6.25 -\> hoher species turnover entlang des Gradienten
+
+-   Einflussreiche Arten:
+
+    | Art                    | score |
+    |------------------------|-------|
+    | Sphagnum fimbriatum    | 3.27  |
+    | Sphagnum auriculatum   | 3.07  |
+    | Fagus sylvatica        | 3.03  |
+    | Betula pendula         | 2.81  |
+    | Pteridium aquilinum    | 2.74  |
+    | Leucobryum glaucum     | 2.63  |
+    | Vaccinium myrtillus    | 2.46  |
+    | Frangula alnus         | 2.23  |
+    | Sphagnum russowii      | 2.15  |
+    | Dicranella cerviculata | 1.89  |
+    | ...                    | ...   |
+    | Sphagnum squarrosum    | -1.80 |
+    | Sphagnum cuspidatum    | -2.28 |
+    | Carex rostrata         | -3.17 |
+
+[DCA2]{.underline}
+
+-   Achsenlänge 3.79 -\> hoher species turnover entlang des Gradienten, ab Achsenlänge 4 kompletter turnover, hier beinahe erreicht
+
+-   Einflussreiche Arten:
+
+    | Art                           | score |
+    |-------------------------------|-------|
+    | Salix aurita                  | 3.35  |
+    | Erophorum angustifolium       | 2.49  |
+    | Hypnum jutlandicum            | 1.77  |
+    | ...                           | ...   |
+    | Fuscocephaloziopsis connivens | -1.59 |
+    | Typha latifolia               | -2.09 |
+    | Scrophularia nodosa           | -2.11 |
+    | Sphagnum squarrosum           | -2.14 |
+    | Sphagnum capillifolium        | -2.38 |
+
+## 5.2 Plot
+
+hier fehlt noch einiges an hübsch machen
+
+am besten wäre es, wenn man die umwelt noch als pfeile anzeigen lassen kann, zb durch zeigerwerte
+
+```{r}
+dca_scores <- scores(dca, display = "sites")
+dca_df <- as.data.frame(dca_scores)
+dca_df$Name <- rownames(dca_df)
+dca_df$site <- data$site[match(dca_df$Name, data$Name)]
+ggplot(dca_df, aes(x = DCA1, y = DCA2, color = site)) +
+  geom_point(size = 3) +
+  geom_text(aes(label = Name), size = 3, vjust = -1) +
+  theme_minimal()
+```

@@ -125,3 +125,37 @@ species_df[order(abs(species_df$DCA1), decreasing = TRUE), ]
 
 
 #next goal: zeigerwerte raussuchen und in die pca/dca als pfeile anzeigen lassen
+
+
+#dca2
+
+dca <- decorana(comm_matrix)
+plot(dca)
+dca
+# Achsenlänge DCA1
+diff(range(dca$rproj[,1]))
+
+# Achsenlänge DCA2
+diff(range(dca$rproj[,2]))
+
+
+dca_scores <- scores(dca, display = "sites")
+dca_df <- as.data.frame(dca_scores)
+dca_df$Name <- rownames(dca_df)
+dca_df$site <- data$site[match(dca_df$Name, data$Name)]
+ggplot(dca_df, aes(x = DCA1, y = DCA2, color = site)) +
+  geom_point(size = 3) +
+  geom_text(aes(label = Name), size = 3, vjust = -1) +
+  theme_minimal()
+
+
+
+species_scores <- scores(dca, display = "species")
+species_df <- as.data.frame(species_scores)
+species_df$Art <- rownames(species_df)
+species_df[order(species_df$DCA1, decreasing = TRUE), ]
+str(species_df)
+
+
+
+species_df <- merge(species_scores, indicator_values, by = "Art")
