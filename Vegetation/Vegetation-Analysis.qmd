@@ -17,7 +17,8 @@ library(ggplot2)
 
 # 2 Daten einlesen und vorbereiten
 
-```{r} #| label: read data}
+```{r}
+ #| label: read data
 # Zeigerwerte von GBIF
 zeigerwerte <- read.table("dwca-zeigerwerte-v1.2/ellenberg.txt",sep = "\t", header = TRUE)
 # Liste meiner Arten, Artnamen für GBIF-Artnamen angepasst
@@ -28,29 +29,16 @@ vegdata <- read.csv("Vegetationsaufnahmen_R - Kopie.csv")
 
 GBIF-Zeigerwerte https://ipt.gbif.org/resource?r=zeigerwerte (aufgerufen am 23.4.2026)
 
-```{r} #| label: clean data and convert to long format}
-rownames(vegdata) <- vegdata$Name
-vegdata$Name <- NULL
-ncol(vegdata)
-str(vegdata)
+```{r}
+#| label: clean data and convert to long format} rownames(vegdata) <- vegdata$Name vegdata$Name <- NULL ncol(vegdata) str(vegdata)
 
-art_cols <- grep("_", names(vegdata), value = TRUE)
-veg_long <- vegdata %>%
-  rownames_to_column("Name") %>%
-  pivot_longer(cols = all_of(art_cols),
-               names_to = "Art_full",
-               values_to = "Deckung") %>%
-  filter(Deckung > 0) %>%
-  tidyr::separate(Art_full, into = c("Art", "Schicht"),
-                  sep = "_(?=[^_]+$)")
-#Zeilen, mit 0 wurden entfernt -> verkürzt Datensatz
-str(veg_long)
-write_xlsx(veg_long, "Veglong.xlsx")
+art_cols <- grep("", names(vegdata), value = TRUE) veg_long <- vegdata %>% rownames_to_column("Name") %>% pivot_longer(cols = all_of(art_cols), names_to = "Art_full", values_to = "Deckung") %>% filter(Deckung > 0) %>% tidyr::separate(Art_full, into = c("Art", "Schicht"), sep = "(?=[^_]+$)") #Zeilen, mit 0 wurden entfernt -> verkürzt Datensatz str(veg_long) write_xlsx(veg_long, "Veglong.xlsx")
 ```
 
 Die Tabelle Veglong.xlsx wird in Excel weiter bearbeitet. Die Artnamen werden mit Suchen&Ersetzen verändert, sodass sie mit den Artnamen in artenliste.csv übereinstimmen. Das garantiert, dass der join später funktioniert. Die bearbeitete Datei wird als Veglong_artnamen_bearbeitet_neu.csv später wieder eingelesen.
 
-```{r} #| label: fill indicator values for species inventory}
+```{r}
+#| label: fill indicator values for species inventory}
 zeiger_selected <- zeigerwerte %>%
   select(id,light,temperature,continental,wetness,alkalinity,nitrogen,salinity)
 
