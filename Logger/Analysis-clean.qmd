@@ -294,6 +294,8 @@ write.csv(all_loggers, "all_loggers.csv")
 
 ### 5.1.1 für jeden Logger
 
+aggregiert die Daten für jeden Tag
+
 ```{r}
 #| label: create summary_daily_logger
 # Mittelwerte gruppiert nach Loggerstandort und Tag erzeugen, zusätzlich Min & Max Temperatur am Tag 
@@ -340,6 +342,8 @@ summary(summary_daily_logger)
 ```
 
 ### 5.1.2 für jeden Standort
+
+aggregiert die Daten für jeden Tag und für jede der drei Flächen (5 Logger pro Fläche aggregiert)
 
 ```{r}
 #| label: create summary_daily_area
@@ -389,6 +393,10 @@ summary(summary_daily_area)
 
 ## 5.2 Summary pro Logger
 
+### 5.2.1 Summary über alle Daten
+
+zeigt die Extrema, SD usw. über den gesamten Aufnahmezeitraum
+
 ```{r}
 #| label: create summary_logger_year
 summary_logger_year <- all_loggers %>%
@@ -429,6 +437,44 @@ summary_logger_year <- all_loggers %>%
   )
 
 summary(summary_logger_year)
+```
+
+### 5.2.2 Summary über SD & range tagesaggregierter Daten
+
+beantwortet die Frage, wie stark die Parameter an einem typischen Tag schwanken
+
+```{r}
+sd_summary_logger <- summary_daily_logger %>%
+  group_by(Standort, Logger, Logger_ID) %>%
+  summarise(
+    Temp_schatten_sd_mean = mean(Temp_schatten_sd, na.rm = TRUE),
+    Temp_schatten_sd_median = median(Temp_schatten_sd, na.rm = TRUE),
+    Temp_schatten_range_mean = mean(Temp_schatten_range, na.rm = TRUE),
+    Temp_schatten_range_median = median(Temp_schatten_range, na.rm = TRUE),
+    
+    Temp_sonne_sd_mean = mean(Temp_sonne_sd, na.rm = TRUE),
+    Temp_sonne_sd_median = median(Temp_sonne_sd, na.rm = TRUE),
+    Temp_sonne_range_mean = mean(Temp_sonne_range, na.rm = TRUE),
+    Temp_sonne_range_median = median(Temp_sonne_range, na.rm = TRUE),
+    
+    Licht_sd_mean = mean(Licht_sd, na.rm = TRUE),
+    Licht_sd_median = median(Licht_sd, na.rm = TRUE),
+    Licht_range_mean = mean(Licht_range, na.rm = TRUE),
+    Licht_range_median = median(Licht_range, na.rm = TRUE),
+    
+    rLF_sd_mean = mean(rLF_sd, na.rm = TRUE),
+    rLF_sd_median = median(rLF_sd, na.rm = TRUE),
+    rLF_range_mean = mean(rLF_range, na.rm = TRUE),
+    rLF_range_median = median(rLF_range, na.rm = TRUE),
+    
+    Tp_sd_mean = mean(Tp_sd, na.rm = TRUE),
+    Tp_sd_median = median(Tp_sd, na.rm = TRUE),
+    Tp_range_mean = mean(Tp_range, na.rm = TRUE),
+    Tp_range_median = median(Tp_range, na.rm = TRUE),
+    
+    .groups = "drop"
+  )
+sd_summary_logger
 ```
 
 # 6. Analyse & Plots einzelner Parameter

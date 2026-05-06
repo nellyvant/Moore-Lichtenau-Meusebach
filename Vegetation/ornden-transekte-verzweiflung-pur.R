@@ -221,3 +221,11 @@ data2 <- data2 %>%
   ungroup()
 
 write.csv(data2, "data_sorted_test.csv", row.names = FALSE)
+
+
+##### 6.5.progress #####
+#okay, ich habe die datei data_sorted_test jetzt einfach mal in excel bearbeitet und per hand eingetragen ein transekt NS udn WO und habe die transektnummer vergeben. die mitte bekommt dabei immer 0 und nach westen und norden werden die zahlen kleiner und nach osten und süden werden sie größer. 
+#damit sollte ich mit szbset nach site, transekt filtern können wenn nötig. das macht die spalte name zwar etwas überflüssig, aber mein gott, ist halt jetzt so, muss ich am ende eben im readme zum skript erläutern
+
+newdata <- read.csv("data_sorted_test.csv")
+str(newdata)
