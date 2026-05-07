@@ -223,9 +223,90 @@ data2 <- data2 %>%
 write.csv(data2, "data_sorted_test.csv", row.names = FALSE)
 
 
-##### 6.5.progress #####
+##### 6.5.progress, ab hier funktioniert alles :) #####
 #okay, ich habe die datei data_sorted_test jetzt einfach mal in excel bearbeitet und per hand eingetragen ein transekt NS udn WO und habe die transektnummer vergeben. die mitte bekommt dabei immer 0 und nach westen und norden werden die zahlen kleiner und nach osten und süden werden sie größer. 
 #damit sollte ich mit szbset nach site, transekt filtern können wenn nötig. das macht die spalte name zwar etwas überflüssig, aber mein gott, ist halt jetzt so, muss ich am ende eben im readme zum skript erläutern
 
 newdata <- read.csv("data_sorted_test.csv")
 str(newdata)
+#entfernen überflüssiger spalten
+newdata <- newdata %>%
+  select(-(X:X.6))
+str(newdata)
+#spalten anders ordnen
+newdata <- newdata %>%
+  relocate(Transekt, Transektnummer, .after = Name)
+str(newdata)
+
+#convert to long_format
+rownames(newdata) <- newdata$Name 
+newdata$Name <- NULL 
+ncol(newdata) 
+str(newdata)
+art_cols <- grep("_(TL|HL|ML|SL)$", names(newdata), value = TRUE)
+new_long <- newdata %>%
+  rownames_to_column("Name") %>%
+  pivot_longer(cols = all_of(art_cols), names_to = "Art_full", values_to = "Deckung") %>% 
+  filter(Deckung > 0) %>%
+  tidyr::separate(Art_full, into = c("Art", "Schicht"), sep = "_(?=[A-Z]{1,2}$)")
+#Zeilen, mit 0 wurden entfernt -> verkürzt Datensatz
+str(new_long)
+
+#join mit artenliste
+zeiger_selected <- zeigerwerte %>%
+  select(id,light,temperature,continental,wetness,alkalinity,nitrogen,salinity)
+
+# Zeigerwerte von GBIF
+zeigerwerte <- read.table("dwca-zeigerwerte-v1.2/ellenberg.txt",sep = "\t", header = TRUE)
+zeigerwerte <- zeigerwerte %>%
+  rename(gbif_name = id)
+# Liste meiner Arten, Artnamen für GBIF-Artnamen angepasst
+mapping <- read_xlsx("artenliste_mapping.xlsx")
+
+# Tabellen zusammenführen
+zeiger_mapped <- zeigerwerte %>%
+  inner_join(mapping, by = "gbif_name") %>%
+  select(gbif_name, my_name, light, temperature, continental, wetness, alkalinity, nitrogen, salinity)
+
+# Tabelle aufräumen
+zeiger_mapped <- zeiger_mapped %>%
+  mutate(across(
+    c(light, temperature, continental, wetness, alkalinity, nitrogen, salinity),
+    ~ str_remove_all(.x, "[~()xX=]") %>%
+      as.numeric()
+  ))
+zeiger_mapped <- zeiger_mapped %>%
+  rename(Art = my_name)
+zeiger_mapped <- zeiger_mapped %>%
+  select(-gbif_name)
+
+
+
+str(zeigerwerte_filled); summary(zeigerwerte_filled)
+#write_xlsx(zeigerwerte_filled, "Zeigerwerte-gefüllt.xlsx")
+
+
+#gewichtete zeigerwerte berechnen
+combined_data2 <- left_join(new_long, zeiger_mapped, by = "Art")
+str(combined_data2)
+
+weighted_values2 <- combined_data2 %>%
+  group_by(plot.ID, Name, site, Transekt, Transektnummer) %>%
+  summarise(
+    Weighted_light = sum(Deckung * light, na.rm = TRUE) / sum(Deckung, na.rm = TRUE),
+    Weighted_temperature = sum(Deckung * temperature, na.rm = TRUE) / sum(Deckung, na.rm = TRUE),
+    Weighted_wetness = sum(Deckung * wetness, na.rm = TRUE) / sum(Deckung, na.rm = TRUE),
+    Weighted_nitrogen = sum(Deckung * nitrogen, na.rm = TRUE) / sum(Deckung, na.rm = TRUE),
+    Weighted_continental = sum(Deckung * continental, na.rm = TRUE) / sum(Deckung, na.rm = TRUE),
+    Weighted_alkalinity = sum(Deckung * alkalinity, na.rm = TRUE) / sum(Deckung, na.rm = TRUE),
+    Weighted_salinity = sum(Deckung * salinity, na.rm = TRUE) / sum(Deckung, na.rm = TRUE),
+    .groups = "drop"
+  )
+
+#write_xlsx(weighted_values, "Zeigerwerte_gewichtet.xlsx")
+
+
+
+
+
+

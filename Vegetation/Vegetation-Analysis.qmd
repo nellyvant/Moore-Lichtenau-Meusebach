@@ -108,7 +108,7 @@ weighted_values <- combined_data %>%
     .groups = "drop"
   )
 
-write_xlsx(weighted_values, "Zeigerwerte_gewichtet.xlsx")
+#write_xlsx(weighted_values, "Zeigerwerte_gewichtet.xlsx")
 ```
 
 kann ich damit einfach eine DCA machen und schauen welche plots halt nach zeigerwert am ähnöichsten sind?? und bruche ich dafür die gewichteten zeigerwerte oder die normalen??
@@ -119,14 +119,14 @@ kann ich damit einfach eine DCA machen und schauen welche plots halt nach zeiger
 ####species richness, Shannon Index, relative Häufigkeit und species evenness bestimmen####
 
 comm_matrix <- veg_long %>%
-  group_by(Name, Art) %>%
+  group_by(plot.ID, Art) %>%
   summarise(Deckung = sum(Deckung), .groups = "drop") %>%
   tidyr::pivot_wider(
     names_from = Art,
     values_from = Deckung,
     values_fill = 0
   ) %>%
-  tibble::column_to_rownames("Name")
+  tibble::column_to_rownames("plot.ID")
 str(comm_matrix)
 
 #berechnen von species richness, shannon Index, relativer Häufigkeit und Evenness
@@ -221,6 +221,45 @@ print(DCA2)
     | Sphagnum squarrosum           | -2.14 |
     | Sphagnum capillifolium        | -2.38 |
 
+**wtf, hier komme ich nicht mehr mit, der code ist von chatgpt und ich weiß nicht ganz, wie ich den plot interpretiere oder das schön machen soll, aahhh**
+
+jetzt kommen die Umweltdaten aka gewichtete Zeigerwerte noch dazu
+
+```{r}
+str(weighted_values)
+#sortieren
+weighted_values_ordered <- weighted_values[
+  match(rownames(comm_matrix), weighted_values$plot.ID),
+]
+any(is.na(weighted_values_ordered$plot.ID))
+
+
+env_data <- weighted_values_ordered %>%
+  dplyr::select(-plot.ID, -Name, -site)
+fit <- envfit(dca, env_data, permutations = 999)
+
+site_scores <- as.data.frame(scores(dca, display = "sites"))
+p <- ggplot(site_scores, aes(DCA1, DCA2)) +
+  geom_point()
+arrows <- as.data.frame(fit$vectors$arrows)
+arrows$variable <- rownames(arrows)
+
+mult <- vegan:::ordiArrowMul(arrows[,1:2])
+arrows[,1:2] <- arrows[,1:2] * mult
+
+p +
+  geom_segment(
+    data = arrows,
+    aes(x = 0, y = 0, xend = DCA1, yend = DCA2),
+    arrow = arrow(length = unit(0.2, "cm"))
+  ) +
+  geom_text(
+    data = arrows,
+    aes(x = DCA1, y = DCA2, label = variable),
+    vjust = -0.5
+  )
+```
+
 ## 5.2 Plot
 
 hier fehlt noch einiges an hübsch machen
@@ -237,3 +276,5 @@ ggplot(dca_df, aes(x = DCA1, y = DCA2, color = site)) +
   geom_text(aes(label = Name), size = 3, vjust = -1) +
   theme_minimal()
 ```
+
+# Transektanalyse
