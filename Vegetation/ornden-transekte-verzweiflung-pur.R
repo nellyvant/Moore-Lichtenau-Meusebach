@@ -5,6 +5,9 @@ str(data)
 # 1 aerbwitsname zerlegen
 library(dplyr)
 library(stringr)
+library(tidyverse)
+library(readxl)
+library(writexl)
 
 data2 <- data %>%
   mutate(
@@ -227,7 +230,7 @@ write.csv(data2, "data_sorted_test.csv", row.names = FALSE)
 #okay, ich habe die datei data_sorted_test jetzt einfach mal in excel bearbeitet und per hand eingetragen ein transekt NS udn WO und habe die transektnummer vergeben. die mitte bekommt dabei immer 0 und nach westen und norden werden die zahlen kleiner und nach osten und süden werden sie größer. 
 #damit sollte ich mit szbset nach site, transekt filtern können wenn nötig. das macht die spalte name zwar etwas überflüssig, aber mein gott, ist halt jetzt so, muss ich am ende eben im readme zum skript erläutern
 
-newdata <- read.csv("data_sorted_test.csv")
+newdata <- read.csv("data_sorted_test - Kopie.csv")
 str(newdata)
 #entfernen überflüssiger spalten
 newdata <- newdata %>%
@@ -253,8 +256,8 @@ new_long <- newdata %>%
 str(new_long)
 
 #join mit artenliste
-zeiger_selected <- zeigerwerte %>%
-  select(id,light,temperature,continental,wetness,alkalinity,nitrogen,salinity)
+#zeiger_selected <- zeigerwerte %>%
+ # select(id,light,temperature,continental,wetness,alkalinity,nitrogen,salinity)
 
 # Zeigerwerte von GBIF
 zeigerwerte <- read.table("dwca-zeigerwerte-v1.2/ellenberg.txt",sep = "\t", header = TRUE)

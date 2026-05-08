@@ -118,6 +118,7 @@ kann ich damit einfach eine DCA machen und schauen welche plots halt nach zeiger
 ```{r}
 ####species richness, Shannon Index, relative Häufigkeit und species evenness bestimmen####
 
+#anlegen einer Vegetationsmatrix
 comm_matrix <- veg_long %>%
   group_by(plot.ID, Art) %>%
   summarise(Deckung = sum(Deckung), .groups = "drop") %>%
@@ -277,4 +278,4 @@ ggplot(dca_df, aes(x = DCA1, y = DCA2, color = site)) +
   theme_minimal()
 ```
 
-# Transektanalyse
+# 6 Transektanalyse
