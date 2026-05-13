@@ -17,34 +17,144 @@ library(ggplot2)
 # 2 Daten einlesen und vorbereiten
 
 ```{r}
-newdata <- read.csv("data_sorted_test - Kopie.csv")
-str(newdata)
-#entfernen überflüssiger spalten
-#kommt evtl weg
-newdata <- newdata %>%
-  select(-(X:X.6))
-str(newdata)
+#| label: read data
+#| output: true
+vegdata <- read.csv("data_sorted_test - Kopie.csv")
+str(vegdata)
 #spalten anders ordnen
-newdata <- newdata %>%
+vegdata <- vegdata %>%
   relocate(Transekt, Transektnummer, .after = Name)
-str(newdata)
-
-#convert to long_format
-rownames(newdata) <- newdata$Name 
-newdata$Name <- NULL 
-ncol(newdata) 
-str(newdata)
-art_cols <- grep("_(TL|HL|ML|SL)$", names(newdata), value = TRUE)
-new_long <- newdata %>%
-  rownames_to_column("Name") %>%
-  pivot_longer(cols = all_of(art_cols), names_to = "Art_full", values_to = "Deckung") %>% 
-  filter(Deckung > 0) %>%
-  tidyr::separate(Art_full, into = c("Art", "Schicht"), sep = "_(?=[A-Z]{1,2}$)")
-#Zeilen, mit 0 wurden entfernt -> verkürzt Datensatz
-str(new_long)
+str(vegdata)
 ```
 
-# 2 Zeigerwerte einlesen
+```{r}
+#| label: convert to long format
+#| output: false
+
+#Umwandeln zu Long format: 0-Werte bleiben erhalten
+
+rownames(vegdata) <- vegdata$Name 
+vegdata$Name <- NULL 
+ncol(vegdata) 
+str(vegdata)
+art_cols <- grep("_(TL|HL|ML|SL)$", names(vegdata), value = TRUE)
+veg_long <- vegdata %>%
+  rownames_to_column("Name") %>%
+  pivot_longer(cols = all_of(art_cols), names_to = "Art_full", values_to = "Deckung") %>% 
+  tidyr::separate(Art_full, into = c("Art", "Schicht"), sep = "_(?=[A-Z]{1,2}$)")
+#sep trennt die Schicht sauber ab, da Arten als Gattung_Epitheton_Schicht vorliegen
+str(veg_long)
+```
+
+```{r}
+#| label: create subsets
+
+#subsets für jede fläche machen
+Lic_subset <- subset(veg_long, site == "Lic")
+MN_subset <- subset(veg_long, site =="Meu_nass")
+MT_subset <- subset(veg_long, site =="Meu_trock")
+
+```
+
+# 3 Exploration
+
+Top 10 Arten nach Deckung
+
+```{r}
+#mittlere Deckungen
+p1 <- Lic_subset %>%
+  group_by(Art) %>%
+  summarise(
+    mean_deckung = mean(Deckung, na.rm = TRUE),
+    n = sum(Deckung > 0)
+  ) %>%
+  arrange(desc(mean_deckung)) %>%
+  slice_head(n = 10) %>%
+  ggplot(aes(x = reorder(Art, mean_deckung), y = mean_deckung)) +
+  geom_col(fill = "darkgreen") +
+  geom_text(aes(label = paste0("n=", n)),
+            hjust = -0.1, size = 3) +
+  coord_flip() +
+  scale_y_continuous(limits = c(0, 45))+
+  labs(
+    x = "Art",
+    y = "Mittlere Deckung",
+    title = "Lichtenau"
+  ) +
+  theme_minimal()
+
+p2 <- MN_subset %>%
+  group_by(Art) %>%
+  summarise(
+    mean_deckung = mean(Deckung, na.rm = TRUE),
+    n = sum(Deckung > 0)
+  ) %>%
+  arrange(desc(mean_deckung)) %>%
+  slice_head(n = 10) %>%
+  ggplot(aes(x = reorder(Art, mean_deckung), y = mean_deckung)) +
+  geom_col(fill = "darkgreen") +
+  geom_text(aes(label = paste0("n=", n)),
+            hjust = -0.1, size = 3) +
+  coord_flip() +
+  scale_y_continuous(limits = c(0, 45))+
+  labs(
+    x = "Art",
+    y = "Mittlere Deckung",
+    title = "Meusebach nass"
+  ) +
+  theme_minimal()
+
+p3 <- MT_subset %>%
+  group_by(Art) %>%
+  summarise(
+    mean_deckung = mean(Deckung, na.rm = TRUE),
+    n = sum(Deckung > 0)
+  ) %>%
+  arrange(desc(mean_deckung)) %>%
+  slice_head(n = 10) %>%
+  ggplot(aes(x = reorder(Art, mean_deckung), y = mean_deckung)) +
+  geom_col(fill = "darkgreen") +
+  geom_text(aes(label = paste0("n=", n)),
+            hjust = -0.1, size = 3) +
+  coord_flip() +
+  scale_y_continuous(limits = c(0, 45))+
+  labs(
+    x = "Art",
+    y = "Mittlere Deckung",
+    title = "Meusebach trocken"
+  ) +
+  theme_minimal()
+
+p_all <- (p1/p2/p3)+plot_annotation(
+    title = "Top 10 Arten nach mittlerer Deckung",
+    theme = theme(plot.title = element_text(size = 18, face = "bold", hjust = 0.5)))
+ggsave("top10_deckung.png", p_all,
+       width = 14, height = 6, dpi = 300)
+
+```
+
+Deckung nach Layer
+
+```{r}
+layer_deckung <- veg_long %>%
+  group_by(site, Schicht) %>%
+  summarise(Deckung = mean(Deckung, na.rm = TRUE), .groups = "drop") %>%
+  group_by(site) %>%
+  mutate(prop = Deckung / sum(Deckung))
+str(layer_deckung)
+
+layer_deckung$Schicht <- factor(
+  layer_deckung$Schicht,
+  levels = c("TL", "SL", "HL", "ML")
+)
+  
+ggplot(layer_deckung, aes(x = site, y = prop, fill = Schicht)) +
+  geom_col() +
+  labs(y = "Anteil der Deckung", x = NULL) +
+  theme_minimal()
+```
+
+# 4 Zeigerwerte einlesen und vorbereiten
 
 ```{r}
 # Zeigerwerte von GBIF
@@ -72,14 +182,14 @@ zeiger_mapped <- zeiger_mapped %>%
   select(-gbif_name)
 ```
 
-3 gewichtete Zeigerwerte berechnen
+gewichtete Zeigerwerte berechnen
 
 ```{r}
 #gewichtete zeigerwerte berechnen
-combined_data2 <- left_join(new_long, zeiger_mapped, by = "Art")
-str(combined_data2)
+combined_data <- left_join(veg_long, zeiger_mapped, by = "Art")
+str(combined_data)
 
-weighted_values2 <- combined_data2 %>%
+weighted_values <- combined_data %>%
   group_by(plot.ID, Name, site, Transekt, Transektnummer) %>%
   summarise(
     Weighted_light = sum(Deckung * light, na.rm = TRUE) / sum(Deckung, na.rm = TRUE),
@@ -95,7 +205,7 @@ weighted_values2 <- combined_data2 %>%
 #write_xlsx(weighted_values, "Zeigerwerte_gewichtet.xlsx")
 ```
 
-4 diversitätsmaße berechnen
+5 diversitätsmaße berechnen
 
 ```{r}
 ####species richness, Shannon Index, relative Häufigkeit und species evenness bestimmen####
@@ -134,105 +244,4 @@ print(results)
 write_xlsx(results, "Ergebnisse_species_richness.xlsx")
 ```
 
-5 deckungsdaten explorieren
-
-```{r}
-# Daten aufbereiten: Top 10 Arten pro Fläche + Sortierung pro Fläche
-plot_data <- new_long %>%
-  group_by(site, Art) %>%
-  summarise(Mittelwert_Deckung = mean(Deckung, na.rm = TRUE), .groups = "drop") %>%
-  group_by(site) %>%
-  arrange(desc(Mittelwert_Deckung)) %>%
-  slice_head(n = 10) %>%
-  # Sortierung pro Fläche als Faktor speichern
-  mutate(Art = factor(Art, levels = rev(Art)))  # rev(), damit häufigste Art oben
-
-# Plot erstellen
-ggplot(plot_data, aes(x = Art, y = Mittelwert_Deckung, fill = site)) +
-  geom_col() +
-  coord_flip() +
-  labs(title = "Häufigste Arten pro Fläche",
-       x = "Art",
-       y = "Mittlere Deckung [%]") +
-  facet_wrap(~ site, scales = "free_y", ncol = 1) +
-  theme_minimal() +
-  theme(legend.position = "none") +
-  scale_fill_manual(values = c("darkgreen", "blue", "purple"))  # Eine Farbe pro Fläche (bunt)
-```
-
-```{r}
-# Daten aufbereiten: Top 10 Arten pro Fläche + Sortierung pro Fläche
-plot_data <- new_long %>%
-  group_by(site, Art) %>%
-  summarise(Mittelwert_Deckung = mean(Deckung, na.rm = TRUE), .groups = "drop") %>%
-  group_by(site) %>%
-  arrange(desc(Mittelwert_Deckung)) %>%
-  slice_head(n = 10) %>%
-  # Sortierung pro Fläche als Faktor speichern (wichtig: pro Gruppe!)
-  group_modify(~ .x %>% mutate(Art = factor(Art, levels = rev(.x$Art))))
-
-# Plot erstellen
-ggplot(plot_data, aes(x = Art, y = Mittelwert_Deckung, fill = site)) +
-  geom_col(width = 0.7) +
-  coord_flip() +
-  labs(title = "Häufigste Arten pro Fläche",
-       x = "Art",
-       y = "Mittlere Deckung [%]") +
-  facet_wrap(~ site, scales = "free_y", ncol = 1) +
-  scale_y_continuous(expand = expansion(add = 0.5)) +  # Mehr Platz zwischen Balken
-  theme_minimal() +
-  theme(
-    legend.position = "none",
-    axis.text.y = element_text(size = 8, hjust = 0)  # Schriftgröße und Ausrichtung
-  ) +
-  scale_fill_manual(values = c("darkgreen", "blue", "purple"))
-```
-
-```{r}
-
-library(patchwork)
-
-# 1. Globales Maximum der Deckung über alle Flächen berechnen
-global_max <- new_long %>%
-  group_by(site, Art) %>%
-  summarise(Mittelwert_Deckung = mean(Deckung, na.rm = TRUE)) %>%
-  pull(Mittelwert_Deckung) %>%
-  max(na.rm = TRUE)
-
-# 2. Daten pro Fläche aufbereiten und sortieren
-flaechen <- unique(new_long$site)
-farben <- c("darkgreen", "blue", "purple")
-plot_list <- list()
-
-for (i in seq_along(flaechen)) {
-  flaeche <- flaechen[i]
-
-  data_flaeche <- new_long %>%
-    filter(site == flaeche) %>%
-    group_by(Art) %>%
-    summarise(Mittelwert_Deckung = mean(Deckung, na.rm = TRUE)) %>%
-    arrange(desc(Mittelwert_Deckung)) %>%
-    slice_head(n = 10) %>%
-    mutate(Art = factor(Art, levels = rev(Art)))
-
-  # Plot mit mehr Platz zwischen den Balken
-  p <- ggplot(data_flaeche, aes(x = Art, y = Mittelwert_Deckung)) +
-    geom_col(fill = farben[i]) +  # Balkenbreite bleibt standardmäßig
-    coord_flip() +
-    labs(title = paste("Häufigste Arten in", flaeche),
-         x = "Art",
-         y = "Mittlere Deckung [%]") +
-    theme_minimal() +
-    theme(
-      legend.position = "none",
-      axis.text.y = element_text(size = 7, hjust = 0)
-    ) +
-    scale_x_discrete(expand = expansion(add = 0.001)) +  # Abstand zwischen den Kategorien auf der x-Achse
-    ylim(0, global_max)
-
-  plot_list[[i]] <- p
-}
-
-# 3. Plots vertikal anordnen
-reduce(plot_list, `+`) + plot_layout(ncol = 1)
-```
+# 6 
