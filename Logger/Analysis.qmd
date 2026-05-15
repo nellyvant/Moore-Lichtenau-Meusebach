@@ -1,0 +1,299 @@
+---
+title: "Datenanalyse_Logger"
+format: html
+editor: visual
+---
+
+# 1 genutzte Packages
+
+```{r}
+library(tidyverse)
+```
+
+dplyr als pakage zur besseren Lesbarkeit\
+lubridate zur Umwandlung der Zeitmessung in Datumsformat\
+ggplot2 zur verbesserten graphischen Darstellung
+
+# 2 Daten einlesen 
+
+## 2.1 Licht und Temperatur (außen)
+
+```{r}
+#Lichtenau
+LM_lt <- read.csv("Licht-und-Temperatur-aussen/Lichtenau Mitte 2025-11-04 18_39_12 CET.csv")
+LO_lt <- read.csv("Licht-und-Temperatur-aussen/Lichtenau Ost 2025-10-02 14_50_43 CEST.csv")
+LW_lt <- read.csv("Licht-und-Temperatur-aussen/Lichtenau West 2025-11-04 18_36_30 CET.csv")
+LN_lt <- read.csv("Licht-und-Temperatur-aussen/Lichtenau Nord 2025-10-02 14_52_52 CEST.csv")
+LS_lt <- read.csv("Licht-und-Temperatur-aussen/Lichtenau Süd 2025-10-02 14_51_42 CEST.csv")
+#Meusebach trocken
+MTM_lt <- read.csv("Licht-und-Temperatur-aussen/Meusebach trock Mitt 2025-11-04 10_33_23 CET.csv")
+MTO_lt <- read.csv("Licht-und-Temperatur-aussen/Meusebach trock Ost 2025-11-04 10_42_29 CET.csv")
+MTW_lt <- read.csv("Licht-und-Temperatur-aussen/Meusebach trock West 2025-10-02 14_56_44 CEST.csv")
+MTN_lt <- read.csv("Licht-und-Temperatur-aussen/Meusebach trock Nord 2025-11-04 10_34_51 CET.csv")
+MTS_lt<- read.csv("Licht-und-Temperatur-aussen/Meusebach trock Süd 2025-10-02 14_54_52 CEST.csv")
+#Meusebach nass
+MNM_lt <- read.csv("Licht-und-Temperatur-aussen/Meusebach nass Mitte 2025-11-04 11_37_40 CET.csv")
+MNO_lt <- read.csv("Licht-und-Temperatur-aussen/Meusebach nass Ost  2025-10-02 14_55_48 CEST.csv")
+MNW_lt <- read.csv("Licht-und-Temperatur-aussen/Meusebach nass West 2025-11-04 11_33_52 CET.csv")
+MNN_lt <- read.csv("Licht-und-Temperatur-aussen/Meusebach nass Nord 2025-10-02 14_53_40 CEST.csv")
+MNS_lt <- read.csv("Licht-und-Temperatur-aussen/Meusebach nass Süd 2025-11-04 11_35_49 CET.csv")
+```
+
+## 2.2 Temperatur und Luftfeuchte (innen)
+
+```{r}
+#Lichtenau
+LM_th <- read.csv("Luftfeuchte-und-Temperatur-innen/Lichtenau Mitte  2025-11-04 14_05_01 CET.csv")
+LO_th <- read.csv("Luftfeuchte-und-Temperatur-innen/Lichtenau Ost 2025-10-02 14_47_35 CEST.csv")
+LW_th <- read.csv("Luftfeuchte-und-Temperatur-innen/Lichtenau West 2025-11-04 14_05_41 CET.csv")
+LN_th <- read.csv("Luftfeuchte-und-Temperatur-innen/Lichtenau Nord 2025-10-02 14_47_08 CEST.csv")
+LS_th <- read.csv("Luftfeuchte-und-Temperatur-innen/Lichtenau Süd 2025-10-02 14_46_44 CEST.csv")
+#Meusebach trocken
+MTM_th <- read.csv("Luftfeuchte-und-Temperatur-innen/Meusebach trock Mitt 2025-11-04 10_30_53 CET.csv")
+MTO_th <- read.csv("Luftfeuchte-und-Temperatur-innen/Meusebach trock Ost 2025-11-04 10_31_49 CET.csv")
+MTW_th <- read.csv("Luftfeuchte-und-Temperatur-innen/Meusebach trock West 2025-10-02 14_45_08 CEST.csv")
+MTN_th <- read.csv("Luftfeuchte-und-Temperatur-innen/Meusebach trock Nord 2025-11-04 10_32_27 CET.csv")
+MTS_th <- read.csv("Luftfeuchte-und-Temperatur-innen/Meusebach trock Süd 2025-10-02 14_43_36 CEST.csv")
+#Meusebach nass
+MNM_th <- read.csv("Luftfeuchte-und-Temperatur-innen/Meusebach nass Mitte 2025-11-04 11_36_57 CET.csv")
+MNO_th <- read.csv("Luftfeuchte-und-Temperatur-innen/Meusebach nass Ost 2025-10-02 14_45_34 CEST.csv")
+MNW_th <- read.csv("Luftfeuchte-und-Temperatur-innen/Meusebach nass West 2025-11-04 11_33_09 CET.csv")
+MNN_th <- read.csv("Luftfeuchte-und-Temperatur-innen/Meusebach nass Nord 2025-10-02 14_45_57 CEST.csv")
+MNS_th <- read.csv("Luftfeuchte-und-Temperatur-innen/Meusebach nass Süd 2025-11-04 11_35_14 CET.csv")
+```
+
+# 3 Daten bereinigen und strukturieren
+
+```{r}
+#Datumsformat umwandeln
+LM_lt$DateTime <- mdy_hms(LM_lt$Date.Time..CEST.CET.)
+LM_th$DateTime <- mdy_hms(LM_th$Date.Time..CEST.CET.)
+LO_lt$DateTime <- mdy_hms(LO_lt$Date.Time..CEST.)
+LO_th$DateTime <- mdy_hms(LO_th$Date.Time..CEST.)
+LW_lt$DateTime <- mdy_hms(LW_lt$Date.Time..CEST.CET.)
+LW_th$DateTime <- mdy_hms(LW_th$Date.Time..CEST.CET.)
+LN_lt$DateTime <- mdy_hms(LN_lt$Date.Time..CEST.)
+LN_th$DateTime <- mdy_hms(LN_th$Date.Time..CEST.)
+LS_lt$DateTime <- mdy_hms(LS_lt$Date.Time..CEST.)
+LS_th$DateTime <- mdy_hms(LS_th$Date.Time..CEST.)
+
+MTM_lt$DateTime <- mdy_hms(MTM_lt$Date.Time..CEST.CET.)
+MTM_th$DateTime <- mdy_hms(MTM_th$Date.Time..CEST.CET.)
+MTO_lt$DateTime <- mdy_hms(MTO_lt$Date.Time..CEST.CET.)
+MTO_th$DateTime <- mdy_hms(MTO_th$Date.Time..CEST.CET.)
+MTW_lt$DateTime <- mdy_hms(MTW_lt$Date.Time..CEST.)
+MTW_th$DateTime <- mdy_hms(MTW_th$Date.Time..CEST.)
+MTN_lt$DateTime <- mdy_hms(MTN_lt$Date.Time..CEST.CET.)
+MTN_th$DateTime <- mdy_hms(MTN_th$Date.Time..CEST.CET.)
+MTS_lt$DateTime <- mdy_hms(MTS_lt$Date.Time..CEST.)
+MTS_th$DateTime <- mdy_hms(MTS_th$Date.Time..CEST.)
+
+MNM_lt$DateTime <- mdy_hms(MNM_lt$Date.Time..CEST.CET.)
+MNM_th$DateTime <- mdy_hms(MNM_th$Date.Time..CEST.CET.)
+MNO_lt$DateTime <- mdy_hms(MNO_lt$Date.Time..CEST.)
+MNO_th$DateTime <- mdy_hms(MNO_th$Date.Time..CEST.)
+MNW_lt$DateTime <- mdy_hms(MNW_lt$Date.Time..CEST.CET.)
+MNW_th$DateTime <- mdy_hms(MNW_th$Date.Time..CEST.CET.)
+MNN_lt$DateTime <- mdy_hms(MNN_lt$Date.Time..CEST.)
+MNN_th$DateTime <- mdy_hms(MNN_th$Date.Time..CEST.)
+MNS_lt$DateTime <- mdy_hms(MNS_lt$Date.Time..CEST.CET.)
+MNS_th$DateTime <- mdy_hms(MNS_th$Date.Time..CEST.CET.)
+```
+
+```{r}
+# Tabellen beider Logger pro Standort zusammenführen
+#einige Variablen in den Originaltabellen brauchen wir nicht mehr, daher bauen wir eine cleane Tabelle, die nur analyserelevante Daten beinhaltet
+LM_lt_clean <- LM_lt %>%
+  select(
+    DateTime,
+    Temp_sonne = Temperature.....C.,
+    Licht_lux  = Light....lux.
+  )
+
+LM_th_clean <- LM_th %>%
+  select(
+    DateTime,
+    Temp_schatten = Temperature.....C.,
+    relLF         = RH......,
+    Taupunkt      = Dew.Point.....C.
+  )
+# Zusammenführen der beiden Tabellen vom gleichen Standort mit join
+LM <- full_join(LM_lt_clean,LM_th_clean,by = "DateTime")
+# Einfügen einer Loggerkennung, Standortkennnung und Logger ID
+LM <- LM %>%
+  mutate(
+    Standort = "L",
+    Logger   = "M",
+    Logger_ID = "LM"
+  )
+summary(LM)
+str(LM)
+```
+
+```{r}
+#zum Zusammenführen der Tabellen wurde die folgende Fuktion erstellt
+
+join_loggers <- function(df_lt, df_th, standort, logger) {
+
+  # cleane Tabellen erstellen, weil in Originaltabellen einiges irrelevantes drin
+  lt_clean <- df_lt %>%
+    select(
+      DateTime,
+      Temp_sonne_C = Temperature.....C.,
+      Licht_lux  = Light....lux.
+    )
+
+  th_clean <- df_th %>%
+    select(
+      DateTime,
+      Temp_schatten_C = Temperature.....C.,
+      relLF_percent         = RH......,
+      Taupunkt_C      = Dew.Point.....C.
+    )
+
+  # join
+  full_join(lt_clean, th_clean, by = "DateTime") %>%
+    mutate(
+      Standort  = standort,
+      Logger    = logger,
+      Logger_ID = paste0(standort, logger)
+    )
+}
+```
+
+```{r}
+#Lichtenau Mitte
+LM <- join_loggers(
+  df_lt    = LM_lt,
+  df_th    = LM_th,
+  standort = "L",
+  logger   = "M"
+)
+#Lichtenau Ost
+LO <- join_loggers(
+  df_lt    = LO_lt,
+  df_th    = LO_th,
+  standort = "L",
+  logger   = "O"
+)
+#Lichtenau West
+LW <- join_loggers(
+  df_lt    = LW_lt,
+  df_th    = LW_th,
+  standort = "L",
+  logger   = "W"
+)
+#Lichtenau Nord
+LN <- join_loggers(
+  df_lt    = LN_lt,
+  df_th    = LN_th,
+  standort = "L",
+  logger   = "N"
+)
+#Lichtenau Süd
+LS <- join_loggers(
+  df_lt    = LS_lt,
+  df_th    = LS_th,
+  standort = "L",
+  logger   = "S"
+)
+#Meusebach trocken Mitte
+MTM <- join_loggers(
+  df_lt    = MTM_lt,
+  df_th    = MTM_th,
+  standort = "MT",
+  logger   = "M"
+)
+#Meusebach trocken Ost
+MTO <- join_loggers(
+  df_lt    = MTO_lt,
+  df_th    = MTO_th,
+  standort = "MT",
+  logger   = "O"
+)
+#Meusebach trocken West
+MTW <- join_loggers(
+  df_lt    = MTW_lt,
+  df_th    = MTW_th,
+  standort = "MT",
+  logger   = "W"
+)
+#Meusebach trocken Nord
+MTN <- join_loggers(
+  df_lt    = MTN_lt,
+  df_th    = MTN_th,
+  standort = "MT",
+  logger   = "N"
+)
+#Meusebach trocken Süd
+MTS <- join_loggers(
+  df_lt    = MTS_lt,
+  df_th    = MTS_th,
+  standort = "MT",
+  logger   = "S"
+)
+#Meusebach nass Mitte
+MNM <- join_loggers(
+  df_lt    = MNM_lt,
+  df_th    = MNM_th,
+  standort = "MN",
+  logger   = "M"
+)
+#Meusebach nass Ost
+MNO <- join_loggers(
+  df_lt    = MNO_lt,
+  df_th    = MNO_th,
+  standort = "MN",
+  logger   = "O"
+)
+#Meusebach nass West
+MNW <- join_loggers(
+  df_lt    = MNW_lt,
+  df_th    = MNW_th,
+  standort = "MN",
+  logger   = "W"
+)
+#Meusebach nass Nord
+MNN <- join_loggers(
+  df_lt    = MNN_lt,
+  df_th    = MNN_th,
+  standort = "MN",
+  logger   = "N"
+)
+#Meusebach nass Süd
+MNS <- join_loggers(
+  df_lt    = MNS_lt,
+  df_th    = MNS_th,
+  standort = "MN",
+  logger   = "S"
+)
+```
+
+```{r}
+# alle Daten nach dem 30.9.2025 23:50 Uhr entfernen
+cutoff <- as.POSIXct("2025-09-30 23:50:00", tz="UTC")
+
+logger_names <- c("LM", "LO", "LW", "LN", "LS", "MTM", "MTO", "MTW", "MTN", "MTS", "MNM", "MNO", "MNW", "MNN", "MNS")
+
+for (logger in logger_names) {
+  assign(logger, get(logger) %>% 
+           filter(DateTime <= cutoff))
+}
+```
+
+```{r}
+#entfernen von Zeilen ohne Messwerte (entstanden durch Auslesen der Logger)
+messwert_spalten <- c("Temp_sonne_C", "Licht_lux", "Temp_schatten_C", "relLF_percent", "Taupunkt_C")
+
+for (logger in logger_names) {
+  # Tabelle holen, filtern, wieder zurückschreiben
+  assign(logger, get(logger) %>% 
+           filter(!if_all(all_of(messwert_spalten), is.na)))
+}
+```
+
+```{r}
+#Zusammenführen als Masterdatensatz
+all_loggers <- bind_rows(lapply(logger_names, get))
+
+```
