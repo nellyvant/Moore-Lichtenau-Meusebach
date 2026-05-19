@@ -32,9 +32,9 @@ class(Wassertiefen$Datum)
 
 ```{r}
 # Mittelwerte pro Tag/ pro Standort berechnen 
-WT_mittel <- Wassertiefen %>%
+WT_mittel <- Wassertiefen %>% 
   group_by(Datum, Standort) %>% 
-  summarise(WT_mean = mean(Wassertiefe, na.rm = TRUE)) %>%
+  summarise(WT_mean = mean(Wassertiefe, na.rm = TRUE)) %>% 
   ungroup()
 
 ```
@@ -184,17 +184,18 @@ plot_box(Wassertiefen, st="L",
 
 ```{r}
 # Statistische Kennzahlen pro Messpunkt und Standort
-Kennzahlen <- Wassertiefen %>%
+Kennzahlen_messpunkt <- Wassertiefen %>%
   group_by(Standort, Messpunkt) %>%
   summarise(
     Mittelwert = mean(Wassertiefe, na.rm = TRUE),
     Median = median(Wassertiefe, na.rm = TRUE),
     Std = sd(Wassertiefe, na.rm = TRUE),
     Min = min(Wassertiefe, na.rm = TRUE),
-    Max = max(Wassertiefe, na.rm = TRUE)
+    Max = max(Wassertiefe, na.rm = TRUE),
+    Range = max(Wassertiefe, na.rm = TRUE) - min(Wassertiefe, na.rm = TRUE),
   )
 
-Kennzahlen
+Kennzahlen_messpunkt
 
 ```
 
@@ -204,9 +205,11 @@ Kennzahlen_standort <- Wassertiefen %>%
   group_by(Standort) %>%
   summarise(
     Mittelwert = mean(Wassertiefe, na.rm = TRUE),
+    Median = median(Wassertiefe, na.rm = TRUE),
     Std = sd(Wassertiefe, na.rm = TRUE),
     Min = min(Wassertiefe, na.rm = TRUE),
-    Max = max(Wassertiefe, na.rm = TRUE)
+    Max = max(Wassertiefe, na.rm = TRUE),
+    Range = max(Wassertiefe, na.rm = TRUE) - min(Wassertiefe, na.rm = TRUE)
   )
 
 Kennzahlen_standort

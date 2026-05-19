@@ -10,7 +10,6 @@ editor: visual
 library(readxl)
 library(dplyr)
 library(ggplot2)
-library(lubridate)
 library(tidyr)
 ```
 
@@ -38,33 +37,54 @@ str(chemie)
 
 ```
 
+## Long-Format erzeugen
+
+```{r}
+chemie_long <- chemie %>%
+  pivot_longer(cols = c(Ammonium, Phosphat, Nitrat),
+               names_to = "Parameter",
+               values_to = "Wert")
+```
+
 # 3 Auswertung
 
 ```{r}
-# Mittelwerte je Logger 
-chemie_mittel <- chemie %>%
-  group_by(ID) %>%
+# Statistik je Messpunkt und Parameter
+chemie_stats_messpunkt <- chemie_long %>%
+  group_by(ID, Parameter) %>%
   summarise(
-    Ammonium = mean(Ammonium, na.rm = TRUE),
-    Phosphat = mean(Phosphat, na.rm = TRUE),
-    Nitrat = mean(Nitrat, na.rm = TRUE)
+    mean = mean(Wert, na.rm = TRUE),
+    sd = sd(Wert, na.rm = TRUE),
+    median = median(Wert, na.rm = TRUE),
+    min = min(Wert, na.rm = TRUE),
+    max = max(Wert, na.rm = TRUE),
+    range = max - min,
+    .groups = "drop"
   )
 
-chemie_mittel
+chemie_stats_messpunkt
 ```
 
 ```{r}
-# Mittelwerte je Fläche 
-chemie %>%
-  group_by(Standort) %>%
+# Statistik je Standort und Parameter
+chemie_stats_flaeche <- chemie_long %>%
+  group_by(Standort, Parameter) %>%
   summarise(
-    Ammonium = mean(Ammonium, na.rm = TRUE),
-    Phosphat = mean(Phosphat, na.rm = TRUE),
-    Nitrat = mean(Nitrat, na.rm = TRUE)
+    mean = mean(Wert, na.rm = TRUE),
+    sd = sd(Wert, na.rm = TRUE),
+    median = median(Wert, na.rm = TRUE),
+    min = min(Wert, na.rm = TRUE),
+    max = max(Wert, na.rm = TRUE),
+    range = max - min,
+    .groups = "drop"
   )
+
+chemie_stats_flaeche
 ```
 
-Diagramme nur so zum ausprobieren, ich benötige keine zum Weiterarbeiten
+## Diagramme
+
+nur so zum ausprobieren, ich benötige keine zum Weiterarbeiten
 
 ```{r}
 
