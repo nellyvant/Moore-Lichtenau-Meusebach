@@ -264,7 +264,7 @@ for (logger in logger_names) {
 }
 ```
 
-#do not run
+#können wir doch runnen. die frage ist: macht es einen unterschied, wenn wir es nicht runnen??
 
 ```{r}
 #| label:do not run until interpolated data is completed, removing NAs
@@ -486,19 +486,33 @@ die logger stehen auf den verschiedenen flächen mal mehr oder weniger beschatte
 der Violinplot zeigt die stark rechtsschiefe Verteilung der Daten (selbst wenn die Nachtwerte ausgeklammert werden)
 
 ```{r}
-#| label: violinplot
+#| label: violinplot central logger
 all_loggers %>%
   filter(Logger == "M",
          Licht_lux > 1) %>%
   ggplot(aes(x = Standort, y = Licht_lux)) +
   geom_boxplot(width=0.1, fill ="white", outlier.color="red")+
   geom_violin(na.rm = T, fill = "lightgreen", alpha =0.5) +
- 
   labs(title = "Lichtverteilung – mittlere Logger (nur Tag)",
        x = "Standort",
        y = "Licht (lux)")
 #ggsave("light_violinplot.png", width = 6, height=4)
 
+```
+
+```{r}
+#| label: violinplot per area
+all_loggers %>%
+  filter(Standort == "L",
+         Licht_lux > 1) %>%
+  ggplot(aes(x=Logger, y=Licht_lux)) +
+    geom_boxplot(width=0.1, fill= "white", outlier.color = "red")+
+    geom_violin(na.rm =T, fill ="lightgreen", alpha =0.5)+
+  labs(title ="Lichtverteilung - alle Logger (nur Tag)",
+       x="Logger",
+       y="Licht (lux)")
+  
+#hier kommt noch kruskal-wallis oder dunn-test für siginfikanz (muss ich nochmal nachschauen wie das genhau geht)
 ```
 
 ```{r}
@@ -515,6 +529,11 @@ ggplot(summary_daily_area,aes(x = Datum, y = Licht_summe, color = Standort)) +
   theme(
     plot.title = element_text(hjust = 0.5)
   )
+
+```
+
+```{r}
+#hier sollte noch lichtsumme an den transekten gezeigt werden
 ```
 
 ## 6.2 Temperatur
@@ -604,6 +623,8 @@ summary(extrema_logger)
 
 Extrema und Mittelwerte
 
+#ider plot braucht noch erklärung, dass der mitelwert im schatten berechnet wurde und die extrema in der sonne und dass die zahlen als datum zu lesen sind
+
 ```{r}
 #| label: temperature ranges all areas
 extrema_logger <- extrema_logger %>%
@@ -637,6 +658,8 @@ ggplot(extrema_logger, aes(x = Logger)) +
 ```
 
 Extrema im Beobachtungszeitraum
+
+#der ist super unübersichtlich, für transektergleiche vlt eher mit mittelwerten arbeiten oder wenigstens monats- oder wochenmittelwerte nd nicht tagesmittelwerte, das hat zu viel noise
 
 ```{r}
 #| label: lineplot Lichtenau Nord-Sued mean&max&min temperature
@@ -801,6 +824,8 @@ ggplot(summary_daily_area,aes(x = Datum, y = Temp_area_schatten_mean, color = St
 
 Wie oft bzw. wann war der Taupunkt \>= Lufttemperatur -\> Bildung von Tau möglich
 
+luftfeucht rand vs mitte -\> beschatten böume oder ziehen sie das wasser aus der fläche??
+
 ## 6.3 Luftfeuchte und Taupunkt
 
 ```{r}
@@ -859,6 +884,8 @@ summary_daily_logger %>%
   theme(legend.position = "none") 
 ```
 
+siginfikanztest ergänzen!!!
+
 ```{r}
 #| label: boxplot of mean humidity all areas
 
@@ -907,6 +934,8 @@ ggplot(summary_daily_area,aes(x = Datum, y = rLF_area_mean, color = Standort)) +
     plot.title = element_text(hjust = 0.5)
   )
 ```
+
+ergänze hier niederschlagsereignisse!
 
 ```{r}
 #| label: do not run

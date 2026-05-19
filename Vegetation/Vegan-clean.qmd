@@ -244,4 +244,4 @@ print(results)
 write_xlsx(results, "Ergebnisse_species_richness.xlsx")
 ```
 
-# 6 
+# 6
