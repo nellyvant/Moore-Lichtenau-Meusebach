@@ -2,6 +2,8 @@
 title: "Datenanalyse_Logger"
 format: html
 editor: visual
+editor_options: 
+  chunk_output_type: inline
 ---
 
 # 1 genutzte Packages
@@ -13,13 +15,12 @@ library(lubridate)
 library(tidyr)
 library(ggplot2)
 library(vegan)
+library(lme4)
 ```
 
 # 2 Daten einlesen
 
 ## 2.1 Licht und Temperatur (außen)
-
-\# add setwd("C:/Users/Nele/OneDrive - Technische Universität Ilmenau/Dokumente/Moore-Lichtenau-Meusebach/Logger") before the read.csv chunks because quarto runs each chunk in their own wd which is automatically the place where your .qmd is saved which is Desktop at the moment
 
 ```{r}
 #| label: read_csv
@@ -321,6 +322,10 @@ summary_daily_logger <- all_loggers %>%
     Licht_sd = sd(Licht_lux, na.rm = T),
     Licht_range = Licht_max - Licht_min,
     Licht_mean_day = mean(Licht_lux[Licht_lux>1], na.rm =T),
+    Sonnenaufgang = min(DateTime[Licht_lux > 1], na.rm = T),
+    Sonnenuntergang  = max(DateTime[Licht_lux > 1], na.rm = T),
+    Tageslicht = as.numeric(difftime(Sonnenuntergang, Sonnenaufgang, units = "hours")),
+    Licht_summe = sum(Licht_lux*10, na.rm=T),
     
     rLF_mean = mean(relLF_percent, na.rm = T),
     rLF_max = max(relLF_percent, na.rm = T),
@@ -488,41 +493,68 @@ der Violinplot zeigt die stark rechtsschiefe Verteilung der Daten (selbst wenn d
 ```{r}
 #| label: violinplot central logger
 all_loggers %>%
-  filter(Logger == "M",
-         Licht_lux > 1) %>%
-  ggplot(aes(x = Standort, y = Licht_lux)) +
-  geom_boxplot(width=0.1, fill ="white", outlier.color="red")+
-  geom_violin(na.rm = T, fill = "lightgreen", alpha =0.5) +
-  labs(title = "Lichtverteilung – mittlere Logger (nur Tag)",
-       x = "Standort",
-       y = "Licht (lux)")
+  filter(Logger == "M", Licht_lux > 1) %>%
+  ggplot(aes(x = Standort, fill = Standort, y = Licht_lux)) +
+  geom_boxplot(width = 0.1, outlier.colour = "red") +
+  geom_violin(na.rm = TRUE, alpha = 0.5) +
+  scale_x_discrete(labels = c("L" = "Kleiner Sumpf", "MN" = "Auf der Pfalz", "MT" = "Fuchshügel")) +
+  labs(title = "Lichtverteilung – mittlere Logger (nur Tag)", x = "Standort", y = "Licht (lux)") +
+  theme(
+    legend.position = "none"
+  )
 #ggsave("light_violinplot.png", width = 6, height=4)
-
 ```
 
+Vergleich innerhalb der Flächen besser mit Lichtsumme, statt wie eben mit violinplot
+
 ```{r}
-#| label: violinplot per area
-all_loggers %>%
-  filter(Standort == "L",
-         Licht_lux > 1) %>%
-  ggplot(aes(x=Logger, y=Licht_lux)) +
-    geom_boxplot(width=0.1, fill= "white", outlier.color = "red")+
-    geom_violin(na.rm =T, fill ="lightgreen", alpha =0.5)+
-  labs(title ="Lichtverteilung - alle Logger (nur Tag)",
+summary_daily_logger %>%
+  filter(Standort == "L") %>%
+  ggplot(aes(x=Logger,fill = Logger, y=Licht_summe)) +
+    geom_boxplot(width=0.8)+
+  labs(title ="Lichtverhältnisse Kleiner Sumpf ",
        x="Logger",
-       y="Licht (lux)")
-  
-#hier kommt noch kruskal-wallis oder dunn-test für siginfikanz (muss ich nochmal nachschauen wie das genhau geht)
+       y="kumulative Lichtinensität (Lux x Zeit)")
+
+# Modell zur Berechnung der Unterschiede unter den Loggern in % da eine Testung auf Signifikanz wegen der zeitlich gepaarten Stichproben umständlich ist
+
+#mod_L_light <- lmer(log10(Licht_summe + 1) ~ Logger + (1|Datum),
+#     data = summary_daily_logger %>%
+#       filter(Standort == "L"))
+#summary(mod_L_light)
+#coefs <- fixef(mod_L_light)
+#intercept_lux <- 10^(coefs[1]) - 1
+#prozent <- (10^(coefs[-1]) - 1) * 100
+
+summary_daily_logger %>%
+  filter(Standort == "MN") %>%
+  ggplot(aes(x=Logger,fill = Logger, y=Licht_summe)) +
+    geom_boxplot(width=0.8)+
+  labs(title ="Lichtverhältnisse Auf der Pfalz ",
+       x="Logger",
+       y="kumulative Lichtinensität (Lux x Zeit)")
+
+summary_daily_logger %>%
+  filter(Standort == "MT") %>%
+  ggplot(aes(x=Logger,fill = Logger, y=Licht_summe)) +
+    geom_boxplot(width=0.8)+
+  labs(title ="Lichtverhältnisse Fuchshügel ",
+       x="Logger",
+       y="kumulative Lichtinensität (Lux x Zeit)")
 ```
 
 ```{r}
 #| label: lineplot lightsum per day
 ggplot(summary_daily_area,aes(x = Datum, y = Licht_summe, color = Standort)) +
-  geom_line(linewidth = 0.7) +
+  geom_line(linewidth = 0.9) +
+  scale_color_discrete(
+    labels = c("L" = "Kleiner Sumpf",
+               "MN" = "Auf der Pfalz",
+               "MT" = "Fuchshügel"))+
   labs(
     title = "tägliche Lichtsumme im Beobachtungszeitraum (Messintervall 10min)",
     x = "Datum",
-    y = "Lichtsumme [lux-minuten] ",
+    y = "kumulative Lichtinensität (Lux x Zeit)",
     color = "Standort"
   ) +
   theme_minimal() +
@@ -530,10 +562,6 @@ ggplot(summary_daily_area,aes(x = Datum, y = Licht_summe, color = Standort)) +
     plot.title = element_text(hjust = 0.5)
   )
 
-```
-
-```{r}
-#hier sollte noch lichtsumme an den transekten gezeigt werden
 ```
 
 ## 6.2 Temperatur
@@ -621,6 +649,32 @@ summary(extrema_logger)
 
 ### 6.2.1 Plots
 
+Vergleich innerer und äußerer Sensor
+
+```{r}
+#| label: Boxplots compares mean temperature in both sensors Lichtenau
+
+summary_daily_logger %>%
+  filter(Standort == "L", Logger %in% c("M", "N", "O", "S", "W")) %>%
+  pivot_longer(
+    cols = c(Temp_sonne_mean, Temp_schatten_mean),
+    names_to = "Licht",
+    values_to = "Temperatur"
+  ) %>%
+  mutate(Licht = recode(Licht,
+                        Temp_sonne_mean = "Außen",
+                        Temp_schatten_mean = "Innen")) %>%
+  ggplot(aes(x = Logger, y = Temperatur, fill = Licht)) +
+  geom_boxplot(position = position_dodge(width = 0.8)) +
+  labs(
+    title = "Vergleich der Tagesmittelwerte der äußeren und inneren Sensoren pro Logger - Lichtenau",
+    x = "Logger",
+    y = "Tagesmitteltemperatur (°C)",
+    fill = "Sensorposition"
+  ) +
+  theme_minimal()
+```
+
 Extrema und Mittelwerte
 
 #ider plot braucht noch erklärung, dass der mitelwert im schatten berechnet wurde und die extrema in der sonne und dass die zahlen als datum zu lesen sind
@@ -633,6 +687,10 @@ extrema_logger <- extrema_logger %>%
             by = c("Standort","Logger","Logger_ID"))
 str(extrema_logger)
 
+flaechen_namen <- c(
+  "L" = "Kleiner Sumpf",
+  "MN" = "Auf der Pfalz",
+  "MT" = "Fuchshügel")
 
 ggplot(extrema_logger, aes(x = Logger)) +
   geom_linerange(aes(ymin = Sonne_min, ymax = Sonne_max, color = Standort),
@@ -647,9 +705,9 @@ ggplot(extrema_logger, aes(x = Logger)) +
             vjust = -0.5,
             size = 3,
             check_overlap = TRUE) +
-  facet_wrap(~Standort, scales = "free_x", nrow = 1) +
+  facet_wrap(~Standort, scales = "free_x", nrow = 1, labeller = labeller(Standort = flaechen_namen))+
   theme_bw() +
-  theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1),legend.position = "none") +
   labs(
     x = "Logger",
     y = "Temperatur [°C]",
@@ -708,8 +766,8 @@ summary_daily_logger %>%
   ggplot(aes(x = Logger, y = Temp_schatten_mean, fill = Logger)) +
   geom_boxplot() +
   labs(
-    title = "Vergleich der Tagesmittelwerte des inneren Sensors pro Logger - Lichtenau",
-    x = "Loggerstandort",
+    title = "Tagesmitteltemperaturen - Kleiner Sumpf",
+    x = "Logger",
     y = "Tagesmitteltemperatur (°C)"
   ) +
   theme_minimal() +
@@ -720,8 +778,8 @@ summary_daily_logger %>%
   ggplot(aes(x = Logger, y = Temp_schatten_mean, fill = Logger)) +
   geom_boxplot() +
   labs(
-    title = "Vergleich der Tagesmittelwerte des inneren Sensors pro Logger - Meusebach nass",
-    x = "Loggerstandort",
+    title = "Tagesmitteltemperaturen  - Auf der Pfalz",
+    x = "Logger",
     y = "Tagesmitteltemperatur (°C)"
   ) +
   theme_minimal() +
@@ -732,8 +790,8 @@ summary_daily_logger %>%
   ggplot(aes(x = Logger, y = Temp_schatten_mean, fill = Logger)) +
   geom_boxplot() +
   labs(
-    title = "Vergleich der Tagesmittelwerte des inneren Sensors pro Logger - Meusebach trocken",
-    x = "Loggerstandort",
+    title = "Tagesmitteltemperaturen  - Fuchshügel",
+    x = "Logger",
     y = "Tagesmitteltemperatur (°C)"
   ) +
   theme_minimal() +
@@ -777,38 +835,16 @@ summary_daily_logger %>%
   theme_minimal()
 ```
 
-Beispiel für Lichtenau
-
-```{r}
-#| label: Boxplots compares mean temperature in both sensors Lichtenau
-
-summary_daily_logger %>%
-  filter(Standort == "L", Logger %in% c("M", "N", "O", "S", "W")) %>%
-  pivot_longer(
-    cols = c(Temp_sonne_mean, Temp_schatten_mean),
-    names_to = "Licht",
-    values_to = "Temperatur"
-  ) %>%
-  mutate(Licht = recode(Licht,
-                        Temp_sonne_mean = "Außen",
-                        Temp_schatten_mean = "Innen")) %>%
-  ggplot(aes(x = Logger, y = Temperatur, fill = Licht)) +
-  geom_boxplot(position = position_dodge(width = 0.8)) +
-  labs(
-    title = "Vergleich der Tagesmittelwerte der äußeren und inneren Sensoren pro Logger - Lichtenau",
-    x = "Logger",
-    y = "Tagesmitteltemperatur (°C)",
-    fill = "Sensorposition"
-  ) +
-  theme_minimal()
-```
-
 ```{r}
 #| label: lineplot mean temp & time
 ggplot(summary_daily_area,aes(x = Datum, y = Temp_area_schatten_mean, color = Standort)) +
   geom_line(linewidth = 0.7) +
+  scale_color_discrete(
+    labels = c("L" = "Kleiner Sumpf",
+               "MN" = "Auf der Pfalz",
+               "MT" = "Fuchshügel"))+
   labs(
-    title = "Tagesmitteltemperatur (Schatten) im Beobachtungszeitraum",
+    title = "Tagesmitteltemperatur im Beobachtungszeitraum",
     x = "Datum",
     y = "Flächenmittel Temperatur (°C)",
     color = "Standort"
@@ -822,51 +858,41 @@ ggplot(summary_daily_area,aes(x = Datum, y = Temp_area_schatten_mean, color = St
 
 ##### *Mögliche Analyse*:
 
-Wie oft bzw. wann war der Taupunkt \>= Lufttemperatur -\> Bildung von Tau möglich
-
 luftfeucht rand vs mitte -\> beschatten böume oder ziehen sie das wasser aus der fläche??
 
 ## 6.3 Luftfeuchte und Taupunkt
 
 ```{r}
-#| label: days with possible dew per month
-tau_days <- all_loggers %>%
-  mutate(
-    Datum = as.Date(DateTime),
-    Monat = month(DateTime) 
-  ) %>%
-  filter(Taupunkt_C >= Temp_schatten_C) %>%  # >= oder ==, je nach Präzision
-  group_by(Standort, Logger, Monat, Datum) %>%
-  summarise(Taupunkt_Tag = n() > 0, .groups = "drop") %>%
-  group_by(Standort, Logger, Monat) %>%
-  summarise(Tage_mit_Tau = sum(Taupunkt_Tag), .groups = "drop")
-summary(tau_days)
-```
-
-```{r}
 #| label: boxplot of mean humidity each area
-
 
 summary_daily_logger %>%
   filter(Standort == "L", Logger %in% c("M", "N", "O", "S", "W"))%>%
   ggplot(aes(x = Logger, y = rLF_mean, fill = Logger)) +
   geom_boxplot() +
   labs(
-    title = "Vergleich der Tagesmittelwerte pro Logger - Lichtenau",
+    title = "Mittlere tägliche Lufteuchte - Kleiner Sumpf",
     x = "Loggerstandort",
-    y = "Tagesmittel Luftfeuchte (°C)"
+    y = "Luftfeuchte in %"
   ) +
   theme_minimal() +
   theme(legend.position = "none") 
+
+
+mod_L_humid <- lmer(rLF_mean ~ Logger + (1|Datum),
+  data = summary_daily_logger %>%
+    filter(Standort == "L"))
+summary(mod_L_humid)
+coefs <- fixef(mod_L_humid)
+coefs
 
 summary_daily_logger %>%
   filter(Standort == "MN", Logger %in% c("M", "N", "O", "S", "W"))%>%
   ggplot(aes(x = Logger, y = rLF_mean, fill = Logger)) +
   geom_boxplot() +
   labs(
-    title = "Vergleich der Tagesmittelwerte pro Logger - Meusebach nass",
+    title = "Mittlere tägliche Lufteuchte - Auf der Pfalz",
     x = "Loggerstandort",
-    y = "Tagesmittel Luftfeuchte (°C)"
+    y = "Luftfeuchte in %"
   ) +
   theme_minimal() +
   theme(legend.position = "none") 
@@ -876,15 +902,24 @@ summary_daily_logger %>%
   ggplot(aes(x = Logger, y = rLF_mean, fill = Logger)) +
   geom_boxplot() +
   labs(
-    title = "Vergleich der Tagesmittelwerte pro Logger - Meusebach trocken",
+    title = "Mittlere tägliche Lufteuchte - Fuchshügel",
     x = "Loggerstandort",
-    y = "Tagesmittel Luftfeuchte (°C)"
+    y = "Luftfeuchte in %"
   ) +
   theme_minimal() +
   theme(legend.position = "none") 
 ```
 
-siginfikanztest ergänzen!!!
+zur Interpretation:
+
+```         
+> coefs (Intercept)     LoggerN     LoggerO     LoggerS     LoggerW    
+          75.094388   -1.392998    2.543914    0.690245    5.378197 
+```
+
+der Intercept zeigt die typische Luftfeuchte an Logger M
+
+Logger N ist ca 1% trockener, Logger O ist 2,5% feuchter usw
 
 ```{r}
 #| label: boxplot of mean humidity all areas
@@ -895,9 +930,9 @@ summary_daily_logger %>%
   ggplot(aes(x = Logger, y = rLF_mean, fill = Logger)) +
   geom_boxplot() +
   labs(
-    title = "Vergleich der Luftfeuchte pro Logger",
-    x = "Loggerstandort",
-    y = "Tagesmitteltemperatur (°C)"
+    title = "Mittlere tägliche Luftfeuchte",
+    x = "Logger",
+    y = "Luftfeuchte in %"
   ) +
   theme_minimal() +
   theme(legend.position = "none") +
@@ -911,9 +946,9 @@ summary_daily_logger %>%
   ggplot(aes(x = Standort, y = rLF_mean, fill = Logger)) +
   geom_boxplot(position = position_dodge(width = 0.8), width =0.7) +
   labs(
-    title = "Vergleich der Tagesmitteltemperatur des äußeren Sensors pro Logger",
-    x = "Loggerstandort",
-    y = "Tagesmitteltemperatur (°C)",
+    title = "Mittlere tägliche Luftfeuchte",
+    x = "Logger",
+    y = "Luftfeuchte in %",
     fill = "Standort"
   ) +
   theme_minimal()
@@ -937,32 +972,7 @@ ggplot(summary_daily_area,aes(x = Datum, y = rLF_area_mean, color = Standort)) +
 
 ergänze hier niederschlagsereignisse!
 
-```{r}
-#| label: do not run
-# dieser Plot ist nicht so sinnvoll, es ist logisch, dass die relLF sinkt mit höherer Temperatur, dafür brauche ich keine plot…
-
-summary_daily_logger %>%
-  filter(Standort %in% c("L", "MT", "MN"),
-         Logger %in% c("N","M","S", "W", "O")) %>%
-  # nur Außen-Sensor verwenden
-  ggplot(aes(x = Temp_sonne_mean, y = rLF_mean, shape = Logger, color = Logger)) +
-  geom_point(size = 2, alpha = 0.7) +
-  labs(
-    title = "Temperatur vs. Luftfeuchte (Außen-Sensor) pro Standort",
-    x = "Temperatur (°C)",
-    y = "Luftfeuchte (%)",
-    shape = "Logger"
-  ) +
-  theme_minimal() +
-  theme(plot.title = element_text(hjust = 0.5))
-
-
-
-```
-
-##### *Mögliche Analyse:*
-
-Vapor pressure deficit berechnen -\> hohes VPD bringt hohe Verdunstung (besonders bei heller Beleuchtung) -\> Sphagnum kann mehr Wasser verdampfen als einfache Waseroberfläche [Lafleur (1990)](https://www.sciencedirect.com/science/article/pii/S0022169496031496#BIB13)distinguishes between wetlands with transpiring and non-transpiring covers. The latter are often dominated by non-vascular *Sphagnum* species, for which evaporation may exceed open water rates under similar meteorological conditions ([Nicols and Brown, 1980](https://www.sciencedirect.com/science/article/pii/S0022169496031496#BIB25)).
+falls du Awekas.at Meusebach verwendest: die uhr startet immer nachts um 1 neu mit niederschlag zählen! das heißt es misst für jeden tag neu von 1-0uhr! 0uhr minus 1uhr = tagesniederschlag
 
 ## 6.4 PCA
 
@@ -1064,3 +1074,36 @@ ggplot() +
 ##### *Mögliche Analyse:*
 
 PCA für jeden Standort einzeln
+
+# Licht und Luftfeuchte
+
+2 Gedanken: Beschattung begrenzt Verdunstung -\> hohe Luftfeuchte an den Rändern
+
+beschattende Bäume ziehen viel Wasser -\> niedrige Luftfeuchte an den Rändern
+
+hier fehlt eigentlich noch was zur tree layer würd ich sagen
+
+```{r}
+summary_daily_logger %>%
+  group_by(Standort) %>%
+  summarise(
+    korrelation = cor(Licht_summe,
+                      rLF_mean,
+                      use = "complete.obs",
+                      method = "spearman")
+  )
+
+mod_L <- lmer(
+  rLF_mean ~ Licht_summe + Logger + (1|Datum),
+  data = summary_daily_logger %>%
+    filter(Standort == "L")
+)
+summary(mod_L)
+
+mod_light <- lmer(
+  rLF_mean ~ Licht_summe + (1|Datum),
+  data = summary_daily_logger %>%
+    filter(Standort == "L")
+)
+summary(mod_light)
+```
