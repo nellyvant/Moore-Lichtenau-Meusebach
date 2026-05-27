@@ -6,6 +6,33 @@ library(sf)
 
 hum <- read_xlsx("Torfzersetzung.xlsx")
 str(hum)
+
+  
+#hier werden Mitelwerte berechnet, obwohl die Skala eigentlich ordinal ist! also mit Vorsicht genießen! oder vlt lieber auf max oder min verlassen
+hum_summary <- hum %>%
+  filter(!is.na(hum_num)) %>%
+  group_by(Punkt, site) %>%
+  summarise(
+    mean_hum = weighted.mean(hum_num, mächtigkeit),
+    mean_hum_rounded = round(mean_hum),
+    max_hum = max(hum_num),
+    min_hum = min(hum_num),
+    top_hum = hum_num[von == 0],
+    torfmaechtigkeit = max(bis),
+    .groups = "drop"
+  )
+
+#hum_summary %>%
+ # group_by(site) %>%
+  #summarise(
+   # min_maechtigkeit = min(torfmaechtigkeit),
+    #max_machtigkeit = max(torfmaechtigkeit),
+    #area_min_hum = min(min_hum),
+    #area_max_hum =max(max_hum),
+    #area_mean_hum = mean())
+
+
+
 hum_colors <- c(
   "1"  = "#ffffcc",
   "2"  = "#ffeda0",
@@ -18,6 +45,20 @@ hum_colors <- c(
   "9"  = "#800026",
   "10" = "#4d0018"
 )
+
+
+hum_summary %>%
+  ggplot(aes(x = factor(mean_hum_rounded),
+             fill = factor(mean_hum_rounded))) +
+  geom_bar() +
+  facet_wrap(~site) +
+  scale_fill_manual(values = hum_colors) +
+  labs(
+    x = "Humifizierungsgrad",
+    y = "Anzahl",
+    fill = "Hum"
+  ) +
+  theme_minimal()
 
 
 
@@ -58,18 +99,7 @@ ggplot(plot_data) +
   
   theme_bw()
 
-#hier werden Mitelwerte berechnet, obwohl die Skala eigentlich ordinal ist! also mit Vorsicht genießen! oder vlt lieber auf max oder min verlassen
-hum_summary <- hum %>%
-  filter(!is.na(hum_num)) %>%
-  group_by(Punkt, site, transekt) %>%
-  summarise(
-    mean_H = weighted.mean(hum_num, mächtigkeit),
-    mean_H_rounded = round(mean_H),
-    max_H = max(hum_num),
-    min_H = min(hum_num),
-    torfmaechtigkeit = max(bis),
-    .groups = "drop"
-  )
+
 
 #hier wird BOR4 entfernt weil NA in humifizierungsgrad ist. das war die Bohrung an der Spundwand in Meu trock und dort gab es ja keinen Torf, sondern nur Sand aka das Verfüllungsmaterial für die Plombe -> im methodenteil erwähnen
 
