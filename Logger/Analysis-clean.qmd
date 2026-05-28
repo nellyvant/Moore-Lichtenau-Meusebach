@@ -342,7 +342,7 @@ summary_daily_logger <- all_loggers %>%
     .groups = "drop"
   )
 
-summary(summary_daily_logger)
+str(summary_daily_logger)
   
 ```
 
@@ -393,7 +393,7 @@ summary_daily_area <- all_loggers %>%
     Tp_area_range = Tp_area_max - Tp_area_min,
     .groups = "drop"
   )
-summary(summary_daily_area)
+str(summary_daily_area)
 ```
 
 ## 5.2 Summary pro Logger
@@ -441,7 +441,7 @@ summary_logger_year <- all_loggers %>%
     .groups = "drop"
   )
 
-summary(summary_logger_year)
+str(summary_logger_year)
 ```
 
 ### 5.2.2 Summary über SD & range tagesaggregierter Daten
@@ -479,16 +479,14 @@ sd_summary_logger <- summary_daily_logger %>%
     
     .groups = "drop"
   )
-sd_summary_logger
+str(sd_summary_logger)
 ```
 
 # 6. Analyse & Plots einzelner Parameter
 
 ## 6.1 Licht
 
-die logger stehen auf den verschiedenen flächen mal mehr oder weniger beschattet. deshalb will ich nur die Lichtintensitäten am Mittleren Logger vergleichen, statt der Mittelwerte
-
-der Violinplot zeigt die stark rechtsschiefe Verteilung der Daten (selbst wenn die Nachtwerte ausgeklammert werden)
+Die Logger stehen auf den verschiedenen flächen mal mehr oder weniger beschattet. Deshalb werden zuerst nur die mittleren Logger verglichen, da sie am meisten exponiert sind.
 
 ```{r}
 #| label: violinplot central logger
@@ -505,7 +503,9 @@ all_loggers %>%
 #ggsave("light_violinplot.png", width = 6, height=4)
 ```
 
-Vergleich innerhalb der Flächen besser mit Lichtsumme, statt wie eben mit violinplot
+Violinplot zeigt stark rechtsschiefe Verteilung der Daten, selbst wenn die Nachtwerte ausgeklammert werden -\> sollte beim Licht genauso sein
+
+Vergleich innerhalb der Flächen besser mit Lichtsumme
 
 ```{r}
 summary_daily_logger %>%
@@ -515,16 +515,6 @@ summary_daily_logger %>%
   labs(title ="Lichtverhältnisse Kleiner Sumpf ",
        x="Logger",
        y="kumulative Lichtinensität (Lux x Zeit)")
-
-# Modell zur Berechnung der Unterschiede unter den Loggern in % da eine Testung auf Signifikanz wegen der zeitlich gepaarten Stichproben umständlich ist
-
-#mod_L_light <- lmer(log10(Licht_summe + 1) ~ Logger + (1|Datum),
-#     data = summary_daily_logger %>%
-#       filter(Standort == "L"))
-#summary(mod_L_light)
-#coefs <- fixef(mod_L_light)
-#intercept_lux <- 10^(coefs[1]) - 1
-#prozent <- (10^(coefs[-1]) - 1) * 100
 
 summary_daily_logger %>%
   filter(Standort == "MN") %>%
@@ -541,6 +531,98 @@ summary_daily_logger %>%
   labs(title ="Lichtverhältnisse Fuchshügel ",
        x="Logger",
        y="kumulative Lichtinensität (Lux x Zeit)")
+```
+
+```{r}
+#| label: verschiedene Methoden für Signifikanztestung (Beispiel Lichtenau)
+# 1. ein model
+
+mod_L_light <- lmer(log10(Licht_summe + 1) ~ Logger + (1|Datum),
+     data = summary_daily_logger %>%
+       filter(Standort == "L"))
+summary(mod_L_light)
+coefs <- fixef(mod_L_light)
+intercept_lux <- 10^(coefs[1]) - 1
+prozent <- (10^(coefs[-1]) - 1) * 100
+ODER
+mod_light_L <- lmer(
+  Licht_summe ~ Logger + (1|Datum),
+  data = summary_daily_logger %>%
+    filter(Standort == "L")
+)
+library(emmeans)
+pairs <- emmeans(mod_light_L, pairwise ~ Logger)
+pairs
+
+#2. T-Tests
+dat_L <- summary_daily_logger %>%
+  filter(Standort == "L") %>%
+  select(Datum, Logger, Licht_summe) %>%
+  pivot_wider(
+    names_from = Logger,
+    values_from = Licht_summe
+  )
+#2.a) händisch
+t.test(dat_L$M, dat_L$N, paired = TRUE) #p-value < 2.2e-16
+t.test(dat_L$M, dat_L$O, paired = TRUE) #p-value < 2.2e-16
+t.test(dat_L$M, dat_L$W, paired = TRUE) #p-value < 2.2e-16
+t.test(dat_L$M, dat_L$S, paired = TRUE) #p-value < 2.2e-16
+t.test(dat_L$N, dat_L$O, paired = TRUE) #p-value = 0.1268
+t.test(dat_L$N, dat_L$W, paired = TRUE) #p-value < 2.2e-16
+t.test(dat_L$N, dat_L$S, paired = TRUE) #p-value < 2.2e-16
+t.test(dat_L$O, dat_L$W, paired = TRUE) #p-value = 8.215e-16
+t.test(dat_L$O, dat_L$S, paired = TRUE) #p-value < 2.2e-16
+t.test(dat_L$W, dat_L$S, paired = TRUE) #p-value < 2.2e-16
+
+#2.b) automatisiert
+logger <- c("M", "N", "O", "S", "W")
+ergebnisse <- combn(logger, 2, simplify = FALSE)
+tests <- lapply(ergebnisse, function(x) {
+  test <- t.test(
+    dat_L[[x[1]]],
+    dat_L[[x[2]]],
+    paired = TRUE)
+  data.frame(
+    Gruppe1 = x[1],
+    Gruppe2 = x[2],
+    p_Wert = test$p.value,
+    Mittelwert_Diff = mean(dat_L[[x[1]]] - dat_L[[x[2]]],na.rm = TRUE))
+})
+tests_df <- bind_rows(tests)
+tests_df
+
+#plot
+summary_daily_logger %>%
+  filter(Standort == "L") %>%
+  ggplot(aes(x = Logger,
+             fill = Logger,
+             y = Licht_summe)) +
+  geom_boxplot(width = 0.8) +
+  geom_text(
+    data = summary_daily_logger %>%
+      filter(Standort == "L") %>%
+      group_by(Logger) %>%
+      summarise(
+        y = max(Licht_summe, na.rm = TRUE) * 1.08,
+        gruppe = case_when(
+          Logger == "M" ~ "a",
+          Logger == "N" ~ "b",
+          Logger == "O" ~ "b",
+          Logger == "S" ~ "c",
+          Logger == "W" ~ "d"
+        ),
+        .groups = "drop"
+      ),
+    aes(x = Logger, y = y, label = gruppe),
+    inherit.aes = FALSE,
+    size = 6,
+    fontface = "bold"
+  ) +
+  labs(title = "Lichtverhältnisse Kleiner Sumpf",
+       x = "Logger",
+       y = "kumulative Lichtintensität (Lux × Zeit)") +
+  theme_minimal() +
+  theme(legend.position = "none")
 ```
 
 ```{r}
@@ -623,8 +705,7 @@ daily_logger_extrema <- all_loggers %>%
 #    Time_schatten_min =
 #      if (all(is.na(Temp_schatten_C))) as.POSIXct(NA)
 #      else DateTime[which.min(Temp_schatten_C)],
-    .groups = "drop"
-  )
+    .groups = "drop")
 
 #Auswertung
 extrema_logger <- daily_logger_extrema %>%
@@ -644,7 +725,7 @@ extrema_logger <- daily_logger_extrema %>%
 #    Schatten_min = min(Temp_schatten_min, na.rm = TRUE),
 #    Schatten_min_Zeit = Time_schatten_min[which.min(Temp_schatten_min)]
  .groups = "drop" )
-summary(extrema_logger)
+str(extrema_logger)
 ```
 
 ### 6.2.1 Plots
@@ -677,7 +758,7 @@ summary_daily_logger %>%
 
 Extrema und Mittelwerte
 
-#ider plot braucht noch erklärung, dass der mitelwert im schatten berechnet wurde und die extrema in der sonne und dass die zahlen als datum zu lesen sind
+#der plot braucht noch erklärung, dass der mitelwert im schatten berechnet wurde und die extrema in der sonne und dass die zahlen als datum zu lesen sind
 
 ```{r}
 #| label: temperature ranges all areas
@@ -697,11 +778,11 @@ ggplot(extrema_logger, aes(x = Logger)) +
                  size = 1) +
   geom_point(aes(y = Tempschatten_Jahresmittel, color = Standort),
              size = 3) +
-  geom_text(aes(y = Sonne_min, label = format(Sonne_min_Zeit, "%d.%m")),
+  geom_text(aes(y = Sonne_min, label = format(Sonne_min_Zeit, "%d.%m.")),
             vjust = 1.5,
             size = 3,
             check_overlap = TRUE) +
-  geom_text(aes(y = Sonne_max, label = format(Sonne_max_Zeit, "%d.%m")),
+  geom_text(aes(y = Sonne_max, label = format(Sonne_max_Zeit, "%d.%m.")),
             vjust = -0.5,
             size = 3,
             check_overlap = TRUE) +
