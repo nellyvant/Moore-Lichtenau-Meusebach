@@ -16,6 +16,7 @@ library(tidyr)
 library(ggplot2)
 library(vegan)
 library(lme4)
+library(readxl)
 ```
 
 # 2 Daten einlesen
@@ -959,12 +960,12 @@ summary_daily_logger %>%
   theme(legend.position = "none") 
 
 
-mod_L_humid <- lmer(rLF_mean ~ Logger + (1|Datum),
-  data = summary_daily_logger %>%
-    filter(Standort == "L"))
-summary(mod_L_humid)
-coefs <- fixef(mod_L_humid)
-coefs
+#mod_L_humid <- lmer(rLF_mean ~ Logger + (1|Datum),
+#  data = summary_daily_logger %>%
+#    filter(Standort == "L"))
+#summary(mod_L_humid)
+#coefs <- fixef(mod_L_humid)
+#coefs
 
 summary_daily_logger %>%
   filter(Standort == "MN", Logger %in% c("M", "N", "O", "S", "W"))%>%
@@ -1051,9 +1052,145 @@ ggplot(summary_daily_area,aes(x = Datum, y = rLF_area_mean, color = Standort)) +
   )
 ```
 
-ergänze hier niederschlagsereignisse!
+```{r}
+#| label: Niederschlagsereignisse von externer Klimastation
+precip <- read_xlsx("Niederschlag_AWEKAS_Station_Meusebach.xlsx")
+str(precip)
+precip <- rename(precip, Datum = Date)
+precip%>%
+  ggplot(aes(x = Date, y = `rain (mm)`)) + geom_line()
 
-falls du Awekas.at Meusebach verwendest: die uhr startet immer nachts um 1 neu mit niederschlag zählen! das heißt es misst für jeden tag neu von 1-0uhr! 0uhr minus 1uhr = tagesniederschlag
+
+plusprecip <- left_join(summary_daily_area, precip, by = "Datum")
+str(plusprecip)
+plusprecip <- plusprecip %>%
+  select(-Temp_area_sonne_mean:-Licht_summe)
+str(plusprecip)
+plusprecip <- plusprecip %>%
+  mutate(Monat = format(Datum, "%Y-%m"))
+
+
+ggplot(plusprecip, aes(x = Datum)) +
+  
+  geom_line(aes(y = rLF_area_mean,
+                color = Standort),
+            linewidth = 1) +
+  
+  geom_col(aes(y = `rain (mm)`),
+           fill = "blue",
+           alpha = 0.5) +
+  
+  scale_y_continuous(
+    name = "Luftfeuchte (%)",
+    sec.axis = sec_axis(~ . / 5,
+                        name = "Niederschlag (mm)")
+  ) +
+  
+  facet_wrap(~ Monat, scales = "free_x") +
+  
+  theme_minimal()
+
+
+cor.test(plusprecip$`rain (mm)`, plusprecip$rLF_area_mean, method = "spearman")
+#p-value < 2.2e-16,  rho 0.6032023 -> logisch, wenns regnet ist zeitgleich die LF hoch
+
+plusprecip <- plusprecip %>%
+  arrange(Datum) %>%
+  mutate(
+    Regen_gestern = lag(`rain (mm)`, 1),
+    Regen_3Tage = zoo::rollsum(`rain (mm)`,
+                               k = 3,
+                               fill = NA,
+                               align = "right"))
+cor.test(plusprecip$Regen_gestern, plusprecip$rLF_area_mean, method = "spearman")
+#p-value < 2.2e-16,  rho 0.5398155 
+cor.test(plusprecip$Regen_3Tage, plusprecip$rLF_area_mean, method = "spearman")
+#p-value < 2.2e-16,  rho 0.5821407
+
+#Regen erhöht am selben Tag die LF (logisch), beeinflusst die LF am nächsten Tag und auch in den nächsten 3 Tagen
+```
+
+```{r}
+#|label: rumprobieren mit austrockung und niederschlag, hat noch nicht hand und fuß
+plusprecip <- left_join(summary_daily_logger, precip, by = "Datum")
+str(plusprecip)
+plusprecip <- plusprecip %>%
+  select(-Temp_sonne_mean:-Licht_summe)
+str(plusprecip)
+plusprecip <- plusprecip %>%
+  mutate(Monat = format(Datum, "%Y-%m"))
+
+plusprecip%>%
+  filter(Standort =="L")%>%
+  ggplot(aes(x = Datum)) +
+  geom_line(aes(y = rLF_mean,
+                color = Logger),
+            linewidth = 1) +
+  geom_col(aes(y = `rain (mm)`),
+           fill = "blue",
+           alpha = 0.5) +
+  
+  scale_y_continuous(
+    name = "Luftfeuchte (%)",
+    sec.axis = sec_axis(~ . / 5,
+                        name = "Niederschlag (mm)")
+  ) +
+  
+  facet_wrap(~ Monat, scales = "free_x") +
+  
+  theme_minimal()
+
+plusprecip <- plusprecip %>%
+  arrange(Datum) %>%
+  mutate(
+    Regen_gestern = lag(`rain (mm)`, 1),
+    Regen_3Tage = zoo::rollsum(`rain (mm)`,
+                               k = 3,
+                               fill = NA,
+                               align = "right")) %>%
+  group_by(Datum) %>%
+  mutate(
+    Regen = first(`rain (mm)`) > 0) %>%
+  ungroup() %>%
+  mutate(
+    letzter_Regen = if_else(Regen, Datum, as.POSIXct(NA))) %>%
+  mutate(
+    letzter_Regen = zoo::na.locf(letzter_Regen, na.rm = FALSE)) %>%
+  mutate(
+    Tage_seit_Regen =as.numeric(difftime(Datum, letzter_Regen,units = "days"))) %>%
+  select(-letzter_Regen) %>%
+  arrange(Logger_ID, Datum) %>%
+  group_by(Logger_ID) %>%
+  mutate(
+    delta_LF = rLF_mean - lag(rLF_mean)
+  ) %>%
+  ungroup()
+
+
+ggplot(plusprecip,
+       aes(x = Tage_seit_Regen,
+           y = rLF_mean)) +
+  
+  geom_point(alpha = 0.3) +
+  
+  geom_smooth(method = "loess",
+              color = "red") +
+  
+  theme_minimal()
+
+
+mod2 <- lm(delta_LF ~ Tage_seit_Regen * Standort,
+           data = plusprecip)
+
+summary(mod2)
+
+
+mod_mixed <- lmer(
+  delta_LF ~ Tage_seit_Regen * Standort +
+    (1 | Logger),
+  data = plusprecip)
+summary(mod_mixed)
+```
 
 ## 6.4 PCA
 
