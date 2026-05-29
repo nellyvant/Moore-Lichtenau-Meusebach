@@ -19,7 +19,7 @@ library(ggplot2)
 ```{r}
 #| label: read data
 #| output: true
-vegdata <- read.csv("data_sorted_test - Kopie.csv")
+vegdata <- read.csv("vegdata_final.csv")
 str(vegdata)
 #spalten anders ordnen
 vegdata <- vegdata %>%
@@ -78,8 +78,8 @@ p1 <- Lic_subset %>%
   scale_y_continuous(limits = c(0, 45))+
   labs(
     x = "Art",
-    y = "Mittlere Deckung",
-    title = "Lichtenau"
+    y = "Mittlere Deckung %",
+    title = "Kleiner Sumpf"
   ) +
   theme_minimal()
 
@@ -99,8 +99,8 @@ p2 <- MN_subset %>%
   scale_y_continuous(limits = c(0, 45))+
   labs(
     x = "Art",
-    y = "Mittlere Deckung",
-    title = "Meusebach nass"
+    y = "Mittlere Deckung %",
+    title = "Auf der Pfalz"
   ) +
   theme_minimal()
 
@@ -120,17 +120,16 @@ p3 <- MT_subset %>%
   scale_y_continuous(limits = c(0, 45))+
   labs(
     x = "Art",
-    y = "Mittlere Deckung",
-    title = "Meusebach trocken"
+    y = "Mittlere Deckung %",
+    title = "Fuchshügel"
   ) +
   theme_minimal()
 
-p_all <- (p1/p2/p3)+plot_annotation(
-    title = "Top 10 Arten nach mittlerer Deckung",
-    theme = theme(plot.title = element_text(size = 18, face = "bold", hjust = 0.5)))
-ggsave("top10_deckung.png", p_all,
-       width = 14, height = 6, dpi = 300)
-
+#p_all <- (p1/p2/p3)+plot_annotation(
+#    title = "Top 10 Arten nach mittlerer Deckung",
+#    theme = theme(plot.title = element_text(size = 18, face = "bold", hjust = 0.5)))
+#ggsave("top10_deckung.png", p_all,
+#       width = 14, height = 6, dpi = 300)
 ```
 
 Deckung nach Layer
@@ -151,7 +150,15 @@ layer_deckung$Schicht <- factor(
 ggplot(layer_deckung, aes(x = site, y = prop, fill = Schicht)) +
   geom_col() +
   labs(y = "Anteil der Deckung", x = NULL) +
+  geom_text(aes(label = round(prop,2)), size = 3, position = position_stack(vjust = 0.5))+
+  scale_x_discrete(labels = c(
+    "Meu_nass" = "Auf der Pfalz",
+    "Meu_trock" = "Fuchshügel",
+    "Lic" = "Kleiner Sumpf"))+
   theme_minimal()
+
+#ggplot(layer_deckung, aes(fill=Schicht, y=Deckung, x=site)) + 
+#    geom_bar(position="fill", stat="identity")
 ```
 
 # 4 Zeigerwerte einlesen und vorbereiten
@@ -235,8 +242,7 @@ results <- data.frame(
   Plot = rownames(comm_matrix),
   Richness = species_richness,
   Shannon = shannon_index,
-  Evenness = species_evenness
-)
+  Evenness = species_evenness)
 
 print(results)
 
