@@ -25,6 +25,14 @@ str(vegdata)
 vegdata <- vegdata %>%
   relocate(Transekt, Transektnummer, .after = Name)
 str(vegdata)
+#entfernen von Arten, die auf der Artenliste waren, aber in keinem der Plots vorkommen
+vegdata <- vegdata[, c(
+  names(vegdata)[1:5],
+  names(vegdata)[6:ncol(vegdata)][
+    colSums(vegdata[, 6:ncol(vegdata)], na.rm = TRUE) > 0
+  ]
+)]
+str(vegdata)
 ```
 
 ```{r}
@@ -212,7 +220,7 @@ weighted_values <- combined_data %>%
 #write_xlsx(weighted_values, "Zeigerwerte_gewichtet.xlsx")
 ```
 
-5 diversitätsmaße berechnen
+Diversitätsmaße berechnen
 
 ```{r}
 ####species richness, Shannon Index, relative Häufigkeit und species evenness bestimmen####
@@ -247,7 +255,72 @@ results <- data.frame(
 print(results)
 
 #als Excel speichern
-write_xlsx(results, "Ergebnisse_species_richness.xlsx")
+#write_xlsx(results, "Ergebnisse_species_richness.xlsx")
 ```
 
 # 6
+
+```{r}
+pca <- rda(comm_matrix)
+plot(pca)
+summary(pca)
+#achsen super lang, leiber dca machen
+
+dca <- decorana(comm_matrix)
+summary(dca)
+
+cor(weighted_values[, c(
+  "Weighted_light",
+  "Weighted_wetness",
+  "Weighted_temperature",
+  "Weighted_nitrogen",
+  "Weighted_alkalinity"
+)])
+
+fit <- envfit(dca, weighted_values[, c("Weighted_light",
+    "Weighted_temperature",
+    "Weighted_wetness",
+    "Weighted_nitrogen",
+    "Weighted_alkalinity")])
+fit
+
+plot(dca)
+arrows <- as.data.frame(scores(fit, display = "vectors"))
+arrows$Variable <- rownames(arrows)
+
+dca_scores <- scores(dca, display = "sites")
+dca_df <- as.data.frame(dca_scores)
+dca_df$Name <- rownames(dca_df)
+dca_df$site <- vegdata$site[match(dca_df$Name, vegdata$plot.ID)]
+
+ggplot(dca_df, aes(DCA1, DCA2, colour = site)) +
+  geom_point(size = 2) +
+
+  geom_segment(
+    data = arrows,
+    aes(
+      x = 0, y = 0,
+      xend = DCA1 * 2,
+      yend = DCA2 * 2
+    ),
+    inherit.aes = FALSE,
+    arrow = arrow(length = unit(0.25, "cm")),
+    colour = "black"
+  ) +
+
+  geom_text(
+    data = arrows,
+    aes(
+      x = DCA1 * 2,
+      y = DCA2 * 2,
+      label = Variable
+    ),
+    inherit.aes = FALSE
+  ) +
+
+  theme_minimal()
+```
+
+werte mal die dca aus, mach vlt einzelne dcas für jede fläche
+
+was sollte ich sonst noch analysieren? -\> modelle: diversität, deckung TL usw \~ feuchte, licht usw
