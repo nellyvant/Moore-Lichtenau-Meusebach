@@ -225,18 +225,6 @@ weighted_values <- combined_data %>%
 ```{r}
 ####species richness, Shannon Index, relative Häufigkeit und species evenness bestimmen####
 
-#anlegen einer Vegetationsmatrix
-comm_matrix <- veg_long %>%
-  group_by(plot.ID, Art) %>%
-  summarise(Deckung = sum(Deckung), .groups = "drop") %>%
-  tidyr::pivot_wider(
-    names_from = Art,
-    values_from = Deckung,
-    values_fill = 0
-  ) %>%
-  tibble::column_to_rownames("plot.ID")
-str(comm_matrix)
-
 #berechnen von species richness, shannon Index, relativer Häufigkeit und Evenness
 
 species_richness <- specnumber(comm_matrix)
@@ -256,13 +244,34 @@ str(results)
 
 #als Excel speichern
 #write_xlsx(results, "Ergebnisse_species_richness.xlsx")
+
+#Zusammenführen mit gewichteten Zeigerwerten
+results$Plot <- as.integer(results$Plot)
+
+merged_data <- results %>%
+  left_join(weighted_values, by = c("Plot" = "plot.ID"))
 ```
 
 # 6 DCA
 
+```{r}
+#anlegen einer Vegetationsmatrix
+comm_matrix <- veg_long %>%
+  group_by(plot.ID, Art) %>%
+  summarise(Deckung = sum(Deckung), .groups = "drop") %>%
+  tidyr::pivot_wider(
+    names_from = Art,
+    values_from = Deckung,
+    values_fill = 0
+  ) %>%
+  tibble::column_to_rownames("plot.ID")
+str(comm_matrix)
+```
+
 ## 6.1 Alle Flächen
 
 ```{r}
+
 pca <- rda(comm_matrix)
 plot(pca)
 summary(pca)
@@ -340,13 +349,13 @@ ggplot(dca_df, aes(DCA1, DCA2, colour = site)) +
 
 fit
 
-|                      | DCA1      | DCA2      | r\^2     | Pr(\>r)        |
-|----------------------|-----------|-----------|----------|----------------|
-| weighted light       | -0.95860  | 0.28475   | 0.8912   | 0.001 \*\*\*   |
-| weighted temperature | -0.74456  | -0.66756  | 0.1546   |  0.001 \*\*\*  |
-| weighted wetness     |  -0.86324 | 0.50479   | 0.5449   | 0.001 \*\*\*   |
-| weighted nitrogen    |  0.13362  |  0.99103  | 0.0352   | 0.010 \*\*     |
-| weighted alkalinity  | -0.49286  |  0.87011  |  0.0273  | 0.026 \*       |
+|                      | DCA1     | DCA2     | r\^2   | Pr(\>r)      |
+|----------------------|----------|----------|--------|--------------|
+| weighted light       | -0.95860 | 0.28475  | 0.8912 | 0.001 \*\*\* |
+| weighted temperature | -0.74456 | -0.66756 | 0.1546 | 0.001 \*\*\* |
+| weighted wetness     | -0.86324 | 0.50479  | 0.5449 | 0.001 \*\*\* |
+| weighted nitrogen    | 0.13362  | 0.99103  | 0.0352 | 0.010 \*\*   |
+| weighted alkalinity  | -0.49286 | 0.87011  | 0.0273 | 0.026 \*     |
 
 ## 6.2 Auf der Pfalz
 
@@ -583,6 +592,106 @@ ggplot(dca_df, aes(DCA1, DCA2, colour = Distanz)) +
 
 ```
 
-werte mal die dca aus, mach vlt einzelne dcas für jede fläche
+# 7 Transektanalyse
+
+```{r}
+
+
+#plot entlang der Transekte
+merged_data %>%
+  filter(site == "Lic") %>%
+  ggplot( aes(Transektnummer, Weighted_wetness)) +
+  geom_point() +
+#  geom_smooth() +
+  facet_wrap(~ Transekt)
+
+merged_data %>%
+  filter(site == "Meu_nass") %>%
+  ggplot( aes(Transektnummer, Weighted_wetness)) +
+  geom_point() +
+ # geom_smooth() +
+  facet_wrap(~ Transekt)
+
+merged_data %>%
+  filter(site == "Meu_trock") %>%
+  ggplot( aes(Transektnummer, Weighted_wetness)) +
+  geom_point() +
+ # geom_smooth() +
+  facet_wrap(~ Transekt)
+
+merged_data %>%
+  filter(site == "Lic") %>%
+  ggplot( aes(Transektnummer, Weighted_temperature)) +
+  geom_point() +
+  geom_smooth() +
+  facet_wrap(~ Transekt)
+
+merged_data %>%
+  filter(site == "Lic") %>%
+  ggplot( aes(Transektnummer, Weighted_light)) +
+  geom_point() +
+  geom_smooth() +
+  facet_wrap(~ Transekt)
+
+merged_data %>%
+  filter(site == "Lic") %>%
+  ggplot( aes(Transektnummer, Weighted_nitrogen)) +
+  geom_point() +
+  geom_smooth() +
+  facet_wrap(~ Transekt)
+merged_data %>%
+  filter(site == "Lic") %>%
+  ggplot( aes(Transektnummer, Weighted_alkalinity)) +
+  geom_point() +
+  geom_smooth() +
+  facet_wrap(~ Transekt)
+
+merged_data %>%
+  filter(site == "Lic") %>%
+  ggplot( aes(Transektnummer, Weighted_temperature)) +
+  geom_point() +
+  geom_smooth() +
+  facet_wrap(~ Transekt)
+
+merged_data %>%
+  filter(site == "Lic") %>%
+  ggplot( aes(Transektnummer, Richness)) +
+  geom_point() +
+  geom_smooth() +
+  facet_wrap(~ Transekt)
+
+merged_data %>%
+  filter(site == "Lic") %>%
+  ggplot( aes(Transektnummer, Shannon)) +
+  geom_point() +
+  geom_smooth() +
+  facet_wrap(~ Transekt)
+
+merged_data %>%
+  filter(site == "Lic") %>%
+  ggplot( aes(Transektnummer, Evenness)) +
+  geom_point() +
+  geom_smooth() +
+  facet_wrap(~ Transekt)
+```
+
+```{r}
+plot_data <- merged_data %>%
+  mutate(
+    x = if_else(Transekt == "WO", Transektnummer, 0),
+    y = if_else(Transekt == "NS", Transektnummer, 0)
+  )
+
+plot_data%>%
+  filter(site=="Lic")%>%
+  ggplot( aes(x = x, y = y, color = Weighted_wetness)) +
+  geom_point(size = 4) +
+  coord_equal() +
+  scale_color_viridis_c(name = "Feuchtezahl") +
+  labs(x = "West–Ost", y = "Süd–Nord") +
+  theme_minimal()
+
+#farbschema anpassen, evtl bessere kontraste (und evtl invertieren weil je feuchter desto blauer eig, aber bei den anderen parametern ist das ja egal)
+```
 
 was sollte ich sonst noch analysieren? -\> modelle: diversität, deckung TL usw \~ feuchte, licht usw
