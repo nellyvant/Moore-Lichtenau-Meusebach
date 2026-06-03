@@ -27,9 +27,9 @@ vegdata <- vegdata %>%
 str(vegdata)
 #entfernen von Arten, die auf der Artenliste waren, aber in keinem der Plots vorkommen
 vegdata <- vegdata[, c(
-  names(vegdata)[1:5],
-  names(vegdata)[6:ncol(vegdata)][
-    colSums(vegdata[, 6:ncol(vegdata)], na.rm = TRUE) > 0
+  names(vegdata)[1:6],
+  names(vegdata)[7:ncol(vegdata)][
+    colSums(vegdata[, 7:ncol(vegdata)], na.rm = TRUE) > 0
   ]
 )]
 str(vegdata)
@@ -158,7 +158,7 @@ layer_deckung$Schicht <- factor(
 ggplot(layer_deckung, aes(x = site, y = prop, fill = Schicht)) +
   geom_col() +
   labs(y = "Anteil der Deckung", x = NULL) +
-  geom_text(aes(label = round(prop,2)), size = 3, position = position_stack(vjust = 0.5))+
+  geom_text(aes(label = round(prop,3)), size = 3, position = position_stack(vjust = 0.5))+
   scale_x_discrete(labels = c(
     "Meu_nass" = "Auf der Pfalz",
     "Meu_trock" = "Fuchshügel",
@@ -220,7 +220,7 @@ weighted_values <- combined_data %>%
 #write_xlsx(weighted_values, "Zeigerwerte_gewichtet.xlsx")
 ```
 
-Diversitätsmaße berechnen
+# 5 Diversitätsmaße berechnen
 
 ```{r}
 ####species richness, Shannon Index, relative Häufigkeit und species evenness bestimmen####
@@ -252,13 +252,15 @@ results <- data.frame(
   Shannon = shannon_index,
   Evenness = species_evenness)
 
-print(results)
+str(results)
 
 #als Excel speichern
 #write_xlsx(results, "Ergebnisse_species_richness.xlsx")
 ```
 
-# 6
+# 6 DCA
+
+## 6.1 Alle Flächen
 
 ```{r}
 pca <- rda(comm_matrix)
@@ -268,14 +270,6 @@ summary(pca)
 
 dca <- decorana(comm_matrix)
 summary(dca)
-
-cor(weighted_values[, c(
-  "Weighted_light",
-  "Weighted_wetness",
-  "Weighted_temperature",
-  "Weighted_nitrogen",
-  "Weighted_alkalinity"
-)])
 
 fit <- envfit(dca, weighted_values[, c("Weighted_light",
     "Weighted_temperature",
@@ -287,6 +281,13 @@ fit
 plot(dca)
 arrows <- as.data.frame(scores(fit, display = "vectors"))
 arrows$Variable <- rownames(arrows)
+arrows$Variable <- c(
+  "Licht",
+  "Temperatur",
+  "Feuchte",
+  "Stickstoff",
+  "Basengehalt"
+)
 
 dca_scores <- scores(dca, display = "sites")
 dca_df <- as.data.frame(dca_scores)
@@ -307,18 +308,279 @@ ggplot(dca_df, aes(DCA1, DCA2, colour = site)) +
     arrow = arrow(length = unit(0.25, "cm")),
     colour = "black"
   ) +
-
   geom_text(
-    data = arrows,
-    aes(
-      x = DCA1 * 2,
-      y = DCA2 * 2,
-      label = Variable
-    ),
-    inherit.aes = FALSE
+  data = arrows,
+  aes(
+    x = DCA1 * 2.3,
+    y = DCA2 * 2.3,
+    label = Variable
+  ),
+  inherit.aes = FALSE
+)+
+ scale_colour_discrete(
+    labels = c(
+      "Lic" = "Kleiner Sumpf",
+      "Meu_trock" = "Fuchshügel",
+      "Meu_nass" = "Auf der Pfalz"
+    )
   ) +
 
-  theme_minimal()
+  labs(
+    title = "DCA der Vegetationsaufnahmen",
+    x = "DCA1",
+    y = "DCA2"
+  ) +
+
+  theme_minimal() +
+  theme(
+    legend.title = element_blank(),
+    plot.title = element_text(hjust = 0.5)
+  )
+```
+
+fit
+
+|                      | DCA1      | DCA2      | r\^2     | Pr(\>r)        |
+|----------------------|-----------|-----------|----------|----------------|
+| weighted light       | -0.95860  | 0.28475   | 0.8912   | 0.001 \*\*\*   |
+| weighted temperature | -0.74456  | -0.66756  | 0.1546   |  0.001 \*\*\*  |
+| weighted wetness     |  -0.86324 | 0.50479   | 0.5449   | 0.001 \*\*\*   |
+| weighted nitrogen    |  0.13362  |  0.99103  | 0.0352   | 0.010 \*\*     |
+| weighted alkalinity  | -0.49286  |  0.87011  |  0.0273  | 0.026 \*       |
+
+## 6.2 Auf der Pfalz
+
+```{r}
+
+comm_MN <- comm_matrix[
+  weighted_values$site == "Meu_nass",
+]
+
+
+dca <- decorana(comm_MN)
+summary(dca)
+
+env_MN <- weighted_values %>%
+  filter(site == "Meu_nass")
+fit <- envfit(dca, env_MN[, c("Weighted_light",
+    "Weighted_temperature",
+    "Weighted_wetness",
+    "Weighted_nitrogen",
+    "Weighted_alkalinity")])
+fit
+
+plot(dca)
+arrows <- as.data.frame(scores(fit, display = "vectors"))
+arrows$Variable <- rownames(arrows)
+arrows$Variable <- c(
+  "Licht",
+  "Temperatur",
+  "Feuchte",
+  "Stickstoff",
+  "Basengehalt"
+)
+
+dca_scores <- scores(dca, display = "sites")
+dca_df <- as.data.frame(dca_scores)
+dca_df$Name <- rownames(dca_df)
+dca_df$site <- vegdata$site[match(dca_df$Name, vegdata$plot.ID)]
+dca_df$Transektnummer <- vegdata$Transektnummer[match(dca_df$Name, vegdata$plot.ID)]
+dca_df$Distanz <- abs(dca_df$Transektnummer)
+
+ggplot(dca_df, aes(DCA1, DCA2, colour = Distanz)) +
+  geom_point(size = 3) +
+  scale_colour_gradient(
+    low = "yellow",
+    high = "darkred",
+    name = "Entfernung zur Mitte"
+    )+
+  geom_segment(
+    data = arrows,
+    aes(
+      x = 0, y = 0,
+      xend = DCA1 * 2,
+      yend = DCA2 * 2
+    ),
+    inherit.aes = FALSE,
+    arrow = arrow(length = unit(0.25, "cm")),
+    colour = "black") +
+  geom_text(
+  data = arrows,
+  aes(
+    x = DCA1 * 2.3,
+    y = DCA2 * 2.3,
+    label = Variable
+  ),
+  inherit.aes = FALSE
+  ) +
+
+  labs(
+    title = "DCA Vegetation Auf der Pfalz",
+    x = "DCA1",
+    y = "DCA2"
+  ) +
+
+  theme_minimal() +
+  theme(
+    plot.title = element_text(hjust = 0.5)
+  )
+
+```
+
+## 6.3 Fuchshügel
+
+```{r}
+comm_MT <- comm_matrix[
+  weighted_values$site == "Meu_trock",
+]
+
+
+dca <- decorana(comm_MT)
+summary(dca)
+
+env_MT <- weighted_values %>%
+  filter(site == "Meu_trock")
+fit <- envfit(dca, env_MT[, c("Weighted_light",
+    "Weighted_temperature",
+    "Weighted_wetness",
+    "Weighted_nitrogen",
+    "Weighted_alkalinity")])
+fit
+
+plot(dca)
+arrows <- as.data.frame(scores(fit, display = "vectors"))
+arrows$Variable <- rownames(arrows)
+arrows$Variable <- c(
+  "Licht",
+  "Temperatur",
+  "Feuchte",
+  "Stickstoff",
+  "Basengehalt"
+)
+
+dca_scores <- scores(dca, display = "sites")
+dca_df <- as.data.frame(dca_scores)
+dca_df$Name <- rownames(dca_df)
+dca_df$site <- vegdata$site[match(dca_df$Name, vegdata$plot.ID)]
+dca_df$Transektnummer <- vegdata$Transektnummer[match(dca_df$Name, vegdata$plot.ID)]
+dca_df$Distanz <- abs(dca_df$Transektnummer)
+
+ggplot(dca_df, aes(DCA1, DCA2, colour = Distanz)) +
+  geom_point(size = 3) +
+  scale_colour_gradient(
+    low = "yellow",
+    high = "darkred",
+    name = "Entfernung zur Mitte"
+    )+
+  geom_segment(
+    data = arrows,
+    aes(
+      x = 0, y = 0,
+      xend = DCA1 * 2,
+      yend = DCA2 * 2
+    ),
+    inherit.aes = FALSE,
+    arrow = arrow(length = unit(0.25, "cm")),
+    colour = "black") +
+  geom_text(
+  data = arrows,
+  aes(
+    x = DCA1 * 2.3,
+    y = DCA2 * 2.3,
+    label = Variable
+  ),
+  inherit.aes = FALSE
+  ) +
+
+  labs(
+    title = "DCA Vegetation Fuchshügel",
+    x = "DCA1",
+    y = "DCA2"
+  ) +
+
+  theme_minimal() +
+  theme(
+    plot.title = element_text(hjust = 0.5)
+  )
+
+```
+
+## 6.3 Kleiner Sumpf
+
+```{r}
+comm_L <- comm_matrix[
+  weighted_values$site == "Lic",
+]
+
+
+dca <- decorana(comm_L)
+summary(dca)
+
+env_L <- weighted_values %>%
+  filter(site == "Lic")
+fit <- envfit(dca, env_L[, c("Weighted_light",
+    "Weighted_temperature",
+    "Weighted_wetness",
+    "Weighted_nitrogen",
+    "Weighted_alkalinity")])
+fit
+
+plot(dca)
+arrows <- as.data.frame(scores(fit, display = "vectors"))
+arrows$Variable <- rownames(arrows)
+arrows$Variable <- c(
+  "Licht",
+  "Temperatur",
+  "Feuchte",
+  "Stickstoff",
+  "Basengehalt"
+)
+
+dca_scores <- scores(dca, display = "sites")
+dca_df <- as.data.frame(dca_scores)
+dca_df$Name <- rownames(dca_df)
+dca_df$site <- vegdata$site[match(dca_df$Name, vegdata$plot.ID)]
+dca_df$Transektnummer <- vegdata$Transektnummer[match(dca_df$Name, vegdata$plot.ID)]
+dca_df$Distanz <- abs(dca_df$Transektnummer)
+
+ggplot(dca_df, aes(DCA1, DCA2, colour = Distanz)) +
+  geom_point(size = 3) +
+  scale_colour_gradient(
+    low = "yellow",
+    high = "darkred",
+    name = "Entfernung zur Mitte"
+    )+
+  geom_segment(
+    data = arrows,
+    aes(
+      x = 0, y = 0,
+      xend = DCA1 * 2,
+      yend = DCA2 * 2
+    ),
+    inherit.aes = FALSE,
+    arrow = arrow(length = unit(0.25, "cm")),
+    colour = "black") +
+  geom_text(
+  data = arrows,
+  aes(
+    x = DCA1 * 2.3,
+    y = DCA2 * 2.3,
+    label = Variable
+  ),
+  inherit.aes = FALSE
+  ) +
+
+  labs(
+    title = "DCA Vegetation Kleiner Sumpf",
+    x = "DCA1",
+    y = "DCA2"
+  ) +
+
+  theme_minimal() +
+  theme(
+    plot.title = element_text(hjust = 0.5)
+  )
+
 ```
 
 werte mal die dca aus, mach vlt einzelne dcas für jede fläche

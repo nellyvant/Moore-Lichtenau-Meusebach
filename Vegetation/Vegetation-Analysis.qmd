@@ -185,7 +185,7 @@ print(DCA2)
 
 -   Achsenlänge 6.25 -\> hoher species turnover entlang des Gradienten
 
--   Einflussreiche Arten:
+-   ~~Einflussreiche~~ Arten:
 
     | Art                    | score |
     |------------------------|-------|
@@ -208,7 +208,7 @@ print(DCA2)
 
 -   Achsenlänge 3.79 -\> hoher species turnover entlang des Gradienten, ab Achsenlänge 4 kompletter turnover, hier beinahe erreicht
 
--   Einflussreiche Arten:
+-   ~~Einflussreiche~~ Arten:
 
     | Art                           | score |
     |-------------------------------|-------|
