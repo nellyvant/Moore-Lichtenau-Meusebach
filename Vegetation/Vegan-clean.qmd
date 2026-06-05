@@ -220,6 +220,15 @@ weighted_values <- combined_data %>%
 #write_xlsx(weighted_values, "Zeigerwerte_gewichtet.xlsx")
 ```
 
+# 5 Höhendaten einlesen und verarbeiten
+
+```{r}
+
+LicMO <- read.csv("C:/Users/Nele/OneDrive - Technische Universität Ilmenau/Dokumente/Moore-Lichtenau-Meusebach/Nele/höhenprofile/Lichtenau/lic_MO.csv", header =F)
+LicWM <- read.csv("C:/Users/Nele/OneDrive - Technische Universität Ilmenau/Dokumente/Moore-Lichtenau-Meusebach/Nele/höhenprofile/Lichtenau/lic_WM_min.csv", header =F)
+MeunassWM <- read.csv("C:/Users/Nele/OneDrive - Technische Universität Ilmenau/Dokumente/Moore-Lichtenau-Meusebach/Nele/höhenprofile/Meu-nass/mn_WM.csv", header =F)
+```
+
 # 5 Diversitätsmaße berechnen
 
 ```{r}
@@ -244,6 +253,12 @@ str(results)
 
 #als Excel speichern
 #write_xlsx(results, "Ergebnisse_species_richness.xlsx")
+
+
+```
+
+```{r}
+#höhendaten einfügen
 
 #Zusammenführen mit gewichteten Zeigerwerten
 results$Plot <- as.integer(results$Plot)
@@ -692,6 +707,36 @@ plot_data%>%
   theme_minimal()
 
 #farbschema anpassen, evtl bessere kontraste (und evtl invertieren weil je feuchter desto blauer eig, aber bei den anderen parametern ist das ja egal)
+```
+
+3D Plot
+
+```{r}
+library(plotly)
+plot_3d <- merged_data %>%
+  filter(site == "Lic") %>%
+  mutate(
+    x = ifelse(Transekt == "WO", Transektnummer, 0),
+    y = ifelse(Transekt == "NS", Transektnummer, 0),
+    z = Weighted_wetness
+  )
+
+plot_ly(
+  plot_3d,
+  x = ~x,
+  y = ~y,
+  z = ~z,
+  color = ~Transekt,
+  type = "scatter3d",
+  mode = "lines"
+) %>%
+  plotly::layout(
+    scene = list(
+      xaxis = list(title = "WO-Transekt"),
+      yaxis = list(title = "NS-Transekt"),
+      zaxis = list(title = "Weighted wetness")
+    )
+  )
 ```
 
 was sollte ich sonst noch analysieren? -\> modelle: diversität, deckung TL usw \~ feuchte, licht usw

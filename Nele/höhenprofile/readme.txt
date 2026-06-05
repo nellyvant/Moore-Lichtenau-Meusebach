@@ -5,4 +5,4 @@ In jedem Ordner gibt es
 	Diese Datei enthält die Werte aus QGIS mit der Erweiterung profile tool. Mit einer Berechnung wurden die Daten auf Meter standardisiert.
 	X = Wert von Profile Tool; Y = Höhe über NN; Meter = berechneter Abstand zum Logger
 
-Zur Erzeugung der Daten siehe Protokoll Datenverarbeitung LIDAS Daten fuer Gelaendeprofil.txt
+Zur Erzeugung der Daten siehe Protokoll Datenverarbeitung LIDAR Daten fuer Gelaendeprofil.txt
