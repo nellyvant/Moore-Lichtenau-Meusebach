@@ -12,6 +12,7 @@ library(readxl)
 library(writexl)
 library(vegan)
 library(ggplot2)
+library(here)
 ```
 
 # 2 Daten einlesen und vorbereiten
@@ -223,10 +224,157 @@ weighted_values <- combined_data %>%
 # 5 Höhendaten einlesen und verarbeiten
 
 ```{r}
+# Einlesen
+licMO <- read.csv("../Nele/höhenprofile/Lichtenau/lic_MO.csv", header=F)
+licWM <- read.csv("../Nele/höhenprofile/Lichtenau/lic_WM_min.csv", header=F)
+licMS <- read.csv("../Nele/höhenprofile/Lichtenau/lic_MS.csv", header=F)
+licNM <- read.csv("../Nele/höhenprofile/Lichtenau/lic_NM.csv", header=F)
+licMS$V1 <- licMS$V1 + max(licNM$V1)
+licNS <- bind_rows(licNM, licMS )
+licMO$V1 <- licMO$V1 + max(licWM$V1)
+licWO <- bind_rows(licWM, licMO )
 
-LicMO <- read.csv("C:/Users/Nele/OneDrive - Technische Universität Ilmenau/Dokumente/Moore-Lichtenau-Meusebach/Nele/höhenprofile/Lichtenau/lic_MO.csv", header =F)
-LicWM <- read.csv("C:/Users/Nele/OneDrive - Technische Universität Ilmenau/Dokumente/Moore-Lichtenau-Meusebach/Nele/höhenprofile/Lichtenau/lic_WM_min.csv", header =F)
-MeunassWM <- read.csv("C:/Users/Nele/OneDrive - Technische Universität Ilmenau/Dokumente/Moore-Lichtenau-Meusebach/Nele/höhenprofile/Meu-nass/mn_WM.csv", header =F)
+MeunassWM <- read.csv("../Nele/höhenprofile/Meu-nass/mn_WM.csv", header=F)
+MeunassMO <- read.csv("../Nele/höhenprofile/Meu-nass/mn_MO.csv", header=F)
+MeunassMS <- read.csv("../Nele/höhenprofile/Meu-nass/mn_MS.csv", header=F)
+MeunassNM <- read.csv("../Nele/höhenprofile/Meu-nass/mn_NM.csv", header=F)
+MeunassMS$V1 <- MeunassMS$V1 + max(MeunassNM$V1)
+MeunassNS <- bind_rows(MeunassNM, MeunassMS )
+MeunassMO$V1 <- MeunassMO$V1 + max(MeunassWM$V1)
+MeunassWO <- bind_rows(MeunassWM, MeunassMO )
+
+MeutrockWM <- read.csv("../Nele/höhenprofile/Meu-trock/mt_WM.csv", header=F)
+MeutrockMO <- read.csv("../Nele/höhenprofile/Meu-trock/mt_MO.csv", header=F)
+MeutrockMS <- read.csv("../Nele/höhenprofile/Meu-trock/mt_MS.csv", header=F)
+MeutrockNM <- read.csv("../Nele/höhenprofile/Meu-trock/mt_NM.csv", header=F)
+MeutrockMS$V1 <- MeutrockMS$V1 + max(MeutrockNM$V1)
+MeutrockNS <- bind_rows(MeutrockNM, MeutrockMS )
+MeutrockMO$V1 <- MeutrockMO$V1 + max(MeutrockWM$V1)
+MeutrockWO <- bind_rows(MeutrockWM, MeutrockMO )
+
+#Duplikate entfernen
+licNS <- licNS %>%
+  distinct(V1, V2, .keep_all = T)
+licWO <- licWO%>%
+  distinct(V1, V2, keep.all=T)
+MeunassNS <- MeunassNS %>%
+  distinct(V1, V2, .keep_all = T)
+MeunassWO <- MeunassWO %>%
+  distinct(V1, V2, .keep_all = T)
+MeutrockNS <- MeutrockNS %>%
+  distinct(V1, V2, .keep_all = T)
+MeutrockWO <- MeutrockWO %>%
+  distinct(V1, V2, .keep_all = T)
+
+#Interpolation (Funktion von ChatGPT GPT 5.5)
+n_plots <- vegdata %>%
+  group_by("site", "Transekt")%>%
+  count(site, Transekt, name = "n_plots")
+n_plots
+
+interpolate_height <- function(df, site_name, transekt_name, values_col = V2) {
+  
+  n <- n_plots |>
+    dplyr::ungroup() |>
+    dplyr::filter(site == site_name, Transekt == transekt_name) |>
+    dplyr::pull(n_plots)
+  
+  werte <- df |> dplyr::pull({{ values_col }})
+  
+  approx(
+    x = seq(0, 1, length.out = length(werte)),
+    y = werte,
+    xout = seq(0, 1, length.out = n)
+  )$y
+}
+
+licNS_hoehe <- interpolate_height(licNS, "Lic", "NS")
+licWO_hoehe<- interpolate_height(licWO, "Lic", "WO")
+MeunassNS_hoehe <- interpolate_height(MeunassNS, "Meu_nass", "NS")
+MeunassWO_hoehe<- interpolate_height(MeunassWO, "Meu_nass", "WO")
+MeutrockNS_hoehe<- interpolate_height(MeutrockNS, "Meu_trock", "NS")
+MeutrockWO_hoehe<- interpolate_height(MeutrockWO, "Meu_trock", "WO")
+#Überprüfen mit Plot
+par(mfrow = c(2, 3))
+plot(licNS_hoehe, type ="line")
+plot(licWO_hoehe, type ="line")
+plot(MeunassNS_hoehe, type ="line")
+plot(MeunassWO_hoehe, type ="line")
+plot(MeutrockNS_hoehe, type ="line")
+plot(MeutrockWO_hoehe, type ="line")
+
+#arbeitsnamen anfügen, da nicht alle vegetationsaufnahmen in der gleichen Richtung erfolgt sind!
+#MT_WO ist WM1-26, MO1-27
+MT_WO_arbeitsname <- c(paste0("WM", 1:26),paste0("MO", 1:27))
+length(MT_WO_arbeitsname);length(MeutrockWO_hoehe)
+MeutrockWO_hoehe_df <- data.frame(
+  arbeitsname = MT_WO_arbeitsname,
+  Hoehe = MeutrockWO_hoehe,
+  site = "Meu_trock")
+#MT_NS ist NM1-29, SM1-30
+MT_NS_arbeitsname <- c(paste0("NM", 1:29),paste0("SM", 30:1))
+length(MT_NS_arbeitsname);length(MeutrockNS_hoehe)
+MeutrockNS_hoehe_df <- data.frame(
+  arbeitsname = MT_NS_arbeitsname,
+  Hoehe = MeutrockNS_hoehe,
+   site = "Meu_trock")
+#MN_WO ist OM 1-32, WM 1-32
+MN_WO_arbeitsname <- c(paste0("WM", 1:32),paste0("OM", 32:1))
+length(MN_WO_arbeitsname);length(MeunassWO_hoehe)
+MeunassWO_hoehe_df <- data.frame(
+  arbeitsname = MN_WO_arbeitsname,
+  Hoehe = MeunassWO_hoehe,
+   site = "Meu_nass")
+#MN_NS ist SM1-23, NM 1-22
+MN_NS_arbeitsname <- c(paste0("NM",1:22 ),paste0("SM",23:1 ))
+length(MN_NS_arbeitsname);length(MeunassNS_hoehe)
+MeunassNS_hoehe_df <- data.frame(
+  arbeitsname = MN_NS_arbeitsname,
+  Hoehe = MeunassNS_hoehe,
+   site = "Meu_nass")
+#LicWO ist OW 1-67
+L_WO_arbeitsname <- c(paste0("OW",67:1 ))
+length(L_WO_arbeitsname);length(licWO_hoehe)
+licWO_hoehe_df <- data.frame(
+  arbeitsname = L_WO_arbeitsname,
+  Hoehe = licWO_hoehe,
+   site = "Lic")
+#LicNS ist SN 1-62
+L_NS_arbeitsname <- c(paste0("SN",62:1 ))
+length(L_NS_arbeitsname);length(licNS_hoehe)
+licNS_hoehe_df <- data.frame(
+  arbeitsname = L_NS_arbeitsname,
+  Hoehe = licNS_hoehe,
+   site = "Lic")
+
+#Zusammenfügen wie in vegdata -> erstmal Reihenfolge nachgucken
+vegdata %>%
+  mutate(zeile = row_number()) %>%
+  group_by(site, Transekt) %>%
+  summarise(
+    erste_Zeile = min(zeile),
+    letzte_Zeile = max(zeile),
+    n = n(),
+    .groups = "drop"
+  ) %>%
+  arrange(erste_Zeile)
+
+hoehe <- bind_rows(MeutrockWO_hoehe_df, MeutrockNS_hoehe_df,MeunassWO_hoehe_df,MeunassNS_hoehe_df,licWO_hoehe_df,licNS_hoehe_df)
+str(hoehe)
+
+vegdata <- vegdata %>%
+  left_join(
+    hoehe,
+    by = c("site", "arbeitsname")) 
+vegdata <- vegdata %>%
+  relocate(Hoehe, .after = Transektnummer)
+
+#plot ID hinzufügen und mit vegetattionsdaten mergen
+#einlesen
+#interpolation
+#vergabe von plot.ID ( am besten in data_merged oder so mal filtern nach transekt und dann über ID oder transektnummer zuordnen)
+#zusammentun mit bind rows
+#join über plot ID
 ```
 
 # 5 Diversitätsmaße berechnen
