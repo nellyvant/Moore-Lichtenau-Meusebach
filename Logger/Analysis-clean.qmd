@@ -325,7 +325,8 @@ summary_daily_logger <- all_loggers %>%
     Sonnenaufgang = min(DateTime[Licht_lux > 1], na.rm = T),
     Sonnenuntergang  = max(DateTime[Licht_lux > 1], na.rm = T),
     Tageslicht = as.numeric(difftime(Sonnenuntergang, Sonnenaufgang, units = "hours")),
-    Licht_summe = sum(Licht_lux*10, na.rm=T),
+    Licht_summe = sum(Licht_lux, na.rm=T),
+    #Licht_summe = sum(Licht_lux, na.rm =T),
     
     rLF_mean = mean(relLF_percent, na.rm = T),
     rLF_max = max(relLF_percent, na.rm = T),
@@ -425,6 +426,7 @@ summary_logger_year <- all_loggers %>%
     Licht_Jahres_max = max(Licht_lux, na.rm = TRUE),
     Licht_Jahres_mean_day = mean(Licht_lux[Licht_lux>1], na.rm =T),
     Licht_Jahres_range = Licht_Jahres_max - Licht_Jahres_min,
+    Licht_Jahres_summe = sum(Licht_lux, na.rm =T),
     
     rLF_Jahresmittel = mean(relLF_percent, na.rm = TRUE),
     rLF_Jahres_sd = sd(relLF_percent, na.rm = TRUE),
@@ -441,7 +443,31 @@ summary_logger_year <- all_loggers %>%
     .groups = "drop"
   )
 
+
+lightsum <- all_loggers %>%
+  mutate(Datum = as.Date(DateTime)) %>%
+  group_by(Standort, Logger,Logger_ID, Datum) %>%
+  summarise(
+    Licht_summe = sum(Licht_lux, na.rm =T),
+    .groups="drop")
+str(lightsum)
+meanlightsum <- lightsum %>%
+ group_by(Standort, Logger,Logger_ID) %>%
+  summarise(
+    Licht_Jahres_Lichtsumme_mean = mean(Licht_summe),
+    .groups = "drop"
+  )
+str(meanlightsum)
+
+summary_logger_year <- summary_logger_year %>%
+  left_join(
+    meanlightsum,
+    by = c("Standort", "Logger", "Logger_ID")
+  )
+
+
 str(summary_logger_year)
+#write.csv(summary_logger_year, "summary_logger_year.csv")
 ```
 
 ### 5.2.2 Summary über SD & range tagesaggregierter Daten
@@ -553,7 +579,7 @@ summary_daily_logger %>%
     geom_boxplot(width=0.8)+
   labs(title ="Lichtverhältnisse Kleiner Sumpf ",
        x="Logger",
-       y="kumulative Lichtinensität (Lux x Zeit)")
+       y="tägliche Lichtsumme")
 
 summary_daily_logger %>%
   filter(Standort == "MN") %>%
@@ -561,7 +587,7 @@ summary_daily_logger %>%
     geom_boxplot(width=0.8)+
   labs(title ="Lichtverhältnisse Auf der Pfalz ",
        x="Logger",
-       y="kumulative Lichtinensität (Lux x Zeit)")
+       y="tägliche Lichtsumme")
 
 summary_daily_logger %>%
   filter(Standort == "MT") %>%
@@ -569,7 +595,7 @@ summary_daily_logger %>%
     geom_boxplot(width=0.8)+
   labs(title ="Lichtverhältnisse Fuchshügel ",
        x="Logger",
-       y="kumulative Lichtinensität (Lux x Zeit)")
+       y="tägliche Lichtsumme")
 ```
 
 ```{r}
@@ -594,6 +620,7 @@ pairs <- emmeans(mod_light_L, pairwise ~ Logger)
 pairs
 
 #2. T-Tests
+#Annahme der Normalverteilung -> eher nicht gegeben
 dat_L <- summary_daily_logger %>%
   filter(Standort == "L") %>%
   select(Datum, Logger, Licht_summe) %>%
@@ -613,7 +640,7 @@ t.test(dat_L$O, dat_L$W, paired = TRUE) #p-value = 8.215e-16
 t.test(dat_L$O, dat_L$S, paired = TRUE) #p-value < 2.2e-16
 t.test(dat_L$W, dat_L$S, paired = TRUE) #p-value < 2.2e-16
 
-#2.b) automatisiert
+#2.b) automatisiert mit ChatGPT 5.5
 logger <- c("M", "N", "O", "S", "W")
 ergebnisse <- combn(logger, 2, simplify = FALSE)
 tests <- lapply(ergebnisse, function(x) {
@@ -675,7 +702,7 @@ ggplot(summary_daily_area,aes(x = Datum, y = Licht_summe, color = Standort)) +
   labs(
     title = "tägliche Lichtsumme im Beobachtungszeitraum (Messintervall 10min)",
     x = "Datum",
-    y = "kumulative Lichtinensität (Lux x Zeit)",
+    y = "tägliche Lichtsumme",
     color = "Standort"
   ) +
   theme_minimal() +
