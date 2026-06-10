@@ -9,7 +9,6 @@ editor_options:
 # 1 genutzte Packages
 
 ```{r}
-#library(tidyverse)
 library(dplyr)
 library(lubridate)
 library(tidyr)
@@ -486,6 +485,45 @@ str(sd_summary_logger)
 # 6. Analyse & Plots einzelner Parameter
 
 ## 6.1 Licht
+
+test auf Normalverteilung
+
+```{r}
+qqnorm(summary_daily_logger$Licht_mean); qqline(summary_daily_logger$Licht_mean)
+hist(summary_daily_logger$Licht_mean)
+qqnorm(summary_daily_logger$Licht_mean_day); qqline(summary_daily_logger$Licht_mean_day)
+hist(summary_daily_logger$Licht_mean_day)
+qqnorm(summary_daily_logger$Licht_summe); qqline(summary_daily_logger$Licht_summe)
+hist(summary_daily_logger$Licht_summe)
+#alle nicht normalverteilt
+qqnorm(sqrt(summary_daily_logger$Licht_mean)); qqline(sqrt(summary_daily_logger$Licht_mean))
+hist(sqrt(summary_daily_logger$Licht_mean))
+qqnorm(sqrt(summary_daily_logger$Licht_mean_day)); qqline(sqrt(summary_daily_logger$Licht_mean_day))
+hist(sqrt(summary_daily_logger$Licht_mean_day))
+qqnorm(sqrt(summary_daily_logger$Licht_summe)); qqline(sqrt(summary_daily_logger$Licht_summe))
+hist(sqrt(summary_daily_logger$Licht_summe))
+#jetzt ist alles normalverteilt
+
+
+#Testung auf signif. Unterschiede mit mehreren gepaarten T-test
+dat <- summary_daily_logger %>%
+  filter(Standort == "L",
+         Logger %in% c("M", "N")) %>%
+  mutate(Licht_sqrt = sqrt(Licht_summe)) %>%
+  select(Datum, Logger, Licht_sqrt) %>%
+  pivot_wider(
+    names_from = Logger,
+    values_from = Licht_sqrt
+  )
+
+t.test(dat$M, dat$N, paired = TRUE)
+
+
+
+
+library(e1071)
+kurtosis(summary_daily_logger$Licht_mean);skewness(summary_daily_logger$Licht_mean)
+```
 
 Die Logger stehen auf den verschiedenen flächen mal mehr oder weniger beschattet. Deshalb werden zuerst nur die mittleren Logger verglichen, da sie am meisten exponiert sind.
 
