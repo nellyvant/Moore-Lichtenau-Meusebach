@@ -98,3 +98,87 @@ hoehe_plot <- approx(
 plot(hoehe_plot, type ="b")
 hoehe_plot
 str(hoehe_plot)
+
+
+
+
+
+
+
+##### test für plots aus logger mit signifikamzniveaus####
+
+summary_daily_logger %>%
+  filter(Standort == "L") %>%
+  ggplot(aes(x=Logger,fill = Logger, y=Licht_mean)) +
+  geom_boxplot(width=0.8)+
+  labs(title ="Licht mean Kleiner Sumpf ",
+       x="Logger",
+       y="tägliche Lichtsumme")
+
+daten_L <- summary_daily_logger %>%
+  filter(Standort == "L") %>%
+  arrange(Logger_ID, Datum)
+
+friedman.test(Licht_mean ~ Logger_ID | Datum, data = daten_L)
+
+pairwise.wilcox.test(
+  daten_L$Licht_mean,
+  daten_L$Logger_ID,
+  paired = TRUE,
+  p.adjust.method = "BH",
+  exact = FALSE
+)
+
+
+
+daten_L <- summary_daily_logger %>%
+  filter(Standort == "L")
+
+buchstaben <- data.frame(
+  Logger = c("M", "N", "O", "S", "W"),
+  gruppe = c("a", "b", "b", "c", "d")
+)
+
+buchstaben_pos <- daten_L %>%
+  group_by(Logger) %>%
+  summarise(y = max(Licht_mean, na.rm = TRUE) * 1.05) %>%
+  left_join(buchstaben, by = "Logger")
+
+ggplot(daten_L, aes(x = Logger, fill = Logger, y = Licht_mean)) +
+  geom_boxplot(width = 0.8) +
+  geom_text(
+    data = buchstaben_pos,
+    aes(x = Logger, y = y, label = gruppe),
+    inherit.aes = FALSE,
+    size = 6
+  ) +
+  labs(
+    title = "Licht mean Kleiner Sumpf",
+    x = "Logger",
+    y = "Licht mean"
+  ) +
+  theme_classic()
+
+
+
+summary_daily_logger %>%
+  filter(Standort == "L") %>%
+  {
+    y_pos <- max(.$Licht_mean, na.rm = TRUE) * 1.08
+    
+    ggplot(., aes(x = Logger, fill = Logger, y = Licht_mean)) +
+      geom_boxplot(width = 0.8) +
+      annotate(
+        "text",
+        x = c("M", "N", "O", "S", "W"),
+        y = y_pos,
+        label = c("a", "b", "b", "c", "d"),
+        size = 6
+      ) +
+      coord_cartesian(ylim = c(NA, y_pos * 1.08)) +
+      labs(
+        title = "Licht mean Kleiner Sumpf",
+        x = "Logger",
+        y = "tägliche Lichtsumme"
+      )
+  }

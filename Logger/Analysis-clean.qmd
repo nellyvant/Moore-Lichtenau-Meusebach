@@ -515,40 +515,7 @@ str(sd_summary_logger)
 test auf Normalverteilung
 
 ```{r}
-qqnorm(summary_daily_logger$Licht_mean); qqline(summary_daily_logger$Licht_mean)
-hist(summary_daily_logger$Licht_mean)
-qqnorm(summary_daily_logger$Licht_mean_day); qqline(summary_daily_logger$Licht_mean_day)
-hist(summary_daily_logger$Licht_mean_day)
-qqnorm(summary_daily_logger$Licht_summe); qqline(summary_daily_logger$Licht_summe)
-hist(summary_daily_logger$Licht_summe)
-#alle nicht normalverteilt
-qqnorm(sqrt(summary_daily_logger$Licht_mean)); qqline(sqrt(summary_daily_logger$Licht_mean))
-hist(sqrt(summary_daily_logger$Licht_mean))
-qqnorm(sqrt(summary_daily_logger$Licht_mean_day)); qqline(sqrt(summary_daily_logger$Licht_mean_day))
-hist(sqrt(summary_daily_logger$Licht_mean_day))
-qqnorm(sqrt(summary_daily_logger$Licht_summe)); qqline(sqrt(summary_daily_logger$Licht_summe))
-hist(sqrt(summary_daily_logger$Licht_summe))
-#jetzt ist alles normalverteilt
 
-
-#Testung auf signif. Unterschiede mit mehreren gepaarten T-test
-dat <- summary_daily_logger %>%
-  filter(Standort == "L",
-         Logger %in% c("M", "N")) %>%
-  mutate(Licht_sqrt = sqrt(Licht_summe)) %>%
-  select(Datum, Logger, Licht_sqrt) %>%
-  pivot_wider(
-    names_from = Logger,
-    values_from = Licht_sqrt
-  )
-
-t.test(dat$M, dat$N, paired = TRUE)
-
-
-
-
-library(e1071)
-kurtosis(summary_daily_logger$Licht_mean);skewness(summary_daily_logger$Licht_mean)
 ```
 
 Die Logger stehen auf den verschiedenen flächen mal mehr oder weniger beschattet. Deshalb werden zuerst nur die mittleren Logger verglichen, da sie am meisten exponiert sind.
@@ -598,9 +565,55 @@ summary_daily_logger %>%
        y="tägliche Lichtsumme")
 ```
 
+## NORMALVERTEILUNG UND SIGNIFIKANZTESTS
+
 ```{r}
 #| label: verschiedene Methoden für Signifikanztestung (Beispiel Lichtenau)
-# 1. ein model
+#testen auf normalverteilung
+
+#summary_daily_logger
+summary_daily_logger %>%
+  filter(Standort == "MT") %>%
+  {
+    qqnorm(.$Licht_mean)
+    qqline(.$Licht_mean)
+    hist(.$Licht_mean)
+    shapiro.test(.$Licht_mean)
+  }
+
+
+#für alle standorte testen siehe nächster code oder wie oben drüber für jeden stanodrt filtern?
+
+
+
+qqnorm(summary_daily_logger$Licht_mean); qqline(summary_daily_logger$Licht_mean)
+hist(summary_daily_logger$Licht_mean)
+qqnorm(summary_daily_logger$Licht_mean_day); qqline(summary_daily_logger$Licht_mean_day)
+hist(summary_daily_logger$Licht_mean_day)
+qqnorm(summary_daily_logger$Licht_summe); qqline(summary_daily_logger$Licht_summe)
+hist(summary_daily_logger$Licht_summe)
+#alle nicht normalverteilt
+qqnorm(sqrt(summary_daily_logger$Licht_mean)); qqline(sqrt(summary_daily_logger$Licht_mean))
+hist(sqrt(summary_daily_logger$Licht_mean))
+qqnorm(sqrt(summary_daily_logger$Licht_mean_day)); qqline(sqrt(summary_daily_logger$Licht_mean_day))
+hist(sqrt(summary_daily_logger$Licht_mean_day))
+qqnorm(sqrt(summary_daily_logger$Licht_summe)); qqline(sqrt(summary_daily_logger$Licht_summe))
+hist(sqrt(summary_daily_logger$Licht_summe))
+#jetzt ist alles normalverteilt
+
+#summary_daily_area
+qqnorm(summary_daily_area$Licht_area_mean); qqline(summary_daily_area$Licht_area_mean)
+hist(summary_daily_area$Licht_area_mean)
+#normalverteilt
+qqnorm(summary_daily_area$Licht_area_mean_day); qqline(summary_daily_area$Licht_area_mean_day)
+hist(summary_daily_area$Licht_area_mean_day)
+#normalverteilt
+qqnorm(sqrt(summary_daily_area$Licht_summe)); qqline(sqrt(summary_daily_area$Licht_summe))
+hist(sqrt(summary_daily_area$Licht_summe))
+#normalverteilt, aber leicht schief
+
+##Signifikanztets Möglichkeiten
+# 1. ein model -> chatgpt
 
 mod_L_light <- lmer(log10(Licht_summe + 1) ~ Logger + (1|Datum),
      data = summary_daily_logger %>%
@@ -620,7 +633,7 @@ pairs <- emmeans(mod_light_L, pairwise ~ Logger)
 pairs
 
 #2. T-Tests
-#Annahme der Normalverteilung -> eher nicht gegeben
+#Annahme der Normalverteilung ->häufig nicht gegeben
 dat_L <- summary_daily_logger %>%
   filter(Standort == "L") %>%
   select(Datum, Logger, Licht_summe) %>%
@@ -640,7 +653,7 @@ t.test(dat_L$O, dat_L$W, paired = TRUE) #p-value = 8.215e-16
 t.test(dat_L$O, dat_L$S, paired = TRUE) #p-value < 2.2e-16
 t.test(dat_L$W, dat_L$S, paired = TRUE) #p-value < 2.2e-16
 
-#2.b) automatisiert mit ChatGPT 5.5
+#2.b) automatisierte T-tests mit ChatGPT 5.5
 logger <- c("M", "N", "O", "S", "W")
 ergebnisse <- combn(logger, 2, simplify = FALSE)
 tests <- lapply(ergebnisse, function(x) {
@@ -689,6 +702,67 @@ summary_daily_logger %>%
        y = "kumulative Lichtintensität (Lux × Zeit)") +
   theme_minimal() +
   theme(legend.position = "none")
+
+
+
+
+
+#Testung auf signif. Unterschiede mit mehreren gepaarten T-test  und sqrt transformation um Normalverteilung zu erreichen
+dat <- summary_daily_logger %>%
+  filter(Standort == "L",
+         Logger %in% c("M", "N")) %>%
+  mutate(Licht_sqrt = sqrt(Licht_summe)) %>%
+  select(Datum, Logger, Licht_sqrt) %>%
+  pivot_wider(
+    names_from = Logger,
+    values_from = Licht_sqrt
+  )
+
+t.test(dat$M, dat$N, paired = TRUE)
+
+
+
+
+#Testung auf signif. Unterschiede mit friedman test
+daten_L <- summary_daily_logger %>%
+  filter(Standort == "L") %>%
+  arrange(Logger_ID, Datum)
+
+friedman.test(Licht_mean ~ Logger_ID | Datum, data = daten_L)
+
+pairwise.wilcox.test(
+  daten_L$Licht_mean,
+  daten_L$Logger_ID,
+  paired = TRUE,
+  p.adjust.method = "BH",
+  exact = FALSE
+)
+
+summary_daily_logger %>%
+  filter(Standort == "L") %>%
+  {
+    y_pos <- max(.$Licht_mean, na.rm = TRUE) * 1.08
+    
+    ggplot(., aes(x = Logger, fill = Logger, y = Licht_mean)) +
+      geom_boxplot(width = 0.8) +
+      annotate(
+        "text",
+        x = c("M", "N", "O", "S", "W"),
+        y = y_pos,
+        label = c("a", "b", "b", "c", "d"),
+        size = 6
+      ) +
+      coord_cartesian(ylim = c(NA, y_pos * 1.08)) +
+      labs(
+        title = "Licht mean Kleiner Sumpf",
+        x = "Logger",
+        y = "tägliche Lichtsumme"
+      )
+  }
+
+
+#library(e1071)
+#kurtosis(summary_daily_logger$Licht_mean);skewness(summary_daily_logger$Licht_mean)
 ```
 
 ```{r}
@@ -792,7 +866,120 @@ extrema_logger <- daily_logger_extrema %>%
 str(extrema_logger)
 ```
 
-### 6.2.1 Plots
+### 6.2.1 Test auf Normalverteilung und Signifikanz
+
+```{r}
+#1 mittlere Temp im Schatten
+summary_daily_logger %>%
+  filter(Standort == "MT") %>%
+  {
+    qqnorm(.$Temp_schatten_mean)
+    qqline(.$Temp_schatten_mean)
+    hist(.$Temp_schatten_mean)
+    shapiro.test(.$Temp_schatten_mean)
+  }
+summary_daily_logger %>%
+  filter(Standort == "MN") %>%
+  {
+    qqnorm(.$Temp_schatten_mean)
+    qqline(.$Temp_schatten_mean)
+    hist(.$Temp_schatten_mean)
+    shapiro.test(.$Temp_schatten_mean)
+  }
+summary_daily_logger %>%
+  filter(Standort == "L") %>%
+  {
+    qqnorm(.$Temp_schatten_mean)
+    qqline(.$Temp_schatten_mean)
+    hist(.$Temp_schatten_mean)
+    shapiro.test(.$Temp_schatten_mean)
+  }
+#alle normalverteilt
+summary_daily_area %>%
+  {
+    qqnorm(.$Temp_area_schatten_mean)
+    qqline(.$Temp_area_schatten_mean)
+    hist(.$Temp_area_schatten_mean)
+    shapiro.test(.$Temp_area_schatten_mean)
+  }
+#normalverteilt
+
+#2 max Temp in Sonne
+summary_daily_logger %>%
+  filter(Standort == "MT") %>%
+  {
+    qqnorm(.$Temp_sonne_max)
+    qqline(.$Temp_sonne_max)
+    hist(.$Temp_sonne_max)
+    shapiro.test(.$Temp_sonne_max)
+  }
+#nicht normal verteilt
+summary_daily_logger %>%
+  filter(Standort == "MN") %>%
+  {
+    qqnorm(.$Temp_sonne_max)
+    qqline(.$Temp_sonne_max)
+    hist(.$Temp_sonne_max)
+    shapiro.test(.$Temp_sonne_max)
+  }
+#eher normal verteilt
+summary_daily_logger %>%
+  filter(Standort == "L") %>%
+  {
+    qqnorm(.$Temp_sonne_max)
+    qqline(.$Temp_sonne_max)
+    hist(.$Temp_sonne_max)
+    shapiro.test(.$Temp_sonne_max)
+  }
+#nicht normalverteilt
+summary_daily_area %>%
+  {
+    qqnorm(.$Temp_area_sonne_max)
+    qqline(.$Temp_area_sonne_max)
+    hist(.$Temp_area_sonne_max)
+    shapiro.test(.$Temp_area_sonne_max)
+  }
+#nicht normalverteilt
+
+#3 Min Temp in Sonne
+summary_daily_logger %>%
+  filter(Standort == "MT") %>%
+  {
+    qqnorm(.$Temp_sonne_min)
+    qqline(.$Temp_sonne_min)
+    hist(.$Temp_sonne_min)
+    shapiro.test(.$Temp_sonne_min)
+  }
+#nicht normal verteilt
+summary_daily_logger %>%
+  filter(Standort == "MN") %>%
+  {
+    qqnorm(.$Temp_sonne_min)
+    qqline(.$Temp_sonne_min)
+    hist(.$Temp_sonne_min)
+    shapiro.test(.$Temp_sonne_min)
+  }
+#nicht normal verteilt
+summary_daily_logger %>%
+  filter(Standort == "L") %>%
+  {
+    qqnorm(.$Temp_sonne_min)
+    qqline(.$Temp_sonne_min)
+    hist(.$Temp_sonne_min)
+    shapiro.test(.$Temp_sonne_min)
+  }
+#nicht normalverteilt
+summary_daily_area %>%
+  {
+    qqnorm(.$Temp_area_sonne_min)
+    qqline(.$Temp_area_sonne_min)
+    hist(.$Temp_area_sonne_min)
+    shapiro.test(.$Temp_area_sonne_min)
+  }
+#nicht normalverteilt
+```
+
+### 6.2.2 Plots
 
 Vergleich innerer und äußerer Sensor
 
@@ -984,6 +1171,18 @@ summary_daily_logger %>%
     fill = "Standort"
   ) +
   theme_minimal()
+
+
+summary_daily_area %>%
+  ggplot(aes(x = Standort, y = Temp_area_schatten_mean, fill = Standort)) +
+  geom_boxplot(position = position_dodge(width = 0.8), width =0.7) +
+  labs(
+    title = "Vergleich der Tagesmitteltemperatur des inneren Sensors pro Standort",
+    x = "Standort",
+    y = "Tagesmitteltemperatur (°C)",
+    fill = "Standort"
+  ) +
+  theme_minimal()
 ```
 
 ```{r}
@@ -1012,6 +1211,46 @@ ggplot(summary_daily_area,aes(x = Datum, y = Temp_area_schatten_mean, color = St
 luftfeucht rand vs mitte -\> beschatten böume oder ziehen sie das wasser aus der fläche??
 
 ## 6.3 Luftfeuchte und Taupunkt
+
+### 6.3.1 Test auf Normalverteilung
+
+```{r}
+summary_daily_logger %>%
+  filter(Standort == "MT") %>%
+  {
+    qqnorm(.$rLF_mean)
+    qqline(.$rLF_mean)
+    hist(.$rLF_mean)
+    shapiro.test(.$rLF_mean)
+  }
+#nicht normal verteilt
+summary_daily_logger %>%
+  filter(Standort == "MN") %>%
+  {
+    qqnorm(.$rLF_mean)
+    qqline(.$rLF_mean)
+    hist(.$rLF_mean)
+    shapiro.test(.$rLF_mean)
+  }
+#nicht normal verteilt
+summary_daily_logger %>%
+  filter(Standort == "L") %>%
+  {
+    qqnorm(.$rLF_mean)
+    qqline(.$rLF_mean)
+    hist(.$rLF_mean)
+    shapiro.test(.$rLF_mean)
+  }
+#eher normalverteilt
+summary_daily_area %>%
+  {
+    qqnorm(.$rLF_area_mean)
+    qqline(.$rLF_area_mean)
+    hist(.$rLF_area_mean)
+    shapiro.test(.$rLF_area_mean)
+  }
+#eher normalverteilt
+```
 
 ```{r}
 #| label: boxplot of mean humidity each area
@@ -1178,6 +1417,8 @@ cor.test(plusprecip$Regen_3Tage, plusprecip$rLF_area_mean, method = "spearman")
 
 #Regen erhöht am selben Tag die LF (logisch), beeinflusst die LF am nächsten Tag und auch in den nächsten 3 Tagen
 ```
+
+hier auf jeden fall nochmal ordnung reinbringen!
 
 ```{r}
 #|label: rumprobieren mit austrockung und niederschlag, hat noch nicht hand und fuß
