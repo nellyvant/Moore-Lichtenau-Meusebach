@@ -269,6 +269,8 @@ for (logger in logger_names) {
 
 #können wir doch runnen. die frage ist: macht es einen unterschied, wenn wir es nicht runnen??
 
+#ich glaube das kann man wahrscheinlich auch weglassen
+
 ```{r}
 #| label:do not run until interpolated data is completed, removing NAs
 #entfernen von Zeilen ohne Messwerte (entstanden durch Auslesen der Logger)
@@ -624,7 +626,7 @@ summary(mod_L_light)
 coefs <- fixef(mod_L_light)
 intercept_lux <- 10^(coefs[1]) - 1
 prozent <- (10^(coefs[-1]) - 1) * 100
-ODER
+#ODER
 mod_light_L <- lmer(
   Licht_summe ~ Logger + (1|Datum),
   data = summary_daily_logger %>%
