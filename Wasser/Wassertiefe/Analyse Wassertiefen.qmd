@@ -43,82 +43,216 @@ WT_mittel <- Wassertiefen %>%
 
 ```{r}
 # Liniendiagramm - Jahresverlauf
+# Zeitlicher Verlauf der mittleren Wassertiefe nach Standort
+
 ggplot(WT_mittel, aes(x = Datum, y = WT_mean, color = Standort)) +
   geom_line(linewidth = 1) +
-  geom_point(size = 2) +
+  #geom_point(size = 2) +
   labs(
-    title = "Zeitlicher Verlauf der mittleren Wassertiefe nach Standort",
-    x = "Datum",
+    title = "",
+    x = "",
     y = "Mittlere Wassertiefe (cm)",
-    color = "Standort"
+    color = "Fläche"
   ) +
-  theme_minimal() +
-  scale_x_date(date_breaks = "1 month", date_labels = "%b %Y")
+  scale_color_manual(
+    breaks = c("MT", "MN", "L"),
+    values = c(
+      "MT" = "#D55E00",
+      "MN" = "#6495ED",
+      "L"  = "#006400"
+    ),
+    labels = c(
+      "MT" = "1",
+      "MN" = "2",
+      "L"  = "3"
+    )
+  ) +
+  theme(
+    axis.title.x = element_text(size = 16),
+    axis.title.y = element_text(size = 16),
+
+    axis.text.x = element_text(angle = 45, hjust = 1, size = 14),
+    axis.text.y = element_text(size = 14),
+
+    legend.title = element_text(size = 15),
+    legend.text = element_text(size = 14),
+
+    panel.grid.major = element_line(color = "grey75"),
+    panel.grid.minor = element_line(color = "grey85"),
+
+    axis.ticks = element_blank(),
+
+    panel.background = element_rect(fill = "white", color = NA)
+  ) +
+  scale_x_date(
+    date_breaks = "1 month",
+    date_labels = "%b %Y"
+  )
+```
+
+```{r}
+#ggsave(
+  #"Zeitlicher Verlauf der mittleren Wassertiefe nach Standort.png",
+  #width = 10,
+  #height = 6,
+  #dpi = 300
+#)
 ```
 
 ## 3.2 Unterschiede zwischen den Standorten
 
 ```{r}
-# Boxplot - Unterschiede zw. Standorten (Tagesmittelwerte)
-ggplot(WT_mittel, aes(x = factor(Standort), y = WT_mean, fill = Standort)) +
+# Boxplot pro Standort, Mittelwert der verschiedenen Messpunkte
+
+ggplot(WT_mittel, aes(x = factor(Standort,levels = c("MT", "MN", "L")), y = WT_mean, fill = Standort)) +
   geom_boxplot() +
   labs(
-    title = "Vergleich der mittleren Wassertiefe nach Standort",
-    x = "Standort",
+    title = "",
+    x = "Fläche",
     y = "Mittlere Wassertiefe (cm)"
   ) +
-  theme_minimal()
+  scale_x_discrete(labels = c(
+    "MT" = "1",
+    "MN" = "2",
+    "L"  = "3"
+  )) +
+  scale_fill_manual(
+    values = c(
+      "MT" = "#D55E00",
+      "MN" = "#6495ED",
+      "L"  = "#006400"
+    )
+  ) +
+  theme(
+    axis.title.x = element_text(size = 16),
+    axis.title.y = element_text(size = 16),
 
+    axis.text.x = element_text(size = 14),
+    axis.text.y = element_text(size = 14),
+
+    legend.position = "none",   
+
+    panel.grid.major = element_line(color = "grey75"),
+    panel.grid.minor = element_line(color = "grey85"),
+
+    axis.ticks = element_blank(),
+
+    panel.background = element_rect(fill = "white", color = NA)
+  )
+```
+
+```{r}
+#ggsave(
+  #"Boxplot_Vergleich der Flächen.png",
+  #width = 10,
+  #height = 6,
+  #dpi = 300
+#)
 ```
 
 ```{r}
 # Boxplot pro Standort, Messpunkte farblich unterscheiden
-ggplot(Wassertiefen, aes(x = factor(Standort), y = Wassertiefe, fill = factor(Messpunkt))) +
-  geom_boxplot(position = position_dodge(0.8)) +
-  labs(title = "Vergleich der Wassertiefen nach Standort und Messstelle (Mai–Sep 2025)",
-       x = "Standort",
-       y = "Wassertiefe (cm)",
-       fill = "Messstelle") +
-  theme_minimal()
+# Vergleich der Wassertiefen nach Standort und Messstelle (Mai–Sep 2025)
 
+ggplot(Wassertiefen,
+       aes(x = factor(Standort, levels = c("MT", "MN", "L")),
+           y = Wassertiefe,
+           fill = factor(Messpunkt))) +
+
+  geom_boxplot(position = position_dodge(0.8)) +
+
+  labs(
+    title = "",
+    x = "Fläche",
+    y = "Wassertiefe (cm)",
+    fill = "Messstelle"
+  ) +
+
+  scale_x_discrete(labels = c(
+    "MT" = "1",
+    "MN" = "2",
+    "L"  = "3"
+  )) +
+
+  theme(
+    axis.title.x = element_text(size = 16),
+    axis.title.y = element_text(size = 16),
+
+    axis.text.x = element_text(size = 14),
+    axis.text.y = element_text(size = 14),
+
+    legend.title = element_text(size = 15),
+    legend.text = element_text(size = 14),
+
+    panel.grid.major = element_line(color = "grey75"),
+    panel.grid.minor = element_line(color = "grey85"),
+
+    axis.ticks = element_blank(),
+
+    panel.background = element_rect(fill = "white", color = NA)
+  )
+```
+
+```{r}
+#ggsave(
+  #"Boxplot_Vergleich der Wassertiefen nach Standort und Messstelle.png",
+  #width = 10,
+  #height = 6,
+  #dpi = 300
+#)
 ```
 
 ## 3.3 Unterschiede innerhalb eines Standortes
 
 ```{r}
-####Jahresverlauf - Liniendiagramm
-plot_lin <- function(df, st, titel=NULL) {
+#### Jahresverlauf - Liniendiagramm
+plot_lin1 <- function(df, st, titel = NULL) {
   
-  # Daten  nach Standort filtern
+  # Daten nach Standort filtern
   df_sub1 <- df %>% filter(Standort == st)
 
-  # Automatischer Titel
-  if (is.null(titel)) {
-    titel <- paste("Wassertiefeschwankungen -", st)
-  }
-  
-  ggplot(df_sub1, aes(Datum, Wassertiefe, color = factor(Messpunkt))) +
+  ggplot(df_sub1, aes(x = Datum, y = Wassertiefe, color = factor(Messpunkt))) +
     geom_line(linewidth = 1) +
-    geom_point(size = 2) +
-    labs(title = titel,
-         x = "Datum", y = "Wassertiefe (cm)", color = "Messstelle") +
-    theme_minimal() +
-    # Achse automatisch an vorhandene Daten anpassen
-    scale_x_date(date_breaks = "1 month", date_labels = "%b %Y")
+    #geom_point(size = 2) +
+    
+    labs(
+      title = titel,
+      x = "",
+      y = "Mittlere Wassertiefe (cm)",
+      color = "Messstelle"
+    ) +
+    
+    scale_x_date(
+      date_breaks = "1 month",
+      date_labels = "%b %Y"
+    ) +
+    
+    theme(
+      axis.title.x = element_text(size = 16),
+      axis.title.y = element_text(size = 16),
+
+      axis.text.x = element_text(angle = 45, hjust = 1, size = 14),
+      axis.text.y = element_text(size = 14),
+
+      legend.title = element_text(size = 15),
+      legend.text = element_text(size = 14),
+
+      panel.grid.major = element_line(color = "grey75"),
+      panel.grid.minor = element_line(color = "grey85"),
+
+      axis.ticks = element_blank(),
+
+      panel.background = element_rect(fill = "white", color = NA)
+    )
 }
+```
 
-
-
+```{r}
 #### Unterschiede zw. den Messstellen - Boxplot 
 plot_box <- function(df, st, titel=NULL, x_name=NULL) {
   
   # Daten filtern
   df_sub2 <- df %>% filter(Standort == st)
-  
-  # Titel setzen, falls NULL
-  if (is.null(titel)) {
-    titel <- paste("Wassertiefeschwankungen nach Messpunkt -", st)
-  }
   
   # x-Achsenname setzen, falls NULL
   if (is.null(x_name)) {
@@ -133,7 +267,23 @@ plot_box <- function(df, st, titel=NULL, x_name=NULL) {
       y = "Wassertiefe (cm)",
       fill = "Messstelle"
     ) +
-    theme_minimal()
+    theme(
+      axis.title.x = element_text(size = 16),
+      axis.title.y = element_text(size = 16),
+
+      axis.text.x = element_text(size = 14),
+      axis.text.y = element_text(size = 14),
+
+      legend.title = element_text(size = 15),
+      legend.text = element_text(size = 14),
+
+      panel.grid.major = element_line(color = "grey75"),
+      panel.grid.minor = element_line(color = "grey85"),
+
+      axis.ticks = element_blank(),
+
+      panel.background = element_rect(fill = "white", color = NA)
+    )
 }
 
 ```
@@ -141,14 +291,13 @@ plot_box <- function(df, st, titel=NULL, x_name=NULL) {
 ### Meusebach trocken
 
 ```{r}
-# Liniendiagramm
-plot_lin(Wassertiefen, "MT", titel="Wassertiefen in Meusebach trocken Mai–September 2025")
+plot_lin1(Wassertiefen, "MT", titel="")
 ```
 
 ```{r}
 # Boxplot
 plot_box(Wassertiefen, st="MT",
-         titel="Messpunkte Meusebach trocken: Mai–Sep 2025",
+         titel="",
          x_name="Meusebach trocken")
 ```
 
@@ -156,13 +305,13 @@ plot_box(Wassertiefen, st="MT",
 
 ```{r}
 # Liniendiagramm
-plot_lin(Wassertiefen, "MN", titel="Wassertiefen in Meusebach nass Mai–September 2025")
+plot_lin1(Wassertiefen, "MN", titel="")
 ```
 
 ```{r}
 # Boxplot
 plot_box(Wassertiefen, st="MN",
-         titel="Messpunkte Meusebach nass: Mai–Sep 2025",
+         titel="",
          x_name="Meusebach nass")
 ```
 
@@ -170,14 +319,14 @@ plot_box(Wassertiefen, st="MN",
 
 ```{r}
 # Liniendiagramm
-plot_lin(Wassertiefen, "L", titel="Wassertiefen in Lichtenau: Mai–September 2025")
+plot_lin1(Wassertiefen, "L", titel="")
 ```
 
 ```{r}
 # Boxplot
 plot_box(Wassertiefen, st="L",
-         titel="Messpunkte Lichtenau: Mai–Sep 2025",
-         x_name="Meusebach nass")
+         titel="",
+         x_name="Lichtenau")
 ```
 
 # 4 Statistische Kennzahlen
