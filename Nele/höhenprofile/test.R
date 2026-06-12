@@ -182,3 +182,292 @@ summary_daily_logger %>%
         y = "tägliche Lichtsumme"
       )
   }
+
+
+##### Niederschläge#####
+
+#Frage: unterscheiden sich die austrocknungsraten der drei flächen signifikant?
+#ich betrachte nur die tage ohne regen, da an regentagen LF sprunghaft ansteigt
+
+
+
+#plusprecip im daily logger summary
+plusprecip <- left_join(summary_daily_logger, precip, by = "Datum")
+str(plusprecip)
+plusprecip <- plusprecip %>%
+  select(-Temp_sonne_mean:-Licht_summe)
+str(plusprecip)
+plusprecip <- plusprecip %>%
+  mutate(Monat = format(Datum, "%Y-%m"))
+
+plusprecip%>%
+  filter(Standort =="L")%>%
+  ggplot(aes(x = Datum)) +
+  geom_line(aes(y = rLF_mean,
+                color = Logger),
+            linewidth = 1) +
+  geom_col(aes(y = `rain (mm)`),
+           fill = "blue",
+           alpha = 0.5) +
+  
+  scale_y_continuous(
+    name = "Luftfeuchte (%)",
+    sec.axis = sec_axis(~ . / 5,
+                        name = "Niederschlag (mm)")
+  ) +
+  
+  facet_wrap(~ Monat, scales = "free_x") +
+  
+  theme_minimal()
+
+plusprecip <- plusprecip %>%
+  arrange(Datum) %>%
+  mutate(
+    Regen_gestern = lag(`rain (mm)`, 1),
+    Regen_3Tage = zoo::rollsum(`rain (mm)`,
+                               k = 3,
+                               fill = NA,
+                               align = "right")) %>%
+  group_by(Datum) %>%
+  mutate(
+    Regen = first(`rain (mm)`) > 0) %>%
+  ungroup() %>%
+  mutate(
+    letzter_Regen = if_else(Regen, Datum, as.POSIXct(NA))) %>%
+  mutate(
+    letzter_Regen = zoo::na.locf(letzter_Regen, na.rm = FALSE)) %>%
+  mutate(
+    Tage_seit_Regen =as.numeric(difftime(Datum, letzter_Regen,units = "days"))) %>%
+  select(-letzter_Regen) %>%
+  arrange(Logger_ID, Datum) %>%
+  group_by(Logger_ID) %>%
+  mutate(
+    delta_LF = rLF_mean - lag(rLF_mean)
+  ) %>%
+  ungroup()
+
+trocken <- plusprecip %>%
+  filter(
+    Regen == FALSE,
+    !is.na(Tage_seit_Regen))
+
+mod <-trocken%>%
+  filter(Standort =="MT")%>%
+  {lm(
+  rLF_mean ~ Tage_seit_Regen * Logger_ID,
+  data=.)}
+
+summary(mod)
+anova(mod)
+
+trocken %>%
+  filter(Standort=="MT")%>%
+  ggplot(aes(x = Tage_seit_Regen,
+           y = rLF_mean,
+           color = Logger_ID)) +
+  geom_point(alpha = 0.4) +
+  geom_smooth(aes(fill=Logger_ID),method = "lm", se = T, alpha=0.1) +
+  theme_minimal() +
+  labs(
+    x = "Tage seit letztem Niederschlag",
+    y = "mittlere relative Luftfeuchte (%)",
+    color = "Logger"
+  )
+
+
+
+
+##### Niederschläge ordentlich#####
+#| label: Niederschlagsereignisse von externer Klimastation
+precip <- read_xlsx("Niederschlag_AWEKAS_Station_Meusebach.xlsx")
+str(precip)
+precip <- rename(precip, Datum = Date)
+precip%>%
+  ggplot(aes(x = Date, y = `rain (mm)`)) + geom_line()
+
+# Join an AREA summary
+plusprecipa <- left_join(summary_daily_area, precip, by = "Datum")
+str(plusprecipa)
+plusprecipa <- plusprecipa %>%
+  select(-Temp_area_sonne_mean:-Licht_summe)
+str(plusprecipa)
+plusprecipa <- plusprecipa %>%
+  mutate(Monat = format(Datum, "%Y-%m"))
+
+#Plot NS und Luftfeuchte über Zeit
+ggplot(plusprecipa, aes(x = Datum)) +
+  geom_line(aes(y = rLF_area_mean,
+                color = Standort),
+            linewidth = 1) +
+  geom_col(aes(y = `rain (mm)`),
+           fill = "blue",
+           alpha = 0.5) +
+  scale_y_continuous(
+    name = "Luftfeuchte (%)",
+    sec.axis = sec_axis(~ . / 5,
+                        name = "Niederschlag (mm)")) +
+  facet_wrap(~ Monat, scales = "free_x") +
+  theme_minimal()
+
+# Korrelationstests
+cor.test(plusprecipa$`rain (mm)`, plusprecipa$rLF_area_mean, method = "spearman")
+#p-value < 2.2e-16,  rho 0.6032023 -> logisch, wenns regnet ist zeitgleich die LF hoch
+
+plusprecipa <- plusprecipa %>%
+  arrange(Datum) %>%
+  mutate(
+    Regen_gestern = lag(`rain (mm)`, 1),
+    Regen_3Tage = zoo::rollsum(`rain (mm)`,
+                               k = 3,
+                               fill = NA,
+                               align = "right"))
+cor.test(plusprecipa$Regen_gestern, plusprecipa$rLF_area_mean, method = "spearman")
+#p-value < 2.2e-16,  rho 0.5398155 
+cor.test(plusprecipa$Regen_3Tage, plusprecipa$rLF_area_mean, method = "spearman")
+#p-value < 2.2e-16,  rho 0.5821407
+
+#Regen erhöht am selben Tag die LF (logisch), beeinflusst die LF am nächsten Tag und auch in den nächsten 3 Tagen
+
+
+#Austrockungsrate vergleichen
+plusprecipa <- plusprecipa %>%
+  group_by(Datum) %>%
+  mutate(
+    Regen = first(`rain (mm)`) > 0) %>%
+  ungroup() %>%
+  mutate(
+    letzter_Regen = if_else(Regen, Datum, as.POSIXct(NA))) %>%
+  mutate(
+    letzter_Regen = zoo::na.locf(letzter_Regen, na.rm = FALSE)) %>%
+  mutate(
+    Tage_seit_Regen =as.numeric(difftime(Datum, letzter_Regen,units = "days"))) %>%
+  select(-letzter_Regen) %>%
+  arrange(Standort, Datum) %>%
+  group_by(Standort) %>%
+  mutate(
+    delta_LF = rLF_area_mean - lag(rLF_area_mean)
+  ) %>%
+  ungroup()
+#verwende nur Tage ohne Regen, da an Regentagen keine Austrocknung stattfindet
+trockena <- plusprecip %>%
+  filter(
+    Regen == FALSE,
+    !is.na(Tage_seit_Regen))
+
+mod <- lm(
+  rLF_area_mean ~ Tage_seit_Regen * Standort,
+  data = trockena
+)
+
+summary(mod)
+#Tage seit Regen erklärt signifikant die Abnahme in LF (logisch)
+#L: LF nimmt 1,8% pro Tag ab
+#MN: LF nimmt 1,8%+0,5%= 2,3% pro Tag ab
+#MT LF nimmt 1,8%+0,1%= 1,9% pro Tag ab
+#Unterschiede zwishcen Flächen nicht signifikant
+anova(mod)
+
+ggplot(trockena,
+       aes(x = Tage_seit_Regen,
+           y = rLF_area_mean,
+           color = Standort)) +
+  geom_point(alpha = 0.4) +
+  geom_smooth(method = "lm", se = TRUE) +
+  theme_minimal() +
+  labs(
+    x = "Tage seit letztem Niederschlag",
+    y = "mittlere relative Luftfeuchte (%)",
+    color = "Standort"
+  )
+
+# Join mit LOGGER summary
+
+plusprecipl <- left_join(summary_daily_logger, precip, by = "Datum")
+str(plusprecipl)
+plusprecipl <- plusprecipl %>%
+  select(-Temp_area_sonne_mean:-Licht_summe)
+str(plusprecipl)
+plusprecipl <- plusprecipl %>%
+  mutate(Monat = format(Datum, "%Y-%m"))
+
+#Plot NS und Luftfeuchte über Zeit
+ggplot(plusprecipl, aes(x = Datum)) +
+  geom_line(aes(y = rLF_area_mean,
+                color = Logger_ID),
+            linewidth = 1) +
+  geom_col(aes(y = `rain (mm)`),
+           fill = "blue",
+           alpha = 0.5) +
+  scale_y_continuous(
+    name = "Luftfeuchte (%)",
+    sec.axis = sec_axis(~ . / 5,
+                        name = "Niederschlag (mm)")) +
+  facet_wrap(~ Monat, scales = "free_x") +
+  theme_minimal()
+
+# Korrelationstests
+cor.test(plusprecipl$`rain (mm)`, plusprecipl$rLF__mean, method = "spearman")
+
+plusprecipl <- plusprecipl %>%
+  arrange(Datum) %>%
+  mutate(
+    Regen_gestern = lag(`rain (mm)`, 1),
+    Regen_3Tage = zoo::rollsum(`rain (mm)`,
+                               k = 3,
+                               fill = NA,
+                               align = "right"))
+cor.test(plusprecipl$Regen_gestern, plusprecipl$rLF_area_mean, method = "spearman")
+
+cor.test(plusprecipl$Regen_3Tage, plusprecipl$rLF_area_mean, method = "spearman")
+
+
+#Regen erhöht am selben Tag die LF (logisch), beeinflusst die LF am nächsten Tag und auch in den nächsten 3 Tagen
+
+
+#Austrockungsrate vergleichen
+plusprecipl <- plusprecipl %>%
+  group_by(Datum) %>%
+  mutate(
+    Regen = first(`rain (mm)`) > 0) %>%
+  ungroup() %>%
+  mutate(
+    letzter_Regen = if_else(Regen, Datum, as.POSIXct(NA))) %>%
+  mutate(
+    letzter_Regen = zoo::na.locf(letzter_Regen, na.rm = FALSE)) %>%
+  mutate(
+    Tage_seit_Regen =as.numeric(difftime(Datum, letzter_Regen,units = "days"))) %>%
+  select(-letzter_Regen) %>%
+  arrange(Standort, Datum) %>%
+  group_by(Standort) %>%
+  mutate(
+    delta_LF = rLF_mean - lag(rLF_mean)
+  ) %>%
+  ungroup()
+#verwende nur Tage ohne Regen, da an Regentagen keine Austrocknung stattfindet
+trockenl <- plusprecipl %>%
+  filter(
+    Regen == FALSE,
+    !is.na(Tage_seit_Regen))
+
+mod <-trocken%>%
+  filter(Standort =="MT")%>%
+  {lm(
+    rLF_mean ~ Tage_seit_Regen * Logger_ID,
+    data=.)}
+
+summary(mod)
+anova(mod)
+
+trocken %>%
+  filter(Standort=="MT")%>%
+  ggplot(aes(x = Tage_seit_Regen,
+             y = rLF_mean,
+             color = Logger_ID)) +
+  geom_point(alpha = 0.4) +
+  geom_smooth(aes(fill=Logger_ID),method = "lm", se = T, alpha=0.1) +
+  theme_minimal() +
+  labs(
+    x = "Tage seit letztem Niederschlag",
+    y = "mittlere relative Luftfeuchte (%)",
+    color = "Logger"
+  )
