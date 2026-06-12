@@ -1,0 +1,3 @@
+Meusebach trocken = Fuchshügel = Fläche 1 = #D55E00
+Meusebach nass = Auf der Pfalz = Fläche 2 = #6495ED
+Lichtenau = Kleiner Sumpf = Fläche 3 = #006400
