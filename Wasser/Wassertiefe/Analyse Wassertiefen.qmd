@@ -24,6 +24,7 @@ class(Wassertiefen$Datum)
 
 # Datum als Date konvertieren
 Wassertiefen$Datum <- as.Date(Wassertiefen$Datum)
+
 str(Wassertiefen)
 class(Wassertiefen$Datum)
 ```
@@ -226,6 +227,14 @@ plot_lin1 <- function(df, st, titel = NULL) {
       date_breaks = "1 month",
       date_labels = "%b %Y"
     ) +
+    scale_color_manual(
+  values = c(
+    "1" = "#F8766D",
+    "2" = "#7CAE00",
+    "3" = "#00BFC4",
+    "4" = "#C77CFF"
+  )
+  ) +
     
     theme(
       axis.title.x = element_text(size = 16),
@@ -267,6 +276,14 @@ plot_box <- function(df, st, titel=NULL, x_name=NULL) {
       y = "Wassertiefe (cm)",
       fill = "Messstelle"
     ) +
+    scale_fill_manual(
+  values = c(
+    "1" = "#F8766D",
+    "2" = "#7CAE00",
+    "3" = "#00BFC4",
+    "4" = "#C77CFF"
+  )
+  ) +
     theme(
       axis.title.x = element_text(size = 16),
       axis.title.y = element_text(size = 16),
@@ -421,6 +438,157 @@ WT_trocken_mp
 
 ```
 
+### Häufigkeit der Wasserstände
+
+```{r}
+# Histogramm zur Häufigkeit der Wasserstände je Standort 
+ggplot(Wassertiefen, aes(x = Wassertiefe, fill = Standort)) +
+  geom_histogram(binwidth = 5, alpha = 0.7) +
+  facet_wrap(~Standort) +
+  theme_minimal() +
+  labs(title = "Verteilung der Wasserstände pro Standort",
+       x = "Wasserstand (cm)",
+       y = "Anzahl der Messungen")
+
+# Histogramm zur Häufigkeit der Wasserstände je Standort ohne Messpunkt 4 bei Lihtenau 
+ggplot(
+  Wassertiefen %>%
+    filter(!(Standort == "L" & Messpunkt == 4)) %>%
+    mutate(Standort = factor(Standort, levels = c("MT", "MN", "L"))),
+  aes(x = Wassertiefe, fill = Standort)
+) +
+  geom_histogram(binwidth = 5, alpha = 0.7) +
+  facet_wrap(~Standort) +
+  labs(
+    title = "",
+    x = "Wasserstand (cm)",
+    y = "Anzahl der Messungen",
+    fill = "Fläche"              
+  ) +
+  scale_fill_manual(
+    values = c(
+      "MT" = "#D55E00",
+      "MN" = "#6495ED",
+      "L"  = "#006400"
+    ),
+    labels = c(                  
+      "MT" = "1",
+      "MN" = "2",
+      "L"  = "3"
+    )
+  ) +
+  theme(
+    axis.title.x = element_text(size = 16),
+    axis.title.y = element_text(size = 16),
+
+    axis.text.x = element_text(size = 14),
+    axis.text.y = element_text(size = 14),
+
+    legend.title = element_text(size = 15),
+    legend.text = element_text(size = 14),
+
+    panel.grid.major = element_line(color = "grey75"),
+    panel.grid.minor = element_line(color = "grey85"),
+
+    axis.ticks = element_blank(),
+
+    panel.background = element_rect(fill = "white", color = NA),
+
+    strip.background = element_blank(),  # graue Balken entfernen
+    strip.text = element_blank()         # MT/MN/L entfernen
+  )
+```
+
+```{r}
+# Histogramm zur Häufigkeit der Wasserstände je Messpunkt und Standort 
+Wassertiefen$Standort <- as.factor(Wassertiefen$Standort)
+Wassertiefen$Messpunkt <- as.factor(Wassertiefen$Messpunkt)
+
+standort_L <- Wassertiefen %>% 
+  filter(Standort == "L")
+standort_L <- Wassertiefen %>%
+  filter(Standort == "L", Messpunkt != "4")#ohne Messpunkt 4 (verzerrt Daten)
+standort_MN <- Wassertiefen %>% 
+  filter(Standort == "MN")
+standort_MT <- Wassertiefen %>% 
+  filter(Standort == "MT")
+
+ggplot(standort_L, aes(x = Wassertiefe, fill = factor(Messpunkt))) +
+  geom_histogram(binwidth = 5, alpha = 0.7) +
+  facet_wrap(~Messpunkt) +
+  labs(
+    title = "",
+    x = "Wasserstand (cm)",
+    y = "Anzahl Messungen",
+    fill = "Messstelle"
+  ) +
+  scale_fill_manual(
+    values = c(
+      "1" = "#F8766D",
+      "2" = "#7CAE00",
+      "3" = "#00BFC4",
+      "4" = "#C77CFF"
+    )
+  ) +
+  theme(
+    axis.title.x = element_text(size = 16),
+    axis.title.y = element_text(size = 16),
+
+    axis.text.x = element_text(size = 14),
+    axis.text.y = element_text(size = 14),
+
+    legend.title = element_text(size = 15),
+    legend.text = element_text(size = 14),
+
+    panel.grid.major = element_line(color = "grey75"),
+    panel.grid.minor = element_line(color = "grey85"),
+
+    axis.ticks = element_blank(),
+
+    panel.background = element_rect(fill = "white", color = NA),
+
+    strip.background = element_blank(),
+    strip.text = element_blank()
+  )
+
+```
+
+```{r}
+ggsave(
+  "Histogramm_Häufigkeit der Wasserstände_Fläche 3 (ohne MS4).png",
+  width = 10,
+  height = 6,
+  dpi = 300
+)
+```
+
+```{r}
+Wassertiefen %>%
+  filter(!(Standort == "L" & Messpunkt == "4")) %>%
+  ggplot(aes(x = Wassertiefe, fill = Standort)) +
+  geom_histogram(binwidth = 5, alpha = 0.7) +
+  facet_grid(Standort ~ Messpunkt) +
+  theme_minimal() +
+  labs(
+    title = "Histogramm der Wasserstände nach Standort und Messpunkt",
+    x = "Wasserstand (cm)",
+    y = "Anzahl Messungen",
+    fill = "Fläche"
+  ) +
+  scale_fill_manual(
+    values = c(
+      "L" = "#1b9e77",
+      "MT" = "#d95f02",
+      "MN" = "#7570b3"
+    ),
+    labels = c(
+      "L" = "Lichtenau",
+      "MT" = "Meusebach trocken",
+      "MN" = "Meusebach nass"
+    )
+  )
+```
+
 # 6 Zusatz
 
 ```{r}
@@ -537,52 +705,9 @@ ggplot(
 ```
 
 ```{r}
-# Histogramm zur Häufigkeit der Wasserstände je Messpunkt und Standort 
-Wassertiefen$Standort <- as.factor(Wassertiefen$Standort)
-Wassertiefen$Messpunkt <- as.factor(Wassertiefen$Messpunkt)
-
-standort_L <- Wassertiefen %>% 
-  filter(Standort == "L")
-standort_L <- Wassertiefen %>%
-  filter(Standort == "L", Messpunkt != "4")#ohne Messpunkt 4 (verzerrt Daten)
-standort_MN <- Wassertiefen %>% 
-  filter(Standort == "MN")
-standort_MT <- Wassertiefen %>% 
-  filter(Standort == "MT")
-
-ggplot(standort_MT, aes(x = Wassertiefe, fill = Messpunkt)) +
-  geom_histogram(binwidth = 5, alpha = 0.7) +
-  facet_wrap(~Messpunkt) +
-  theme_minimal() +
-  labs(title = "Histogramm pro Messpunkt & Standort",
-       x = "Wasserstand (cm)",
-       y = "Anzahl Messungen")
 
 ```
 
 ```{r}
-Wassertiefen %>%
-  filter(!(Standort == "L" & Messpunkt == "4")) %>%
-  ggplot(aes(x = Wassertiefe, fill = Standort)) +
-  geom_histogram(binwidth = 5, alpha = 0.7) +
-  facet_grid(Standort ~ Messpunkt) +
-  theme_minimal() +
-  labs(
-    title = "Histogramm der Wasserstände nach Standort und Messpunkt",
-    x = "Wasserstand (cm)",
-    y = "Anzahl Messungen",
-    fill = "Fläche"
-  ) +
-  scale_fill_manual(
-    values = c(
-      "L" = "#1b9e77",
-      "MT" = "#d95f02",
-      "MN" = "#7570b3"
-    ),
-    labels = c(
-      "L" = "Lichtenau",
-      "MT" = "Meusebach trocken",
-      "MN" = "Meusebach nass"
-    )
-  )
+
 ```
