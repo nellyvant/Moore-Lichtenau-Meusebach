@@ -386,6 +386,18 @@ ggplot(vegdata,
 
 ```{r}
 ####species richness, Shannon Index, relative Häufigkeit und species evenness bestimmen####
+#anlegen einer Vegetationsmatrix
+comm_matrix <- veg_long %>%
+  group_by(plot.ID, Art) %>%
+  summarise(Deckung = sum(Deckung), .groups = "drop") %>%
+  tidyr::pivot_wider(
+    names_from = Art,
+    values_from = Deckung,
+    values_fill = 0
+  ) %>%
+  tibble::column_to_rownames("plot.ID")
+str(comm_matrix)
+
 
 #berechnen von species richness, shannon Index, relativer Häufigkeit und Evenness
 species_richness <- specnumber(comm_matrix)
@@ -422,20 +434,6 @@ merged_data <- results %>%
 ```
 
 # 6 DCA
-
-```{r}
-#anlegen einer Vegetationsmatrix
-comm_matrix <- veg_long %>%
-  group_by(plot.ID, Art) %>%
-  summarise(Deckung = sum(Deckung), .groups = "drop") %>%
-  tidyr::pivot_wider(
-    names_from = Art,
-    values_from = Deckung,
-    values_fill = 0
-  ) %>%
-  tibble::column_to_rownames("plot.ID")
-str(comm_matrix)
-```
 
 ## 6.1 Alle Flächen
 
@@ -761,7 +759,7 @@ ggplot(dca_df, aes(DCA1, DCA2, colour = Distanz)) +
 
 ```
 
-# 7 Transektanalyse -\> hier muss ich noch was sinnvolles draus machen
+# 7 Transektanalyse -\> bisher nur Plots
 
 ```{r}
 
@@ -937,9 +935,9 @@ plot_data %>%
   labs(x = NULL, y = NULL)
 ```
 
-3D Plot
-
 ```{r}
+#| label: do not run
+# 3D Plot
 library(plotly)
 plot_3d <- merged_data %>%
   filter(site == "Lic") %>%
@@ -967,12 +965,13 @@ plot_ly(
   )
 ```
 
-was sollte ich sonst noch analysieren? -\> modelle: diversität, deckung TL usw \~ feuchte, licht usw
+TODO: für jeden plot deckung jeder layer in merged_data hinzufügen
 
 Korrelationen testen
 
 ```{r}
 library(corrplot)
+#global
 #corrplot() erwartet numerische Matrix!
 corr_matrix <- merged_data %>%
   select(where(is.numeric)) %>%
@@ -980,7 +979,7 @@ corr_matrix <- merged_data %>%
   cor(use = "pairwise.complete.obs")
 corrplot(corr_matrix, method ="number")
 
-
+#lokal
 corr_matrix <- merged_data %>%
   filter(site == "Meu_trock") %>%
   select(where(is.numeric)) %>%
