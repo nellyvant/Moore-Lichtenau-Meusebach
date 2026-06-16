@@ -475,10 +475,238 @@ trocken %>%
 
 ##### ornden Signifikanztests#####
 
-#| label: verschiedene Methoden für Signifikanztestung (Beispiel Lichtenau)
+#| label: verschiedene Methoden für Signifikanztestung (Beispiel Lichtenau) bzw alle flächen gegeneinander
 #testen auf normalverteilung
 
 #innerhalb des Standort
+#summary_daily_logger
+library(ggpubr)
+summary_daily_logger %>%
+  filter(Standort == "L") %>%
+  ggqqplot(
+    x = "Licht_mean",
+    facet.by = "Logger",
+    add = "qqline"
+  )
+summary_daily_logger %>%
+  filter(Standort == "L") %>%
+  ggplot(aes(x = Licht_mean)) +
+  geom_histogram(bins = 10) +
+  facet_wrap(~ Logger, scales = "free") 
+#alle in etwa normalverteilt
+
+#Innerhalb der Fläche
+#summary_daily_area
+
+summary_daily_area %>%
+  ggqqplot(
+    x = "Licht_area_mean",
+    facet.by = "Standort",
+    add = "qqline")
+summary_daily_area %>%
+  ggplot(aes(x = Licht_area_mean)) +
+  geom_histogram(bins = 10) +
+  facet_wrap(~ Standort, scales = "free") 
+#nicht normalverteilt
+
+
+
+##Signifikanztets Möglichkeiten
+
+
+#1. T-Tests
+#Annahme der Normalverteilung ->häufig nicht gegeben
+dat_L <- summary_daily_logger %>%
+  filter(Standort == "L") %>%
+  select(Datum, Logger, Licht_summe) %>%
+  pivot_wider(
+    names_from = Logger,
+    values_from = Licht_summe
+  )
+#2.a) händisch
+t.test(dat_L$M, dat_L$N, paired = TRUE) #p-value < 2.2e-16
+t.test(dat_L$M, dat_L$O, paired = TRUE) #p-value < 2.2e-16
+t.test(dat_L$M, dat_L$W, paired = TRUE) #p-value < 2.2e-16
+t.test(dat_L$M, dat_L$S, paired = TRUE) #p-value < 2.2e-16
+t.test(dat_L$N, dat_L$O, paired = TRUE) #p-value = 0.1268
+t.test(dat_L$N, dat_L$W, paired = TRUE) #p-value < 2.2e-16
+t.test(dat_L$N, dat_L$S, paired = TRUE) #p-value < 2.2e-16
+t.test(dat_L$O, dat_L$W, paired = TRUE) #p-value = 8.215e-16
+t.test(dat_L$O, dat_L$S, paired = TRUE) #p-value < 2.2e-16
+t.test(dat_L$W, dat_L$S, paired = TRUE) #p-value < 2.2e-16
+
+#alle Logger signif. unterchidlich außer N&O
+
+#2.b) automatisierte T-tests mit ChatGPT 5.5
+logger <- c("M", "N", "O", "S", "W")
+ergebnisse <- combn(logger, 2, simplify = FALSE)
+tests <- lapply(ergebnisse, function(x) {
+  test <- t.test(
+    dat_L[[x[1]]],
+    dat_L[[x[2]]],
+    paired = TRUE)
+  data.frame(
+    Gruppe1 = x[1],
+    Gruppe2 = x[2],
+    p_Wert = test$p.value,
+    Mittelwert_Diff = mean(dat_L[[x[1]]] - dat_L[[x[2]]],na.rm = TRUE))
+})
+tests_df <- bind_rows(tests)
+tests_df
+
+#plot
+summary_daily_logger %>%
+  filter(Standort == "L") %>%
+  ggplot(aes(x = Logger,
+             fill = Logger,
+             y = Licht_summe)) +
+  geom_boxplot(width = 0.8) +
+  geom_text(
+    data = summary_daily_logger %>%
+      filter(Standort == "L") %>%
+      group_by(Logger) %>%
+      summarise(
+        y = max(Licht_summe, na.rm = TRUE) * 1.08,
+        gruppe = case_when(
+          Logger == "M" ~ "a",
+          Logger == "N" ~ "b",
+          Logger == "O" ~ "b",
+          Logger == "S" ~ "c",
+          Logger == "W" ~ "d"
+        ),
+        .groups = "drop"
+      ),
+    aes(x = Logger, y = y, label = gruppe),
+    inherit.aes = FALSE,
+    size = 6,
+    fontface = "bold"
+  ) +
+  labs(title = "Lichtverhältnisse Kleiner Sumpf",
+       x = "Logger",
+       y = "kumulative Lichtintensität (Lux × Zeit)") +
+  theme_minimal() +
+  theme(legend.position = "none")
+
+
+
+
+
+#3. Testung auf signif. Unterschiede mit mehreren gepaarten T-test  und sqrt transformation um Normalverteilung zu erreichen
+dat_L_sqrt <- summary_daily_logger %>%
+  filter(Standort == "L")%>%
+  mutate(Licht_sqrt = sqrt(Licht_summe)) %>%
+  select(Datum, Logger, Licht_sqrt) %>%
+  pivot_wider(
+    names_from = Logger,
+    values_from = Licht_sqrt
+  )
+
+
+tests <- lapply(ergebnisse, function(x) {
+  test <- t.test(
+    dat_L_sqrt[[x[1]]],
+    dat_L_sqrt[[x[2]]],
+    paired = TRUE)
+  data.frame(
+    Gruppe1 = x[1],
+    Gruppe2 = x[2],
+    p_Wert = test$p.value,
+    Mittelwert_Diff = mean(dat_L_sqrt[[x[1]]] - dat_L_sqrt[[x[2]]],na.rm = TRUE))
+})
+tests_df <- bind_rows(tests)
+tests_df
+
+#alle signif unterschiedl außer N&O
+
+
+#4. Testung auf signif. Unterschiede mit friedman test
+dat_L_fried <- summary_daily_logger %>%
+  filter(Standort == "L") %>%
+  arrange(Logger_ID, Datum)
+
+friedman.test(Licht_mean ~ Logger_ID | Datum, data = dat_L_fried)
+
+pairwise.wilcox.test(
+  dat_L_fried$Licht_mean,
+  dat_L_fried$Logger_ID,
+  paired = TRUE,
+  p.adjust.method = "BH",
+  exact = FALSE
+)
+
+#alle Logger in L unterscheiden sich signif außer N&O
+
+summary_daily_logger %>%
+  filter(Standort == "L") %>%
+  {
+    y_pos <- max(.$Licht_mean, na.rm = TRUE) * 1.08
+    
+    ggplot(., aes(x = Logger, fill = Logger, y = Licht_mean)) +
+      geom_boxplot(width = 0.8) +
+      annotate(
+        "text",
+        x = c("M", "N", "O", "S", "W"),
+        y = y_pos,
+        label = c("a", "b", "b", "c", "d"),
+        size = 6
+      ) +
+      coord_cartesian(ylim = c(NA, y_pos * 1.08)) +
+      labs(
+        title = "Licht mean Kleiner Sumpf",
+        x = "Logger",
+        y = "tägliche Lichtsumme"
+      )
+  }
+
+
+#5. Test mit repeated measures anova
+library(rstatix)
+
+res <- anova_test(
+  data = dat_L_fried,
+  dv = Licht_mean,
+  wid = Datum,
+  within = Logger
+)
+
+get_anova_table(res)
+
+pwc <- dat_L_fried %>%
+  pairwise_t_test(
+    Licht_mean ~ Logger, paired = TRUE,
+    p.adjust.method = "bonferroni"
+  )
+pwc
+
+#alle logger in L unterscheiden sich signif. außer N&O
+
+
+
+# 1. ein model -> chatgpt
+
+mod_L_light <- lmer(log10(Licht_summe + 1) ~ Logger + (1|Datum),
+                    data = summary_daily_logger %>%
+                      filter(Standort == "L"))
+summary(mod_L_light)
+coefs <- fixef(mod_L_light)
+intercept_lux <- 10^(coefs[1]) - 1
+prozent <- (10^(coefs[-1]) - 1) * 100
+#ODER
+mod_light_L <- lmer(
+  Licht_summe ~ Logger + (1|Datum),
+  data = summary_daily_logger %>%
+    filter(Standort == "L")
+)
+library(emmeans)
+pairs <- emmeans(mod_light_L, pairwise ~ Logger)
+pairs
+# alle signif unterschiedlich außer N&O
+
+
+#####Signifikanztests Version vom 16.6. VOR dem ordnen für meeting mit markus#####
+#| label: verschiedene Methoden für Signifikanztestung (Beispiel Lichtenau)
+#testen auf normalverteilung
+
 #summary_daily_logger
 summary_daily_logger %>%
   filter(Standort == "L") %>%
@@ -488,24 +716,19 @@ summary_daily_logger %>%
     hist(.$Licht_mean)
     shapiro.test(.$Licht_mean)
   }
-#nicht normalverteilt
-#ODER
-install.packages("ggpubr")
-library(ggpubr)
-summary_daily_logger %>%
-  filter(Standort == "L") %>%
-  ggqqplot(
-    x = "Licht_mean",
-    facet.by = "Logger",
-    add = "qqline"
-  )
 
-#Innerhalb der Fläche
+
+#für alle standorte testen siehe nächster code oder wie oben drüber für jeden stanodrt filtern?
 #summary_daily_area
 qqnorm(summary_daily_area$Licht_area_mean); qqline(summary_daily_area$Licht_area_mean)
 hist(summary_daily_area$Licht_area_mean)
 #normalverteilt
-
+qqnorm(summary_daily_area$Licht_area_mean_day); qqline(summary_daily_area$Licht_area_mean_day)
+hist(summary_daily_area$Licht_area_mean_day)
+#normalverteilt
+qqnorm(sqrt(summary_daily_area$Licht_summe)); qqline(sqrt(summary_daily_area$Licht_summe))
+hist(sqrt(summary_daily_area$Licht_summe))
+#normalverteilt, aber leicht schief
 
 
 #qqnorm(summary_daily_logger$Licht_mean); qqline(summary_daily_logger$Licht_mean)
