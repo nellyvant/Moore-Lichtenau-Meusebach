@@ -577,7 +577,7 @@ summary_daily_logger %>%
 
 #summary_daily_logger
 summary_daily_logger %>%
-  filter(Standort == "MT") %>%
+  filter(Standort == "L") %>%
   {
     qqnorm(.$Licht_mean)
     qqline(.$Licht_mean)
@@ -587,24 +587,6 @@ summary_daily_logger %>%
 
 
 #für alle standorte testen siehe nächster code oder wie oben drüber für jeden stanodrt filtern?
-
-
-
-qqnorm(summary_daily_logger$Licht_mean); qqline(summary_daily_logger$Licht_mean)
-hist(summary_daily_logger$Licht_mean)
-qqnorm(summary_daily_logger$Licht_mean_day); qqline(summary_daily_logger$Licht_mean_day)
-hist(summary_daily_logger$Licht_mean_day)
-qqnorm(summary_daily_logger$Licht_summe); qqline(summary_daily_logger$Licht_summe)
-hist(summary_daily_logger$Licht_summe)
-#alle nicht normalverteilt
-qqnorm(sqrt(summary_daily_logger$Licht_mean)); qqline(sqrt(summary_daily_logger$Licht_mean))
-hist(sqrt(summary_daily_logger$Licht_mean))
-qqnorm(sqrt(summary_daily_logger$Licht_mean_day)); qqline(sqrt(summary_daily_logger$Licht_mean_day))
-hist(sqrt(summary_daily_logger$Licht_mean_day))
-qqnorm(sqrt(summary_daily_logger$Licht_summe)); qqline(sqrt(summary_daily_logger$Licht_summe))
-hist(sqrt(summary_daily_logger$Licht_summe))
-#jetzt ist alles normalverteilt
-
 #summary_daily_area
 qqnorm(summary_daily_area$Licht_area_mean); qqline(summary_daily_area$Licht_area_mean)
 hist(summary_daily_area$Licht_area_mean)
@@ -615,6 +597,24 @@ hist(summary_daily_area$Licht_area_mean_day)
 qqnorm(sqrt(summary_daily_area$Licht_summe)); qqline(sqrt(summary_daily_area$Licht_summe))
 hist(sqrt(summary_daily_area$Licht_summe))
 #normalverteilt, aber leicht schief
+
+
+#qqnorm(summary_daily_logger$Licht_mean); qqline(summary_daily_logger$Licht_mean)
+#hist(summary_daily_logger$Licht_mean)
+#qqnorm(summary_daily_logger$Licht_mean_day); qqline(summary_daily_logger$Licht_mean_day)
+#hist(summary_daily_logger$Licht_mean_day)
+#qqnorm(summary_daily_logger$Licht_summe); qqline(summary_daily_logger$Licht_summe)
+#hist(summary_daily_logger$Licht_summe)
+#alle nicht normalverteilt
+#qqnorm(sqrt(summary_daily_logger$Licht_mean)); qqline(sqrt(summary_daily_logger$Licht_mean))
+#hist(sqrt(summary_daily_logger$Licht_mean))
+#qqnorm(sqrt(summary_daily_logger$Licht_mean_day)); qqline(sqrt(summary_daily_logger$Licht_mean_day))
+#hist(sqrt(summary_daily_logger$Licht_mean_day))
+#qqnorm(sqrt(summary_daily_logger$Licht_summe)); qqline(sqrt(summary_daily_logger$Licht_summe))
+#hist(sqrt(summary_daily_logger$Licht_summe))
+#jetzt ist alles normalverteilt
+
+
 
 ##Signifikanztets Möglichkeiten
 # 1. ein model -> chatgpt
@@ -635,6 +635,17 @@ mod_light_L <- lmer(
 library(emmeans)
 pairs <- emmeans(mod_light_L, pairwise ~ Logger)
 pairs
+# contrast estimate    SE  df t.ratio p.value
+# M - N      812334 42600 580  19.055 <0.0001
+# M - O      838218 42600 580  19.662 <0.0001
+# M - S     1951543 42600 580  45.778 <0.0001
+# M - W     1115488 42600 580  26.167 <0.0001
+# N - O       25884 42600 580   0.607  0.9740
+# N - S     1139209 42600 580  26.723 <0.0001
+# N - W      303154 42600 580   7.111 <0.0001
+# O - S     1113325 42600 580  26.116 <0.0001
+# O - W      277270 42600 580   6.504 <0.0001
+# S - W     -836055 42600 580 -19.612 <0.0001
 
 #2. T-Tests
 #Annahme der Normalverteilung ->häufig nicht gegeben
@@ -764,6 +775,18 @@ summary_daily_logger %>%
       )
   }
 
+
+#Test mit repeated measures anova
+library(rstatix)
+
+res <- anova_test(
+  data = data,
+  dv = luftfeuchte,
+  wid = zeitpunkt,
+  within = standort
+)
+
+get_anova_table(res)
 
 #library(e1071)
 #kurtosis(summary_daily_logger$Licht_mean);skewness(summary_daily_logger$Licht_mean)

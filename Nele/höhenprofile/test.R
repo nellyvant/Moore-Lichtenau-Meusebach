@@ -471,3 +471,231 @@ trocken %>%
     y = "mittlere relative Luftfeuchte (%)",
     color = "Logger"
   )
+
+
+##### ornden Signifikanztests#####
+
+#| label: verschiedene Methoden für Signifikanztestung (Beispiel Lichtenau)
+#testen auf normalverteilung
+
+#innerhalb des Standort
+#summary_daily_logger
+summary_daily_logger %>%
+  filter(Standort == "L") %>%
+  {
+    qqnorm(.$Licht_mean)
+    qqline(.$Licht_mean)
+    hist(.$Licht_mean)
+    shapiro.test(.$Licht_mean)
+  }
+#nicht normalverteilt
+#ODER
+install.packages("ggpubr")
+library(ggpubr)
+summary_daily_logger %>%
+  filter(Standort == "L") %>%
+  ggqqplot(
+    x = "Licht_mean",
+    facet.by = "Logger",
+    add = "qqline"
+  )
+
+#Innerhalb der Fläche
+#summary_daily_area
+qqnorm(summary_daily_area$Licht_area_mean); qqline(summary_daily_area$Licht_area_mean)
+hist(summary_daily_area$Licht_area_mean)
+#normalverteilt
+
+
+
+#qqnorm(summary_daily_logger$Licht_mean); qqline(summary_daily_logger$Licht_mean)
+#hist(summary_daily_logger$Licht_mean)
+#qqnorm(summary_daily_logger$Licht_mean_day); qqline(summary_daily_logger$Licht_mean_day)
+#hist(summary_daily_logger$Licht_mean_day)
+#qqnorm(summary_daily_logger$Licht_summe); qqline(summary_daily_logger$Licht_summe)
+#hist(summary_daily_logger$Licht_summe)
+#alle nicht normalverteilt
+#qqnorm(sqrt(summary_daily_logger$Licht_mean)); qqline(sqrt(summary_daily_logger$Licht_mean))
+#hist(sqrt(summary_daily_logger$Licht_mean))
+#qqnorm(sqrt(summary_daily_logger$Licht_mean_day)); qqline(sqrt(summary_daily_logger$Licht_mean_day))
+#hist(sqrt(summary_daily_logger$Licht_mean_day))
+#qqnorm(sqrt(summary_daily_logger$Licht_summe)); qqline(sqrt(summary_daily_logger$Licht_summe))
+#hist(sqrt(summary_daily_logger$Licht_summe))
+#jetzt ist alles normalverteilt
+
+
+
+##Signifikanztets Möglichkeiten
+# 1. ein model -> chatgpt
+
+mod_L_light <- lmer(log10(Licht_summe + 1) ~ Logger + (1|Datum),
+                    data = summary_daily_logger %>%
+                      filter(Standort == "L"))
+summary(mod_L_light)
+coefs <- fixef(mod_L_light)
+intercept_lux <- 10^(coefs[1]) - 1
+prozent <- (10^(coefs[-1]) - 1) * 100
+#ODER
+mod_light_L <- lmer(
+  Licht_summe ~ Logger + (1|Datum),
+  data = summary_daily_logger %>%
+    filter(Standort == "L")
+)
+library(emmeans)
+pairs <- emmeans(mod_light_L, pairwise ~ Logger)
+pairs
+# contrast estimate    SE  df t.ratio p.value
+# M - N      812334 42600 580  19.055 <0.0001
+# M - O      838218 42600 580  19.662 <0.0001
+# M - S     1951543 42600 580  45.778 <0.0001
+# M - W     1115488 42600 580  26.167 <0.0001
+# N - O       25884 42600 580   0.607  0.9740
+# N - S     1139209 42600 580  26.723 <0.0001
+# N - W      303154 42600 580   7.111 <0.0001
+# O - S     1113325 42600 580  26.116 <0.0001
+# O - W      277270 42600 580   6.504 <0.0001
+# S - W     -836055 42600 580 -19.612 <0.0001
+
+#2. T-Tests
+#Annahme der Normalverteilung ->häufig nicht gegeben
+dat_L <- summary_daily_logger %>%
+  filter(Standort == "L") %>%
+  select(Datum, Logger, Licht_summe) %>%
+  pivot_wider(
+    names_from = Logger,
+    values_from = Licht_summe
+  )
+#2.a) händisch
+t.test(dat_L$M, dat_L$N, paired = TRUE) #p-value < 2.2e-16
+t.test(dat_L$M, dat_L$O, paired = TRUE) #p-value < 2.2e-16
+t.test(dat_L$M, dat_L$W, paired = TRUE) #p-value < 2.2e-16
+t.test(dat_L$M, dat_L$S, paired = TRUE) #p-value < 2.2e-16
+t.test(dat_L$N, dat_L$O, paired = TRUE) #p-value = 0.1268
+t.test(dat_L$N, dat_L$W, paired = TRUE) #p-value < 2.2e-16
+t.test(dat_L$N, dat_L$S, paired = TRUE) #p-value < 2.2e-16
+t.test(dat_L$O, dat_L$W, paired = TRUE) #p-value = 8.215e-16
+t.test(dat_L$O, dat_L$S, paired = TRUE) #p-value < 2.2e-16
+t.test(dat_L$W, dat_L$S, paired = TRUE) #p-value < 2.2e-16
+
+#2.b) automatisierte T-tests mit ChatGPT 5.5
+logger <- c("M", "N", "O", "S", "W")
+ergebnisse <- combn(logger, 2, simplify = FALSE)
+tests <- lapply(ergebnisse, function(x) {
+  test <- t.test(
+    dat_L[[x[1]]],
+    dat_L[[x[2]]],
+    paired = TRUE)
+  data.frame(
+    Gruppe1 = x[1],
+    Gruppe2 = x[2],
+    p_Wert = test$p.value,
+    Mittelwert_Diff = mean(dat_L[[x[1]]] - dat_L[[x[2]]],na.rm = TRUE))
+})
+tests_df <- bind_rows(tests)
+tests_df
+
+#plot
+summary_daily_logger %>%
+  filter(Standort == "L") %>%
+  ggplot(aes(x = Logger,
+             fill = Logger,
+             y = Licht_summe)) +
+  geom_boxplot(width = 0.8) +
+  geom_text(
+    data = summary_daily_logger %>%
+      filter(Standort == "L") %>%
+      group_by(Logger) %>%
+      summarise(
+        y = max(Licht_summe, na.rm = TRUE) * 1.08,
+        gruppe = case_when(
+          Logger == "M" ~ "a",
+          Logger == "N" ~ "b",
+          Logger == "O" ~ "b",
+          Logger == "S" ~ "c",
+          Logger == "W" ~ "d"
+        ),
+        .groups = "drop"
+      ),
+    aes(x = Logger, y = y, label = gruppe),
+    inherit.aes = FALSE,
+    size = 6,
+    fontface = "bold"
+  ) +
+  labs(title = "Lichtverhältnisse Kleiner Sumpf",
+       x = "Logger",
+       y = "kumulative Lichtintensität (Lux × Zeit)") +
+  theme_minimal() +
+  theme(legend.position = "none")
+
+
+
+
+
+#Testung auf signif. Unterschiede mit mehreren gepaarten T-test  und sqrt transformation um Normalverteilung zu erreichen
+dat <- summary_daily_logger %>%
+  filter(Standort == "L",
+         Logger %in% c("M", "N")) %>%
+  mutate(Licht_sqrt = sqrt(Licht_summe)) %>%
+  select(Datum, Logger, Licht_sqrt) %>%
+  pivot_wider(
+    names_from = Logger,
+    values_from = Licht_sqrt
+  )
+
+t.test(dat$M, dat$N, paired = TRUE)
+
+
+
+
+#Testung auf signif. Unterschiede mit friedman test
+daten_L <- summary_daily_logger %>%
+  filter(Standort == "L") %>%
+  arrange(Logger_ID, Datum)
+
+friedman.test(Licht_mean ~ Logger_ID | Datum, data = daten_L)
+
+pairwise.wilcox.test(
+  daten_L$Licht_mean,
+  daten_L$Logger_ID,
+  paired = TRUE,
+  p.adjust.method = "BH",
+  exact = FALSE
+)
+
+summary_daily_logger %>%
+  filter(Standort == "L") %>%
+  {
+    y_pos <- max(.$Licht_mean, na.rm = TRUE) * 1.08
+    
+    ggplot(., aes(x = Logger, fill = Logger, y = Licht_mean)) +
+      geom_boxplot(width = 0.8) +
+      annotate(
+        "text",
+        x = c("M", "N", "O", "S", "W"),
+        y = y_pos,
+        label = c("a", "b", "b", "c", "d"),
+        size = 6
+      ) +
+      coord_cartesian(ylim = c(NA, y_pos * 1.08)) +
+      labs(
+        title = "Licht mean Kleiner Sumpf",
+        x = "Logger",
+        y = "tägliche Lichtsumme"
+      )
+  }
+
+
+#Test mit repeated measures anova
+library(rstatix)
+
+res <- anova_test(
+  data = data,
+  dv = luftfeuchte,
+  wid = zeitpunkt,
+  within = standort
+)
+
+get_anova_table(res)
+
+#library(e1071)
+#kurtosis(summary_daily_logger$Licht_mean);skewness(summary_daily_logger$Licht_mean)
