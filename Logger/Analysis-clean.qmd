@@ -375,6 +375,7 @@ MNS_th$DateTime <- mdy_hms(MNS_th$Date.Time..CEST.CET.)
 ```{r}
 #| label: function programming
 #Funktion zum Zusammenführen der Tabellen 
+#Funktion von ChatGPT 5.5
 
 join_loggers <- function(df_lt, df_th, standort, logger) {
 
@@ -1514,10 +1515,6 @@ ggplot(summary_daily_area,aes(x = Datum, y = Temp_area_schatten_mean, color = St
 #ggsave("area_mean_temp_in_year.png", width = 20, height = 6) 
 ```
 
-##### *Mögliche Analyse*:
-
-luftfeucht rand vs mitte -\> beschatten böume oder ziehen sie das wasser aus der fläche??
-
 ## 6.3 Luftfeuchte und Taupunkt
 
 ### 6.3.1 Test auf Normalverteilung
@@ -1690,14 +1687,6 @@ summary_daily_logger %>%
   theme_minimal() +
   theme(legend.position = "none") 
 
-
-#mod_L_humid <- lmer(rLF_mean ~ Logger + (1|Datum),
-#  data = summary_daily_logger %>%
-#    filter(Standort == "L"))
-#summary(mod_L_humid)
-#coefs <- fixef(mod_L_humid)
-#coefs
-
 summary_daily_logger %>%
   filter(Standort == "MN", Logger %in% c("M", "N", "O", "S", "W"))%>%
   ggplot(aes(x = Logger, y = rLF_mean, fill = Logger)) +
@@ -1722,17 +1711,6 @@ summary_daily_logger %>%
   theme_minimal() +
   theme(legend.position = "none") 
 ```
-
-zur Interpretation:
-
-```         
-> coefs (Intercept)     LoggerN     LoggerO     LoggerS     LoggerW    
-          75.094388   -1.392998    2.543914    0.690245    5.378197 
-```
-
-der Intercept zeigt die typische Luftfeuchte an Logger M
-
-Logger N ist ca 1% trockener, Logger O ist 2,5% feuchter usw
 
 ```{r}
 #| label: boxplot of mean humidity all areas
