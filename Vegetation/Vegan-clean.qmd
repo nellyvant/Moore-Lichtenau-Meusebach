@@ -143,6 +143,15 @@ p3 <- MT_subset %>%
 Deckung nach Layer
 
 ```{r}
+layer_per_plot<- veg_long%>%
+  group_by(plot.ID, Schicht) %>%
+  summarise(Deckung = sum(Deckung, na.rm = TRUE), .groups = "drop") %>%
+  pivot_wider(
+    names_from = Schicht,
+    values_from = Deckung,
+    values_fill = 0
+  )
+
 layer_deckung <- veg_long %>%
   group_by(site, Schicht) %>%
   summarise(Deckung = mean(Deckung, na.rm = TRUE), .groups = "drop") %>%
@@ -382,7 +391,7 @@ ggplot(vegdata,
 
 ```
 
-# 5 Diversitätsmaße berechnen
+# 6 Diversitätsmaße berechnen
 
 ```{r}
 ####species richness, Shannon Index, relative Häufigkeit und species evenness bestimmen####
@@ -430,12 +439,14 @@ hoeheID <- vegdata %>%
 
 merged_data <- results %>%
   left_join(weighted_values, by = c("Plot" = "plot.ID")) %>%
-  left_join(hoeheID, by = c("Plot" = "plot.ID"))
+  left_join(hoeheID, by = c("Plot" = "plot.ID")) %>%
+  left_join(layer_per_plot, by =c("Plot" = "plot.ID"))
+  
 ```
 
-# 6 DCA
+# 7 DCA
 
-## 6.1 Alle Flächen
+## 7.1 Alle Flächen
 
 ```{r}
 
@@ -524,7 +535,7 @@ fit
 | weighted nitrogen    | 0.13362  | 0.99103  | 0.0352 | 0.010 \*\*   |
 | weighted alkalinity  | -0.49286 | 0.87011  | 0.0273 | 0.026 \*     |
 
-## 6.2 Auf der Pfalz
+## 7.2 Auf der Pfalz
 
 ```{r}
 
@@ -603,7 +614,7 @@ ggplot(dca_df, aes(DCA1, DCA2, colour = Distanz)) +
 
 ```
 
-## 6.3 Fuchshügel
+## 7.3 Fuchshügel
 
 ```{r}
 comm_MT <- comm_matrix[
@@ -681,7 +692,7 @@ ggplot(dca_df, aes(DCA1, DCA2, colour = Distanz)) +
 
 ```
 
-## 6.3 Kleiner Sumpf
+## 7.3 Kleiner Sumpf
 
 ```{r}
 comm_L <- comm_matrix[
@@ -759,7 +770,7 @@ ggplot(dca_df, aes(DCA1, DCA2, colour = Distanz)) +
 
 ```
 
-# 7 Transektanalyse -\> bisher nur Plots
+# 8 Transektanalyse -\> bisher nur Plots
 
 ```{r}
 
@@ -1003,3 +1014,26 @@ Fragestellungen
 welche Arten sind moortypisch? wo im Transekr kommen sie vor? -\> Plots aus combined_data oder veglong entlang transekt mit deckung der typischen arten für moor, typische störzeiger, seltene arten etc
 
 welche umweltgrößen sind am bestimmendsten? (vmtl licht und feuchte) -\> aus loggern: wieviel licht ist denn hier viel? -\> beschattung(bäume) wären ja weniger licht-\> ist das schlecht für moorarten oder schlecht für störzeiger? oder schlecht für beide?
+
+Modell Artenzahl
+
+```{r}
+library(lme4)
+
+model1 <- glm(
+  Richness ~ 
+    scale(Weighted_light) +
+    scale(Weighted_temperature) +
+    scale(Weighted_wetness) +
+    scale(Hoehe) +
+    scale(Transektnummer) +
+    site,
+  family = poisson,
+  data = merged_data
+)
+summary(model1)
+
+library(performance)
+
+check_model(model1)
+```
