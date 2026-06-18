@@ -529,12 +529,8 @@ for (logger in logger_names) {
 }
 ```
 
-#können wir doch runnen. die frage ist: macht es einen unterschied, wenn wir es nicht runnen??
-
-#ich glaube das kann man wahrscheinlich auch weglassen
-
 ```{r}
-#| label:do not run until interpolated data is completed, removing NAs
+#| label: Entfernen von NAs
 #entfernen von Zeilen ohne Messwerte (entstanden durch Auslesen der Logger)
 messwert_spalten <- c("Temp_sonne_C", "Licht_lux", "Temp_schatten_C", "relLF_percent", "Taupunkt_C")
 
@@ -588,9 +584,9 @@ summary_daily_logger <- all_loggers %>%
     Licht_sd = sd(Licht_lux, na.rm = T),
     Licht_range = Licht_max - Licht_min,
     Licht_mean_day = mean(Licht_lux[Licht_lux>1], na.rm =T),
-    Sonnenaufgang = min(DateTime[Licht_lux > 1], na.rm = T),
-    Sonnenuntergang  = max(DateTime[Licht_lux > 1], na.rm = T),
-    Tageslicht = as.numeric(difftime(Sonnenuntergang, Sonnenaufgang, units = "hours")),
+#    Sonnenaufgang = min(DateTime[Licht_lux > 1], na.rm = T),
+#    Sonnenuntergang  = max(DateTime[Licht_lux > 1], na.rm = T),
+#    Tageslicht = as.numeric(difftime(Sonnenuntergang, Sonnenaufgang, units = "hours")),
     Licht_summe = sum(Licht_lux, na.rm=T),
     #Licht_summe = sum(Licht_lux, na.rm =T),
     
@@ -642,9 +638,9 @@ summary_daily_area <- all_loggers %>%
     Licht_area_sd = sd(Licht_lux, na.rm = T),
     Licht_area_range = Licht_area_max - Licht_area_min,
     Licht_area_mean_day = mean(Licht_lux[Licht_lux>1], na.rm =T),
-    Sonnenaufgang = min(DateTime[Licht_lux > 1], na.rm = T),
-    Sonnenuntergang  = max(DateTime[Licht_lux > 1], na.rm = T),
-    Tageslicht = as.numeric(difftime(Sonnenuntergang, Sonnenaufgang, units = "hours")),
+#    Sonnenaufgang = min(DateTime[Licht_lux > 1], na.rm = T),
+#    Sonnenuntergang  = max(DateTime[Licht_lux > 1], na.rm = T),
+#    Tageslicht = as.numeric(difftime(Sonnenuntergang, Sonnenaufgang, units = "hours")),
     Licht_summe = sum(Licht_lux*10, na.rm=T),
     
     rLF_area_mean = mean(relLF_percent, na.rm = T),
@@ -1844,7 +1840,7 @@ mod <- lm(
   rLF_area_mean ~ Tage_seit_Regen * Standort,
   data = trockena
 )
-
+plot(mod)
 summary(mod)
 #Tage seit Regen erklärt signifikant die Abnahme in LF (logisch)
 #L: LF nimmt 1,8% pro Tag ab
@@ -1936,16 +1932,16 @@ trockenl <- plusprecipl %>%
     !is.na(Tage_seit_Regen))
 
 mod <-trockenl%>%
-  filter(Standort =="MT")%>%
+  filter(Standort =="MN")%>%
   {lm(
     rLF_mean ~ Tage_seit_Regen * Logger_ID,
     data=.)}
-
+plot(mod)
 summary(mod)
 anova(mod)
 
 trockenl %>%
-  filter(Standort=="MT")%>%
+  filter(Standort=="MN")%>%
   ggplot(aes(x = Tage_seit_Regen,
              y = rLF_mean,
              color = Logger_ID)) +
@@ -1954,8 +1950,7 @@ trockenl %>%
   theme_minimal() +
   labs(
     x = "Tage seit letztem Niederschlag",
-    y = "mittlere relative Luftfeuchte (%)",
-    color = "Logger"
+    y = "mittlere relative Luftfeuchte (%)"
   )
 ```
 
@@ -1967,12 +1962,12 @@ PCA für alle Logger und alle Parameter
 #| label: PCA with 2 plots
 #nur Temp_schatten für bessere Vergleichbarkeit
 df_pca <- summary_logger_year %>%
-  select(Standort, Logger, Tempschatten_Jahresmittel,Licht_Jahres_mean_day, rLF_Jahresmittel)
+  select(Standort, Logger, Tempschatten_Jahresmittel,Licht_Jahresmittel, rLF_Jahresmittel)
 
 decorana(df_pca[, c("Tempschatten_Jahresmittel",
-                      "Licht_Jahres_mean_day", "rLF_Jahresmittel")])
+                      "Licht_Jahresmittel", "rLF_Jahresmittel")])
 pca <- rda(df_pca[, c("Tempschatten_Jahresmittel",
-                      "Licht_Jahres_mean_day","rLF_Jahresmittel")],
+                      "Licht_Jahresmittel","rLF_Jahresmittel")],
            scale = TRUE)
 summary(pca)
 screeplot(pca)
@@ -2054,6 +2049,66 @@ ggplot() +
   coord_cartesian(xlim = c(-2, 2), ylim = c(-2, 2))
 
 #theme_classic im zweiten plot, während theme_bw im ersten
+```
+
+PCA für jeden Standort einzeln
+
+```{r}
+
+df_pca_L <- summary_daily_logger %>%
+  filter(Standort =="MT")%>%
+  select(Standort, Logger, Temp_schatten_mean,Licht_summe, rLF_mean)
+
+#decorana(df_pca_L[, c("Temp_schatten_mean","Licht_summe", "rLF_mean")])
+pca <- rda(df_pca_L[, c("Temp_schatten_mean","Licht_summe", "rLF_mean")],
+           scale = TRUE)
+summary(pca)
+screeplot(pca)
+biplot(pca)
+
+
+site_scores <- scores(pca, display = "sites")
+var_scores  <- scores(pca, display = "species")
+
+sites <- data.frame(site_scores,
+                    Standort = df_pca_L$Standort,
+                    Logger   = df_pca_L$Logger)
+
+vars <- data.frame(var_scores,
+                   Variable = rownames(var_scores))
+eig <- summary(pca)$cont$importance[2, ]
+vars <- data.frame(var_scores,
+                   Variable = rownames(var_scores))
+vars$Label <- c("Temperatur", "Licht", "Luftfeuchte") 
+
+pfeilfaktor<- 0.1
+ggplot() +
+  stat_ellipse(data = sites,
+               aes(PC1, PC2, fill =Logger),
+               geom="polygon",
+               alpha = 0.2,
+               show.legend = F) +
+  geom_point(data = sites,
+             aes(PC1, PC2, color =Logger),
+             size = 3) +
+  #geom_text(data = sites,
+  #          aes(PC1, PC2),
+  #          vjust = -1, show.legend = F) +
+  geom_segment(data = vars,
+               aes(x = 0, y = 0,
+                   xend = PC1*pfeilfaktor, yend = PC2*pfeilfaktor),
+               arrow = arrow(length = unit(0.25, "cm")),
+               color = "black") +
+ # geom_text(data = vars,
+#            aes(PC1, PC2, label = Label),
+#            color = "black",
+#            vjust = -0.5, hjust= 0.3) +
+  xlab(paste0("PC1 (", round(eig[1]*100,1), "%)")) +
+  ylab(paste0("PC2 (", round(eig[2]*100,1), "%)")) +
+  theme_bw() +
+  coord_fixed(ratio = 0.7)
+
+
 ```
 
 ##### *Mögliche Analyse:*
