@@ -535,6 +535,238 @@ fit
 | weighted nitrogen    | 0.13362  | 0.99103  | 0.0352 | 0.010 \*\*   |
 | weighted alkalinity  | -0.49286 | 0.87011  | 0.0273 | 0.026 \*     |
 
+```{r}
+dca <- decorana(comm_matrix)
+
+# Scores der Aufnahmeflächen
+dca_sites <- as.data.frame(
+  scores(dca, display = "sites", choices = 1:2)
+)
+
+dca_sites$plot.ID <- rownames(dca_sites)
+dca_sites$plot.ID <- as.integer(dca_sites$plot.ID)
+
+dca_sites <- dca_sites %>%
+  left_join(
+    vegdata %>%
+      select(plot.ID, site),
+    by = "plot.ID"
+  )
+
+# Scores der Arten
+dca_species <- as.data.frame(
+  scores(dca, display = "species", choices = 1:2)
+)
+
+dca_species$Art <- rownames(dca_species)
+
+ggplot() +
+  geom_point(
+    data = dca_sites,
+    aes(x = DCA1, y = DCA2, color = site),
+    size = 2
+  ) +
+  geom_text(
+    data = dca_species,
+    aes(x = DCA1, y = DCA2, label = Art),
+    color = "black",
+    size = 3
+  ) +
+  labs(
+    x = "DCA1",
+    y = "DCA2",
+    color = "Gebiet"
+  ) +
+  theme_classic()
+```
+
+```{r}
+comm_moose<- veg_long %>%
+  filter(Schicht =="ML")%>%
+  group_by(plot.ID, Art) %>%
+  summarise(Deckung = sum(Deckung), .groups = "drop") %>%
+  tidyr::pivot_wider(
+    names_from = Art,
+    values_from = Deckung,
+    values_fill = 0
+  ) %>%
+  tibble::column_to_rownames("plot.ID")
+str(comm_moose)
+comm_moose <- comm_moose[
+  rowSums(comm_moose) > 0,
+  ,
+  drop = FALSE
+]
+
+dca <- decorana(comm_moose)
+
+# Scores der Aufnahmeflächen
+dca_sites <- as.data.frame(
+  scores(dca, display = "sites", choices = 1:2)
+)
+
+dca_sites$plot.ID <- rownames(dca_sites)
+dca_sites$plot.ID <- as.integer(dca_sites$plot.ID)
+
+dca_sites <- dca_sites %>%
+  left_join(
+    vegdata %>%
+      select(plot.ID, site),
+    by = "plot.ID"
+  )
+
+# Scores der Arten
+dca_species <- as.data.frame(
+  scores(dca, display = "species", choices = 1:2)
+)
+
+dca_species$Art <- rownames(dca_species)
+
+ggplot() +
+  geom_point(
+    data = dca_sites,
+    aes(x = DCA1, y = DCA2, color = site),
+    size = 2
+  ) +
+  geom_text(
+    data = dca_species,
+    aes(x = DCA1, y = DCA2, label = Art),
+    color = "black",
+    size = 3
+  ) +
+  labs(
+    x = "DCA1",
+    y = "DCA2",
+    color = "Gebiet"
+  ) +
+  theme_classic()
+
+
+
+comm_moose_dca <- comm_moose[
+  rownames(comm_moose) != "225",
+  ,
+  drop = FALSE
+]
+
+# Sphagnum_squarrosum ist danach eine vollständige Nullspalte
+comm_moose_dca <- comm_moose_dca[
+  ,
+  colSums(comm_moose_dca) > 0,
+  drop = FALSE
+]
+
+dca_moose <- decorana(comm_moose_dca)
+
+summary(dca_moose)
+plot(dca_moose)
+
+
+# Scores der Aufnahmeflächen
+dca_sites <- as.data.frame(
+  scores(dca_moose, display = "sites", choices = 1:2)
+)
+
+dca_sites$plot.ID <- rownames(dca_sites)
+dca_sites$plot.ID <- as.integer(dca_sites$plot.ID)
+
+dca_sites <- dca_sites %>%
+  left_join(
+    vegdata %>%
+      select(plot.ID, site),
+    by = "plot.ID"
+  )
+
+# Scores der Arten
+dca_species <- as.data.frame(
+  scores(dca_moose, display = "species", choices = 1:2)
+)
+
+dca_species$Art <- rownames(dca_species)
+
+ggplot() +
+  geom_point(
+    data = dca_sites,
+    aes(x = DCA1, y = DCA2, color = site),
+    size = 2
+  ) +
+  geom_text(
+    data = dca_species,
+    aes(x = DCA1, y = DCA2, label = Art),
+    color = "black",
+    size = 3
+  ) +
+  labs(
+    x = "DCA1",
+    y = "DCA2",
+    color = "Gebiet"
+  ) +
+  theme_classic()
+
+```
+
+```{r}
+comm_nomoss<- veg_long %>%
+  filter(Schicht !="ML")%>%
+  group_by(plot.ID, Art) %>%
+  summarise(Deckung = sum(Deckung), .groups = "drop") %>%
+  tidyr::pivot_wider(
+    names_from = Art,
+    values_from = Deckung,
+    values_fill = 0
+  ) %>%
+  tibble::column_to_rownames("plot.ID")
+str(comm_nomoss)
+comm_nomoss <- comm_nomoss[
+  rowSums(comm_nomoss) > 0,
+  ,
+  drop = FALSE
+]
+
+dca <- decorana(comm_nomoss)
+
+# Scores der Aufnahmeflächen
+dca_sites <- as.data.frame(
+  scores(dca, display = "sites", choices = 1:2)
+)
+
+dca_sites$plot.ID <- rownames(dca_sites)
+dca_sites$plot.ID <- as.integer(dca_sites$plot.ID)
+
+dca_sites <- dca_sites %>%
+  left_join(
+    vegdata %>%
+      select(plot.ID, site),
+    by = "plot.ID"
+  )
+
+# Scores der Arten
+dca_species <- as.data.frame(
+  scores(dca, display = "species", choices = 1:2)
+)
+
+dca_species$Art <- rownames(dca_species)
+
+ggplot() +
+  geom_point(
+    data = dca_sites,
+    aes(x = DCA1, y = DCA2, color = site),
+    size = 2
+  ) +
+  geom_text(
+    data = dca_species,
+    aes(x = DCA1, y = DCA2, label = Art),
+    color = "black",
+    size = 3
+  ) +
+  labs(
+    x = "DCA1",
+    y = "DCA2",
+    color = "Gebiet"
+  ) +
+  theme_classic()
+```
+
 ## 7.2 Auf der Pfalz
 
 ```{r}
