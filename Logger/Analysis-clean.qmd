@@ -1848,7 +1848,7 @@ summary(mod)
 #L: LF nimmt 1,8% pro Tag ab
 #MN: LF nimmt 1,8%+0,5%= 2,3% pro Tag ab
 #MT LF nimmt 1,8%+0,1%= 1,9% pro Tag ab
-#Unterschiede zwishcen Flächen nicht signifikant
+#Unterschiede zwischen Flächen nicht signifikant
 anova(mod)
 
 ggplot(trockena,
@@ -2121,7 +2121,7 @@ PCA für jeden Standort einzeln
 
 ## 7.1 Licht
 
-### 7.1.1 Test auf Normalverteilung 
+### 7.1.1 Test auf Normalverteilung
 
 ```{r}
 summary_daily_area %>%
@@ -2163,7 +2163,7 @@ pairwise.wilcox.test(
 #Alle drei Flächen unterscheiden sich signifikant voneinander im Lichtniveau.
 ```
 
-### 7.1.3 Plots 
+### 7.1.3 Plots
 
 ```{r}
 summary_daily_area %>%
@@ -2182,9 +2182,9 @@ summary_daily_area %>%
   )
 ```
 
-## 7.2 Temperatur 
+## 7.2 Temperatur
 
-### 7.2.1 Test auf Normalverteilung 
+### 7.2.1 Test auf Normalverteilung
 
 ```{r}
 #Vergleich Tagesmittelwert (Schatten)
@@ -2340,7 +2340,7 @@ pairwise.wilcox.test(
 #Alle drei Flächen unterscheiden sich signifikant in den Temperaturmaxima. 
 ```
 
-### 7.2.3 Plots 
+### 7.2.3 Plots
 
 ```{r}
 summary_daily_area %>%
@@ -2376,7 +2376,7 @@ summary_daily_area %>%
 
 ## 7.3 Luftfeuchte (und Taupunkt)
 
-### 7.3.1 Test auf Normalverteilung 
+### 7.3.1 Test auf Normalverteilung
 
 ```{r}
 #Vergleich Tagesmittelwerte
@@ -2452,7 +2452,7 @@ pairwise.wilcox.test(
 #Es gibt einen signifikanten Unterschied in der Variabilität der relativen Luftfeuchte zwischen den Flächen 1 (MT) und 3 (L).
 ```
 
-### 7.3.3 Plots 
+### 7.3.3 Plots
 
 ```{r}
 summary_daily_area %>%
