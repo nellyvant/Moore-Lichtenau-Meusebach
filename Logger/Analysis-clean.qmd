@@ -2117,6 +2117,159 @@ ggplot() +
 
 PCA für jeden Standort einzeln
 
+# 7. Analyse und Plots - Vergleich zw. den drei Flächen
+
+## 7.1 Licht
+
+### 7.1.1 Test auf Normalverteilung 
+
+```{r}
+summary_daily_area %>%
+  ggqqplot(
+    x = "Licht_area_mean",
+    facet.by = "Standort",
+    add = "qqline")
+
+summary_daily_area %>%
+  ggplot(aes(x = Licht_area_mean)) +
+  geom_histogram(bins = 10) +
+  facet_wrap(~ Standort, scales = "free") +
+  theme_minimal()
+
+#eher keine Normalverteilung gegeben 
+```
+
+```{r}
+
+```
+
+### 7.1.2 Signifikanztest
+
+```{r}
+
+```
+
+### 7.1.3 Plots 
+
+```{r}
+
+```
+
+## 7.2 Temperatur 
+
+### 7.2.1 Test auf Normalverteilung 
+
+```{r}
+#Vergleich Tagesmittelwert (Schatten)
+summary_daily_area %>%
+  ggqqplot(
+    x = "Temp_area_schatten_mean",
+    facet.by = "Standort",
+    add = "qqline")
+
+summary_daily_area %>%
+  ggplot(aes(x = Temp_area_schatten_mean)) +
+  geom_histogram(bins = 10) +
+  facet_grid(~ Standort, scales = "free") 
+#normalverteilt
+
+#Vergleich tägliche sd (Schatten)
+summary_daily_area %>%
+  ggqqplot(
+    x = "Temp_area_schatten_sd",
+    facet.by = "Standort",
+    add = "qqline")
+
+summary_daily_area %>%
+  ggplot(aes(x = Temp_area_schatten_sd)) +
+  geom_histogram(bins = 10) +
+  facet_grid(~ Standort, scales = "free") 
+#eher keine Normalverteilung gegeben 
+
+#Vergleich tägliche sd (Sonne)
+summary_daily_area %>%
+  ggqqplot(
+    x = "Temp_area_sonne_sd",
+    facet.by = "Standort",
+    add = "qqline")
+
+summary_daily_area %>%
+  ggplot(aes(x = Temp_area_sonne_sd)) +
+  geom_histogram(bins = 10) +
+  facet_grid(~ Standort, scales = "free") 
+#eher keine Normalverteilung gegeben 
+
+#Vergleich Tagesmaxima (Sonne)
+summary_daily_area %>%
+  ggqqplot(
+    x = "Temp_area_sonne_max",
+    facet.by = "Standort",
+    add = "qqline")
+
+summary_daily_area %>%
+  ggplot(aes(x = Temp_area_sonne_max)) +
+  geom_histogram(bins = 10) +
+  facet_grid(~ Standort, scales = "free")  
+#keine Normalverteilung gegeben 
+
+```
+
+### 7.2.2 Signifikanztest
+
+```{r}
+
+```
+
+### 7.2.3 Plots 
+
+```{r}
+
+```
+
+## 7.3 Luftfeuchte (und Taupunkt)
+
+### 7.3.1 Test auf Normalverteilung 
+
+```{r}
+#Vergleich Tagesmittelwerte
+summary_daily_area %>%
+  ggqqplot(
+    x = "rLF_area_mean",
+    facet.by = "Standort",
+    add = "qqline")
+
+summary_daily_area %>%
+  ggplot(aes(x = rLF_area_mean)) +
+  geom_histogram(bins = 10) +
+  facet_grid(~ Standort, scales = "free") 
+#eher keine Normalverteilung gegeben 
+
+#Vergleich tägliche SD
+summary_daily_area %>%
+  ggqqplot(
+    x = "rLF_area_sd",
+    facet.by = "Standort",
+    add = "qqline")
+
+summary_daily_area %>%
+  ggplot(aes(x = rLF_area_sd)) +
+  geom_histogram(bins = 10) +
+  facet_grid(~ Standort, scales = "free") 
+#eher keine Normalverteilung gegeben 
+```
+
+### 7.3.2 Signifikanztest
+
+```{r}
+
+```
+
+### 7.3.3 Plots 
+
+```{r}
+
+```
+
 # Licht und Luftfeuchte
 
 2 Gedanken: Beschattung begrenzt Verdunstung -\> hohe Luftfeuchte an den Rändern
