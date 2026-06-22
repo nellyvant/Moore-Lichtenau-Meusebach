@@ -922,3 +922,127 @@ get_anova_table(res)
 
 #library(e1071)
 #kurtosis(summary_daily_logger$Licht_mean);skewness(summary_daily_logger$Licht_mean)
+
+
+
+#####Signifikanztest deltaLF#####
+str(trockenl)
+trockenl %>%
+  filter(Standort == "L") %>%
+  ggqqplot(
+    x = "delta_LF",
+    facet.by = "Logger",
+    add = "qqline"
+  )
+trockenl %>%
+  filter(Standort == "L") %>%
+  ggplot(aes(x = delta_LF)) +
+  geom_histogram(bins = 10) +
+  facet_wrap(~ Logger, scales = "free") 
+shapiro.test(trockenl$delta_LF[trockenl$Standort == "L"])
+#keine Normalverteilung
+#friedman test
+dat_L_fried <- summary_daily_logger %>%
+  filter(Standort == "L") %>%
+  arrange(Logger_ID, Datum)
+
+dat_rLF_L<- trockenl %>%
+  filter(Standort =="L")%>%
+  arrange(Logger_ID, Datum)
+
+friedman.test( delta_LF ~ Logger_ID | Datum, data = dat_rLF_L)
+
+pairwise.wilcox.test(
+  dat_rLF_L$delta_LF,
+  dat_rLF_L$Logger_ID,
+  paired = TRUE,
+  p.adjust.method = "BH",
+  exact = FALSE
+)
+dat_rLF_L %>%
+  group_by(Logger_ID) %>%
+  summarise(
+    n = sum(!is.na(delta_LF)),
+    Median = median(delta_LF, na.rm = TRUE),
+    IQR = IQR(delta_LF, na.rm = TRUE)
+  ) %>%
+  arrange(Median)
+ggplot(dat_rLF_L, aes(x = Logger_ID, y = delta_LF)) +
+  geom_boxplot() +
+  geom_jitter(width = 0.1, alpha = 0.3) +
+  labs(x = "Logger", y = "delta_LF") +
+  theme_classic()
+
+
+#model
+#join trocken mit daten aus summary-daily_logger
+mod_data<- trockenl %>%
+  left_join(summary_daily_logger%>% select(Logger_ID,Datum,Licht_summe, Temp_schatten_mean), by = c("Logger_ID","Datum"))
+
+mod<- lmer(delta_LF~Temp_schatten_mean + Licht_summe +(1| Logger_ID), data=mod_data)
+plot(mod)
+summary(mod)
+anova(mod)
+
+mod <- lm(
+  plusprecipl$deltaLF ~  summary_daily_logger$Temp_schatten_mean + summary_daily_logger$Licht_summe* summary_daily_logger$Standort)
+plot(mod)
+summary(mod)
+#Tage seit Regen erklärt signifikant die Abnahme in LF (logisch)
+#L: LF nimmt 1,8% pro Tag ab
+#MN: LF nimmt 1,8%+0,5%= 2,3% pro Tag ab
+#MT LF nimmt 1,8%+0,1%= 1,9% pro Tag ab
+#Unterschiede zwischen Flächen nicht signifikant
+#anova(mod)
+
+
+
+#deckung tree layer an den loggern
+deckung_TL <- veg_long %>%
+  filter(
+    Schicht == "TL",
+    Transekt %in% c("NS", "WO")
+  ) %>%
+  group_by(site, Transekt) %>%
+  filter(
+    Transektnummer == min(Transektnummer, na.rm = TRUE) |
+      Transektnummer == max(Transektnummer, na.rm = TRUE) |
+      Transektnummer == 0
+  ) %>%
+  ungroup() %>%
+  group_by(
+    site,
+    Transekt,
+    Transektnummer,
+    Name,
+    plot.ID,
+    arbeitsname
+  ) %>%
+  summarise(
+    Deckung_TL = sum(Deckung, na.rm = TRUE),
+    .groups = "drop"
+  )
+deckung_TL
+deckung_TL <- deckung_TL %>%
+  group_by(site, Transekt) %>%
+  mutate(
+    logger = case_when(
+      Transektnummer == 0 ~ "M",
+      
+      Transekt == "NS" &
+        Transektnummer == min(Transektnummer, na.rm = TRUE) ~ "S",
+      
+      Transekt == "NS" &
+        Transektnummer == max(Transektnummer, na.rm = TRUE) ~ "N",
+      
+      Transekt == "WO" &
+        Transektnummer == min(Transektnummer, na.rm = TRUE) ~ "W",
+      
+      Transekt == "WO" &
+        Transektnummer == max(Transektnummer, na.rm = TRUE) ~ "O",
+      
+      TRUE ~ NA_character_
+    )
+  ) %>%
+  ungroup()
+deckung_TL
