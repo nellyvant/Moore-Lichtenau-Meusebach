@@ -174,6 +174,34 @@ p3 <- MT_subset %>%
 #       width = 14, height = 6, dpi = 300)
 ```
 
+```{r}
+#plot redo
+#) p3$data → die plots muss ich neu berechnen und einzeln abspeichern, schauen wie mean-deckung berechnet wird (also ist das der mean innerhalb der plots, wo die art vorkommt oder der mean über alle plots zusammen??, zweiteres wäre mist, weil in manchen plots kommt es ja gar nicht vor, das würde ja alles verfälschen) → momentan ist nach deckung sortiert, will ich niht lieber die 10 häufisgten statt die 10 mit der höchsten mittleren deckung??
+
+p3 <- MT_subset %>%
+  group_by(Art) %>%
+  summarise(
+    mean_deckung = mean(Deckung[Deckung>0], na.rm = TRUE),
+    n = sum(Deckung > 0)
+  ) %>%
+  arrange(desc(n)) %>%
+  slice_head(n = 10) %>%
+  ggplot(aes(x = reorder(Art, n), y = mean_deckung)) +
+  geom_col(fill = "darkgreen") +
+  geom_text(aes(label = paste0("n=", n)),
+            hjust = -0.1, size = 3) +
+  coord_flip() +
+  scale_y_continuous(limits = c(0, 45))+
+  labs(
+    x = "Art",
+    y = "Mittlere Deckung %",
+    title = "Fuchshügel"
+  ) +
+  theme_minimal()
+
+p3
+```
+
 Deckung nach Layer
 
 ```{r}

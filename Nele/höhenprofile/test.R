@@ -1046,3 +1046,44 @@ deckung_TL <- deckung_TL %>%
   ) %>%
   ungroup()
 deckung_TL
+
+#####Top10 redo#####
+p3_data <- MT_subset %>%
+  select(Art, Deckung) %>%
+  group_by(Art) %>%
+  summarise(
+    mean_deckung = mean(Deckung, na.rm = TRUE),
+    n = sum(Deckung > 0, na.rm = TRUE),
+    .groups = "drop"
+  ) %>%
+  slice_max(
+    order_by = mean_deckung,
+    n = 10,
+    with_ties = FALSE
+  ) %>%
+  mutate(
+    Art = reorder(Art, mean_deckung),
+    label = paste0("n=", n)
+  ) %>%
+  as.data.frame()
+
+p3 <- ggplot(
+  p3_data,
+  aes(x = Art, y = mean_deckung)
+) +
+  geom_col(fill = "darkgreen") +
+  geom_text(
+    aes(label = label),
+    hjust = -0.1,
+    size = 3
+  ) +
+  coord_flip() +
+  scale_y_continuous(limits = c(0, 45)) +
+  labs(
+    x = "Art",
+    y = "Mittlere Deckung %",
+    title = "Fuchshügel"
+  ) +
+  theme_minimal()
+p3
+object.size(p3)
