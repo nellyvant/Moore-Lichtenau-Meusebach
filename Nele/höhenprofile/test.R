@@ -1087,3 +1087,211 @@ p3 <- ggplot(
   theme_minimal()
 p3
 object.size(p3)
+
+
+
+#####DCA worklflow#####
+#pfeile der umwelt nur für ganze flächen anzeigen lassen, farbe nach entfernung zur mitte
+#arten nur auf transekten anzeigen lassen, um gemeinschaften zu erkennen, farbe nach richtung (WO,NS)
+
+#DCA für die ganze Fläche mit Pfeilen
+data_MN <- merged_data$site == "Meu_trock" 
+comm_MN <- comm_matrix[data_MN, , drop = FALSE]
+
+
+comm_MN <- comm_MN[
+  rowSums(comm_MN) > 0,
+  colSums(comm_MN) > 0,
+  drop = FALSE
+]
+
+dca <- decorana(comm_MN)
+summary(dca)
+
+env_MN <- merged_data %>%
+  filter(site == "Meu_trock")
+fit <- envfit(dca, env_MN[, c("Weighted_light",
+                              "Weighted_temperature",
+                              "Weighted_wetness",
+                              "Weighted_nitrogen",
+                              "Weighted_alkalinity",
+                              "Hoehe",
+                              "TL",
+                              "ML",
+                              "HL",
+                              "SL")])
+fit
+
+plot(dca)
+arrows <-as.data.frame(scores(fit, display = "vectors"))
+arrows$Variable <- rownames(arrows)
+arrows$p_value <- fit$vectors$pvals
+arrows$r2 <- fit$vectors$r
+arrows$Variable <- c(
+  "Licht",
+  "Temperatur",
+  "Feuchte",
+  "Stickstoff",
+  "Basengehalt",
+  "Höhe",
+  "Baumschicht",
+  "Moosschicht",
+  "Krautschicht",
+  "Strauchschicht"
+)
+# nur Umweltvariablen mit signifikanten p-Werten anzeigen
+arrows_sig <- arrows %>%
+  filter(p_value <= 0.05)
+
+dca_scores <- scores(dca, display = "sites")
+dca_df <- as.data.frame(dca_scores)
+dca_df$Name <- rownames(dca_df)
+dca_df$site <- vegdata$site[match(dca_df$Name, vegdata$plot.ID)]
+dca_df$Transektnummer <- vegdata$Transektnummer[match(dca_df$Name, vegdata$plot.ID)]
+dca_df$Distanz <- abs(dca_df$Transektnummer)
+
+ggplot(dca_df, aes(DCA1, DCA2, colour = Distanz)) +
+  geom_point(size = 3) +
+  scale_colour_gradient2(
+    low = "#005A8D",
+    mid = "#FFD700",
+    high = "#7A0177",,
+    midpoint = 0,
+    name = "Entfernung zum Mittelpunkt")+
+  geom_segment(
+    data = arrows_sig,
+    aes(
+      x = 0, y = 0,
+      xend = DCA1 * 2,
+      yend = DCA2 * 2
+    ),
+    inherit.aes = FALSE,
+    arrow = arrow(length = unit(0.25, "cm")),
+    colour = "black") +
+  geom_text(
+    data = arrows_sig,
+    aes(
+      x = DCA1 * 2.3,
+      y = DCA2 * 2.3,
+      label = Variable
+    ),
+    inherit.aes = FALSE
+  ) +
+  
+  labs(
+    title = "DCA Vegetation Fuchshügel",
+    x = "DCA1",
+    y = "DCA2"
+  ) +
+  
+  theme_minimal() +
+  theme(
+    plot.title = element_text(hjust = 0.5)
+  )
+
+
+#DCA für einzelne Transekte mit Darstellung der Arten
+data_MN_WO <- merged_data$site == "Meu_trock" & merged_data$Transekt == "WO"
+comm_MN_WO <- comm_matrix[idx_MN, , drop = FALSE]
+
+
+comm_MN_WO <- comm_MN_WO[
+  rowSums(comm_MN_WO) > 0,
+  colSums(comm_MN_WO) > 0,
+  drop = FALSE
+]
+
+dca <- decorana(comm_MN_WO)
+summary(dca)
+
+dca_scores <- scores(dca, display = "sites")
+dca_df <- as.data.frame(dca_scores)
+dca_df$Name <- rownames(dca_df)
+dca_df$site <- vegdata$site[match(dca_df$Name, vegdata$plot.ID)]
+dca_df$Transektnummer <- vegdata$Transektnummer[match(dca_df$Name, vegdata$plot.ID)]
+
+species_df <- as.data.frame(scores(dca, display = "species", choices = c(1, 2)))
+species_df$Art <- rownames(species_df)
+species_totals <- colSums(comm_MN, na.rm = TRUE)
+species_df <- species_df %>%
+  filter(Art %in% names(species_totals[species_totals > 0]))
+
+ggplot(dca_df, aes(DCA1, DCA2, colour = Transektnummer)) +
+  geom_point(size = 3) +
+  
+  geom_text(
+    data = species_df,
+    aes(x = DCA1, y = DCA2, label = Art),
+    inherit.aes = FALSE,
+    size = 3,
+    colour = "grey30"
+  ) +
+  scale_colour_gradient2(
+    low = "#005A8D",
+    mid = "#FFD700",
+    high = "#7A0177",
+    midpoint = 0,
+    name = "Position im Transekt"
+  ) +
+  labs(
+    title = "DCA Vegetation Auf der Pfalz",
+    x = "DCA1",
+    y = "DCA2"
+  ) +
+  
+  theme_minimal() +
+  theme(
+    plot.title = element_text(hjust = 0.5)
+  )
+
+
+
+
+
+
+ggplot(dca_df, aes(DCA1, DCA2, colour = Transektnummer)) +
+  geom_point(size = 3) +
+  
+  # Symbole für die Arten
+  geom_point(
+    data = species_df,
+    aes(x = DCA1, y = DCA2),
+    inherit.aes = FALSE,
+    shape = 17,          # Dreieck
+    size = 3,
+    colour = "grey20"
+  ) +
+  
+  # Beschriftungen ohne Überlappung
+  geom_text_repel(
+    data = species_df,
+    aes(x = DCA1, y = DCA2, label = Art),
+    inherit.aes = FALSE,
+    size = 3,
+    colour = "grey20",
+    box.padding = 0.5,
+    point.padding = 0.3,
+    segment.colour = "grey60",
+    max.overlaps = Inf
+  ) +
+  
+  scale_colour_gradient2(
+    low = "#005A8D",
+    mid = "#FFD700",
+    high = "#7A0177",
+    midpoint = 0,
+    breaks = range(dca_df$Transektnummer, na.rm = TRUE),
+    labels = c("Westen", "Osten"),
+    name = "Position im Transekt"
+  ) +
+  
+  labs(
+    title = "DCA Vegetation Auf der Pfalz",
+    x = "DCA1",
+    y = "DCA2"
+  ) +
+  
+  theme_minimal() +
+  theme(
+    plot.title = element_text(hjust = 0.5)
+  )

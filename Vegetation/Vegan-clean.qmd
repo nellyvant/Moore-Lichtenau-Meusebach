@@ -181,7 +181,7 @@ p3 <- MT_subset %>%
 p3 <- MT_subset %>%
   group_by(Art) %>%
   summarise(
-    mean_deckung = mean(Deckung[Deckung>0], na.rm = TRUE),
+    mean_deckung = mean(Deckung,na.rm=T),
     n = sum(Deckung > 0)
   ) %>%
   arrange(desc(n)) %>%
@@ -191,7 +191,7 @@ p3 <- MT_subset %>%
   geom_text(aes(label = paste0("n=", n)),
             hjust = -0.1, size = 3) +
   coord_flip() +
-  scale_y_continuous(limits = c(0, 45))+
+  scale_y_continuous(limits = c(0, 50))+
   labs(
     x = "Art",
     y = "Mittlere Deckung %",
@@ -200,6 +200,15 @@ p3 <- MT_subset %>%
   theme_minimal()
 
 p3
+
+#Anzahl von holzigen Arten in der Krautschicht
+#ersetze Pinus_sylvestris mit Betula oder Frangula_alnus
+MT_subset %>%
+  filter(
+    Art == "Pinus_sylvestris",
+    Deckung > 0
+  ) %>%
+  count(Schicht, name = "Anzahl")
 ```
 
 Deckung nach Layer
@@ -229,7 +238,7 @@ layer_deckung$Schicht <- factor(
 ggplot(layer_deckung, aes(x = site, y = prop, fill = Schicht)) +
   geom_col() +
   labs(y = "Anteil der Deckung", x = NULL) +
-  geom_text(aes(label = round(prop,3)), size = 3, position = position_stack(vjust = 0.5))+
+  geom_text(aes(label = round(prop,2)), size = 3, position = position_stack(vjust = 0.5))+
   scale_x_discrete(labels = c(
     "Meu_nass" = "Auf der Pfalz",
     "Meu_trock" = "Fuchshügel",
@@ -678,12 +687,18 @@ ggplot() +
 
 ## 7.2 Auf der Pfalz
 
+DCA mit environmental fit für die gesamte Fläche
+
 ```{r}
+data_MN <- merged_data$site == "Meu_nass" 
+comm_MN <- comm_matrix[data_MN, , drop = FALSE]
 
-comm_MN <- comm_matrix[
-  weighted_values$site == "Meu_nass",
+
+comm_MN <- comm_MN[
+  rowSums(comm_MN) > 0,
+  colSums(comm_MN) > 0,
+  drop = FALSE
 ]
-
 
 dca <- decorana(comm_MN)
 summary(dca)
@@ -691,20 +706,22 @@ summary(dca)
 env_MN <- merged_data %>%
   filter(site == "Meu_nass")
 fit <- envfit(dca, env_MN[, c("Weighted_light",
-    "Weighted_temperature",
-    "Weighted_wetness",
-    "Weighted_nitrogen",
-    "Weighted_alkalinity",
-    "Hoehe",
-    "SL",
-    "TL",
-    "ML",
-    "HL")])
+                              "Weighted_temperature",
+                              "Weighted_wetness",
+                              "Weighted_nitrogen",
+                              "Weighted_alkalinity",
+                              "Hoehe",
+                              "TL",
+                              "ML",
+                              "HL",
+                              "SL")])
 fit
 
 plot(dca)
-arrows <- as.data.frame(scores(fit, display = "vectors"))
+arrows <-as.data.frame(scores(fit, display = "vectors"))
 arrows$Variable <- rownames(arrows)
+arrows$p_value <- fit$vectors$pvals
+arrows$r2 <- fit$vectors$r
 arrows$Variable <- c(
   "Licht",
   "Temperatur",
@@ -712,11 +729,14 @@ arrows$Variable <- c(
   "Stickstoff",
   "Basengehalt",
   "Höhe",
-  "Strauchschicht",
   "Baumschicht",
   "Moosschicht",
-  "Krautschicht"
+  "Krautschicht",
+  "Strauchschicht"
 )
+# nur Umweltvariablen mit signifikanten p-Werten anzeigen
+arrows_sig <- arrows %>%
+  filter(p_value <= 0.05)
 
 dca_scores <- scores(dca, display = "sites")
 dca_df <- as.data.frame(dca_scores)
@@ -727,13 +747,14 @@ dca_df$Distanz <- abs(dca_df$Transektnummer)
 
 ggplot(dca_df, aes(DCA1, DCA2, colour = Distanz)) +
   geom_point(size = 3) +
-  scale_colour_gradient(
-    low = "yellow",
-    high = "darkred",
-    name = "Entfernung zur Mitte"
-    )+
+  scale_colour_gradient2(
+    low = "#005A8D",
+    mid = "#FFD700",
+    high = "#7A0177",
+    midpoint = 0,
+    name = "Entfernung zum Mittelpunkt")+
   geom_segment(
-    data = arrows,
+    data = arrows_sig,
     aes(
       x = 0, y = 0,
       xend = DCA1 * 2,
@@ -743,21 +764,159 @@ ggplot(dca_df, aes(DCA1, DCA2, colour = Distanz)) +
     arrow = arrow(length = unit(0.25, "cm")),
     colour = "black") +
   geom_text(
-  data = arrows,
-  aes(
-    x = DCA1 * 2.3,
-    y = DCA2 * 2.3,
-    label = Variable
-  ),
-  inherit.aes = FALSE
+    data = arrows_sig,
+    aes(
+      x = DCA1 * 2.3,
+      y = DCA2 * 2.3,
+      label = Variable
+    ),
+    inherit.aes = FALSE
   ) +
-
+  
   labs(
     title = "DCA Vegetation Auf der Pfalz",
     x = "DCA1",
     y = "DCA2"
   ) +
+  
+  theme_minimal() +
+  theme(
+    plot.title = element_text(hjust = 0.5)
+  )
+```
 
+DCA mit species scores jeweils für ein Transekt
+
+```{r}
+#Transekt WO
+data_MN_WO <- merged_data$site == "Meu_nass" & merged_data$Transekt == "WO"
+comm_MN_WO <- comm_matrix[data_MN_WO, , drop = FALSE]
+
+
+comm_MN_WO <- comm_MN_WO[
+  rowSums(comm_MN_WO) > 0,
+  colSums(comm_MN_WO) > 0,
+  drop = FALSE
+]
+
+dca <- decorana(comm_MN_WO)
+summary(dca)
+
+dca_scores <- scores(dca, display = "sites")
+dca_df <- as.data.frame(dca_scores)
+dca_df$Name <- rownames(dca_df)
+dca_df$site <- vegdata$site[match(dca_df$Name, vegdata$plot.ID)]
+dca_df$Transektnummer <- vegdata$Transektnummer[match(dca_df$Name, vegdata$plot.ID)]
+
+species_df <- as.data.frame(scores(dca, display = "species", choices = c(1, 2)))
+species_df$Art <- rownames(species_df)
+species_totals <- colSums(comm_MN, na.rm = TRUE)
+species_df <- species_df %>%
+  filter(Art %in% names(species_totals[species_totals > 0]))
+
+
+ggplot(dca_df, aes(DCA1, DCA2, colour = Transektnummer)) +
+  geom_point(size = 3) +
+  geom_point(
+    data = species_df,
+    aes(x = DCA1, y = DCA2),
+    inherit.aes = FALSE,
+    shape = 17,       
+    size = 3,
+    colour = "grey20"
+  ) +
+  geom_text_repel(
+    data = species_df,
+    aes(x = DCA1, y = DCA2, label = Art),
+    inherit.aes = FALSE,
+    size = 3,
+    colour = "grey20",
+    box.padding = 0.5,
+    point.padding = 0.3,
+    segment.colour = "grey60",
+    max.overlaps = Inf
+  ) +
+  scale_colour_gradient2(
+    low = "#005A8D",
+    mid = "#FFD700",
+    high = "#7A0177",
+    midpoint = 0,
+    breaks = range(dca_df$Transektnummer, na.rm = TRUE),
+    labels = c("Westen", "Osten"),
+    name = "Position im Transekt"
+  ) +
+  labs(
+    title = "DCA Vegetation Auf der Pfalz, West-Ost Transekt",
+    x = "DCA1",
+    y = "DCA2"
+  ) +
+  theme_minimal() +
+  theme(
+    plot.title = element_text(hjust = 0.5)
+  )
+
+
+#Transekt NS
+data_MN_NS <- merged_data$site == "Meu_nass" & merged_data$Transekt == "NS"
+comm_MN_NS <- comm_matrix[data_MN_NS, , drop = FALSE]
+
+
+comm_MN_NS <- comm_MN_NS[
+  rowSums(comm_MN_NS) > 0,
+  colSums(comm_MN_NS) > 0,
+  drop = FALSE
+]
+
+dca <- decorana(comm_MN_NS)
+summary(dca)
+
+dca_scores <- scores(dca, display = "sites")
+dca_df <- as.data.frame(dca_scores)
+dca_df$Name <- rownames(dca_df)
+dca_df$site <- vegdata$site[match(dca_df$Name, vegdata$plot.ID)]
+dca_df$Transektnummer <- vegdata$Transektnummer[match(dca_df$Name, vegdata$plot.ID)]
+
+species_df <- as.data.frame(scores(dca, display = "species", choices = c(1, 2)))
+species_df$Art <- rownames(species_df)
+species_totals <- colSums(comm_MN, na.rm = TRUE)
+species_df <- species_df %>%
+  filter(Art %in% names(species_totals[species_totals > 0]))
+
+ggplot(dca_df, aes(DCA1, DCA2, colour = Transektnummer)) +
+  geom_point(size = 3) +
+  geom_point(
+    data = species_df,
+    aes(x = DCA1, y = DCA2),
+    inherit.aes = FALSE,
+    shape = 17,         
+    size = 3,
+    colour = "grey20"
+  ) +
+  geom_text_repel(
+    data = species_df,
+    aes(x = DCA1, y = DCA2, label = Art),
+    inherit.aes = FALSE,
+    size = 3,
+    colour = "grey20",
+    box.padding = 0.5,
+    point.padding = 0.3,
+    segment.colour = "grey60",
+    max.overlaps = Inf
+  ) +
+  scale_colour_gradient2(
+    low = "#005A8D",
+    mid = "#FFD700",
+    high = "#7A0177",
+    midpoint = 0,
+    breaks = range(dca_df$Transektnummer, na.rm = TRUE),
+    labels = c("Süden", "Norden"),
+    name = "Position im Transekt"
+  ) +
+  labs(
+    title = "DCA Vegetation Auf der Pfalz, Nord-Süd Transekt",
+    x = "DCA1",
+    y = "DCA2"
+  ) +
   theme_minimal() +
   theme(
     plot.title = element_text(hjust = 0.5)
@@ -766,6 +925,7 @@ ggplot(dca_df, aes(DCA1, DCA2, colour = Distanz)) +
 ```
 
 ```{r}
+#|test mit darstellung mit kleinen strichen zu den artnamen
 
 
 comm_moose<- veg_long %>%
@@ -901,12 +1061,18 @@ p
 
 ## 7.3 Fuchshügel
 
-```{r}
-####NEU
-comm_MT <- comm_matrix[
-  weighted_values$site == "Meu_trock",
-]
+DCA mit environmental fit für die gesamte Fläche
 
+```{r}
+data_MT <- merged_data$site == "Meu_trock" 
+comm_MT <- comm_matrix[data_MT, , drop = FALSE]
+
+
+comm_MT <- comm_MT[
+  rowSums(comm_MT) > 0,
+  colSums(comm_MT) > 0,
+  drop = FALSE
+]
 
 dca <- decorana(comm_MT)
 summary(dca)
@@ -914,20 +1080,22 @@ summary(dca)
 env_MT <- merged_data %>%
   filter(site == "Meu_trock")
 fit <- envfit(dca, env_MT[, c("Weighted_light",
-    "Weighted_temperature",
-    "Weighted_wetness",
-    "Weighted_nitrogen",
-    "Weighted_alkalinity",
-    "Hoehe",
-    "SL",
-    "TL",
-    "ML",
-    "HL")])
+                              "Weighted_temperature",
+                              "Weighted_wetness",
+                              "Weighted_nitrogen",
+                              "Weighted_alkalinity",
+                              "Hoehe",
+                              "TL",
+                              "ML",
+                              "HL",
+                              "SL")])
 fit
 
 plot(dca)
-arrows <- as.data.frame(scores(fit, display = "vectors"))
+arrows <-as.data.frame(scores(fit, display = "vectors"))
 arrows$Variable <- rownames(arrows)
+arrows$p_value <- fit$vectors$pvals
+arrows$r2 <- fit$vectors$r
 arrows$Variable <- c(
   "Licht",
   "Temperatur",
@@ -935,11 +1103,14 @@ arrows$Variable <- c(
   "Stickstoff",
   "Basengehalt",
   "Höhe",
-  "Strauchschicht",
   "Baumschicht",
   "Moosschicht",
-  "Krautschicht"
+  "Krautschicht",
+  "Strauchschicht"
 )
+# nur Umweltvariablen mit signifikanten p-Werten anzeigen
+arrows_sig <- arrows %>%
+  filter(p_value <= 0.05)
 
 dca_scores <- scores(dca, display = "sites")
 dca_df <- as.data.frame(dca_scores)
@@ -950,13 +1121,14 @@ dca_df$Distanz <- abs(dca_df$Transektnummer)
 
 ggplot(dca_df, aes(DCA1, DCA2, colour = Distanz)) +
   geom_point(size = 3) +
-  scale_colour_gradient(
-    low = "yellow",
-    high = "darkred",
-    name = "Entfernung zur Mitte"
-    )+
+  scale_colour_gradient2(
+    low = "#005A8D",
+    mid = "#FFD700",
+    high = "#7A0177",
+    midpoint = 0,
+    name = "Entfernung zum Mittelpunkt")+
   geom_segment(
-    data = arrows,
+    data = arrows_sig,
     aes(
       x = 0, y = 0,
       xend = DCA1 * 2,
@@ -966,97 +1138,159 @@ ggplot(dca_df, aes(DCA1, DCA2, colour = Distanz)) +
     arrow = arrow(length = unit(0.25, "cm")),
     colour = "black") +
   geom_text(
-  data = arrows,
-  aes(
-    x = DCA1 * 2.3,
-    y = DCA2 * 2.3,
-    label = Variable
-  ),
-  inherit.aes = FALSE
+    data = arrows_sig,
+    aes(
+      x = DCA1 * 2.3,
+      y = DCA2 * 2.3,
+      label = Variable
+    ),
+    inherit.aes = FALSE
   ) +
-
+  
   labs(
     title = "DCA Vegetation Fuchshügel",
     x = "DCA1",
     y = "DCA2"
   ) +
+  
+  theme_minimal() +
+  theme(
+    plot.title = element_text(hjust = 0.5)
+  )
+```
 
+DCA mit species scores jeweils für ein Transekt
+
+```{r}
+#Transekt WO
+data_MT_WO <- merged_data$site == "Meu_trock" & merged_data$Transekt == "WO"
+comm_MT_WO <- comm_matrix[data_MT_WO, , drop = FALSE]
+
+
+comm_MT_WO <- comm_MT_WO[
+  rowSums(comm_MT_WO) > 0,
+  colSums(comm_MT_WO) > 0,
+  drop = FALSE
+]
+
+dca <- decorana(comm_MT_WO)
+summary(dca)
+
+dca_scores <- scores(dca, display = "sites")
+dca_df <- as.data.frame(dca_scores)
+dca_df$Name <- rownames(dca_df)
+dca_df$site <- vegdata$site[match(dca_df$Name, vegdata$plot.ID)]
+dca_df$Transektnummer <- vegdata$Transektnummer[match(dca_df$Name, vegdata$plot.ID)]
+
+species_df <- as.data.frame(scores(dca, display = "species", choices = c(1, 2)))
+species_df$Art <- rownames(species_df)
+species_totals <- colSums(comm_MN, na.rm = TRUE)
+species_df <- species_df %>%
+  filter(Art %in% names(species_totals[species_totals > 0]))
+
+
+ggplot(dca_df, aes(DCA1, DCA2, colour = Transektnummer)) +
+  geom_point(size = 3) +
+  geom_point(
+    data = species_df,
+    aes(x = DCA1, y = DCA2),
+    inherit.aes = FALSE,
+    shape = 17,       
+    size = 3,
+    colour = "grey20"
+  ) +
+  geom_text_repel(
+    data = species_df,
+    aes(x = DCA1, y = DCA2, label = Art),
+    inherit.aes = FALSE,
+    size = 3,
+    colour = "grey20",
+    box.padding = 0.5,
+    point.padding = 0.3,
+    segment.colour = "grey60",
+    max.overlaps = Inf
+  ) +
+  scale_colour_gradient2(
+    low = "#005A8D",
+    mid = "#FFD700",
+    high = "#7A0177",
+    midpoint = 0,
+    breaks = range(dca_df$Transektnummer, na.rm = TRUE),
+    labels = c("Westen", "Osten"),
+    name = "Position im Transekt"
+  ) +
+  labs(
+    title = "DCA Vegetation Fuchshügel, West-Ost Transekt",
+    x = "DCA1",
+    y = "DCA2"
+  ) +
   theme_minimal() +
   theme(
     plot.title = element_text(hjust = 0.5)
   )
 
 
+#Transekt NS
+data_MT_NS <- merged_data$site == "Meu_trock" & merged_data$Transekt == "NS"
+comm_MT_NS <- comm_matrix[data_MT_NS, , drop = FALSE]
 
-####ALT
-comm_MT <- comm_matrix[
-  weighted_values$site == "Meu_trock",
+
+comm_MT_NS <- comm_MT_NS[
+  rowSums(comm_MT_NS) > 0,
+  colSums(comm_MT_NS) > 0,
+  drop = FALSE
 ]
 
-
-dca <- decorana(comm_MT)
+dca <- decorana(comm_MT_NS)
 summary(dca)
-
-env_MT <- weighted_values %>%
-  filter(site == "Meu_trock")
-fit <- envfit(dca, env_MT[, c("Weighted_light",
-    "Weighted_temperature",
-    "Weighted_wetness",
-    "Weighted_nitrogen",
-    "Weighted_alkalinity")])
-fit
-
-plot(dca)
-arrows <- as.data.frame(scores(fit, display = "vectors"))
-arrows$Variable <- rownames(arrows)
-arrows$Variable <- c(
-  "Licht",
-  "Temperatur",
-  "Feuchte",
-  "Stickstoff",
-  "Basengehalt"
-)
 
 dca_scores <- scores(dca, display = "sites")
 dca_df <- as.data.frame(dca_scores)
 dca_df$Name <- rownames(dca_df)
 dca_df$site <- vegdata$site[match(dca_df$Name, vegdata$plot.ID)]
 dca_df$Transektnummer <- vegdata$Transektnummer[match(dca_df$Name, vegdata$plot.ID)]
-dca_df$Distanz <- abs(dca_df$Transektnummer)
 
-ggplot(dca_df, aes(DCA1, DCA2, colour = Distanz)) +
+species_df <- as.data.frame(scores(dca, display = "species", choices = c(1, 2)))
+species_df$Art <- rownames(species_df)
+species_totals <- colSums(comm_MN, na.rm = TRUE)
+species_df <- species_df %>%
+  filter(Art %in% names(species_totals[species_totals > 0]))
+
+ggplot(dca_df, aes(DCA1, DCA2, colour = Transektnummer)) +
   geom_point(size = 3) +
-  scale_colour_gradient(
-    low = "yellow",
-    high = "darkred",
-    name = "Entfernung zur Mitte"
-    )+
-  geom_segment(
-    data = arrows,
-    aes(
-      x = 0, y = 0,
-      xend = DCA1 * 2,
-      yend = DCA2 * 2
-    ),
+  geom_point(
+    data = species_df,
+    aes(x = DCA1, y = DCA2),
     inherit.aes = FALSE,
-    arrow = arrow(length = unit(0.25, "cm")),
-    colour = "black") +
-  geom_text(
-  data = arrows,
-  aes(
-    x = DCA1 * 2.3,
-    y = DCA2 * 2.3,
-    label = Variable
-  ),
-  inherit.aes = FALSE
+    shape = 17,         
+    size = 3,
+    colour = "grey20"
   ) +
-
+  geom_text_repel(
+    data = species_df,
+    aes(x = DCA1, y = DCA2, label = Art),
+    inherit.aes = FALSE,
+    size = 3,
+    colour = "grey20",
+    box.padding = 0.5,
+    point.padding = 0.3,
+    segment.colour = "grey60",
+    max.overlaps = Inf
+  ) +
+  scale_colour_gradient2(
+    low = "#005A8D",
+    mid = "#FFD700",
+    high = "#7A0177",
+    midpoint = 0,
+    breaks = range(dca_df$Transektnummer, na.rm = TRUE),
+    labels = c("Süden", "Norden"),
+    name = "Position im Transekt"
+  ) +
   labs(
-    title = "DCA Vegetation Fuchshügel",
+    title = "DCA Vegetation Fuchshügel, Nord-Süd Transekt",
     x = "DCA1",
     y = "DCA2"
   ) +
-
   theme_minimal() +
   theme(
     plot.title = element_text(hjust = 0.5)
@@ -1066,12 +1300,18 @@ ggplot(dca_df, aes(DCA1, DCA2, colour = Distanz)) +
 
 ## 7.3 Kleiner Sumpf
 
-```{r}
-####NEU
-comm_L <- comm_matrix[
-  weighted_values$site == "Lic",
-]
+DCA mit environmental fit für die gesamte Fläche
 
+```{r}
+data_L <- merged_data$site == "Lic" 
+comm_L <- comm_matrix[data_L, , drop = FALSE]
+
+
+comm_L <- comm_L[
+  rowSums(comm_L) > 0,
+  colSums(comm_L) > 0,
+  drop = FALSE
+]
 
 dca <- decorana(comm_L)
 summary(dca)
@@ -1079,20 +1319,22 @@ summary(dca)
 env_L <- merged_data %>%
   filter(site == "Lic")
 fit <- envfit(dca, env_L[, c("Weighted_light",
-    "Weighted_temperature",
-    "Weighted_wetness",
-    "Weighted_nitrogen",
-    "Weighted_alkalinity",
-    "Hoehe",
-    "SL",
-    "TL",
-    "ML",
-    "HL")])
+                              "Weighted_temperature",
+                              "Weighted_wetness",
+                              "Weighted_nitrogen",
+                              "Weighted_alkalinity",
+                              "Hoehe",
+                              "TL",
+                              "ML",
+                              "HL",
+                              "SL")])
 fit
 
 plot(dca)
-arrows <- as.data.frame(scores(fit, display = "vectors"))
+arrows <-as.data.frame(scores(fit, display = "vectors"))
 arrows$Variable <- rownames(arrows)
+arrows$p_value <- fit$vectors$pvals
+arrows$r2 <- fit$vectors$r
 arrows$Variable <- c(
   "Licht",
   "Temperatur",
@@ -1100,11 +1342,14 @@ arrows$Variable <- c(
   "Stickstoff",
   "Basengehalt",
   "Höhe",
-  "Strauchschicht",
   "Baumschicht",
   "Moosschicht",
-  "Krautschicht"
+  "Krautschicht",
+  "Strauchschicht"
 )
+# nur Umweltvariablen mit signifikanten p-Werten anzeigen
+arrows_sig <- arrows %>%
+  filter(p_value <= 0.05)
 
 dca_scores <- scores(dca, display = "sites")
 dca_df <- as.data.frame(dca_scores)
@@ -1115,13 +1360,14 @@ dca_df$Distanz <- abs(dca_df$Transektnummer)
 
 ggplot(dca_df, aes(DCA1, DCA2, colour = Distanz)) +
   geom_point(size = 3) +
-  scale_colour_gradient(
-    low = "yellow",
-    high = "darkred",
-    name = "Entfernung zur Mitte"
-    )+
+  scale_colour_gradient2(
+    low = "#005A8D",
+    mid = "#FFD700",
+    high = "#7A0177",
+    midpoint = 0,
+    name = "Entfernung zum Mittelpunkt")+
   geom_segment(
-    data = arrows,
+    data = arrows_sig,
     aes(
       x = 0, y = 0,
       xend = DCA1 * 2,
@@ -1131,98 +1377,159 @@ ggplot(dca_df, aes(DCA1, DCA2, colour = Distanz)) +
     arrow = arrow(length = unit(0.25, "cm")),
     colour = "black") +
   geom_text(
-  data = arrows,
-  aes(
-    x = DCA1 * 2.3,
-    y = DCA2 * 2.3,
-    label = Variable
-  ),
-  inherit.aes = FALSE
+    data = arrows_sig,
+    aes(
+      x = DCA1 * 2.3,
+      y = DCA2 * 2.3,
+      label = Variable
+    ),
+    inherit.aes = FALSE
   ) +
-
+  
   labs(
-    title = "DCA Vegetation Auf der Pfalz",
+    title = "DCA Vegetation Kleiner Sumpf",
     x = "DCA1",
     y = "DCA2"
   ) +
+  
+  theme_minimal() +
+  theme(
+    plot.title = element_text(hjust = 0.5)
+  )
+```
 
+DCA mit species scores jeweils für ein Transekt
+
+```{r}
+#Transekt WO
+data_L_WO <- merged_data$site == "Lic" & merged_data$Transekt == "WO"
+comm_L_WO <- comm_matrix[data_L_WO, , drop = FALSE]
+
+
+comm_L_WO <- comm_L_WO[
+  rowSums(comm_L_WO) > 0,
+  colSums(comm_L_WO) > 0,
+  drop = FALSE
+]
+
+dca <- decorana(comm_L_WO)
+summary(dca)
+
+dca_scores <- scores(dca, display = "sites")
+dca_df <- as.data.frame(dca_scores)
+dca_df$Name <- rownames(dca_df)
+dca_df$site <- vegdata$site[match(dca_df$Name, vegdata$plot.ID)]
+dca_df$Transektnummer <- vegdata$Transektnummer[match(dca_df$Name, vegdata$plot.ID)]
+
+species_df <- as.data.frame(scores(dca, display = "species", choices = c(1, 2)))
+species_df$Art <- rownames(species_df)
+species_totals <- colSums(comm_MN, na.rm = TRUE)
+species_df <- species_df %>%
+  filter(Art %in% names(species_totals[species_totals > 0]))
+
+
+ggplot(dca_df, aes(DCA1, DCA2, colour = Transektnummer)) +
+  geom_point(size = 3) +
+  geom_point(
+    data = species_df,
+    aes(x = DCA1, y = DCA2),
+    inherit.aes = FALSE,
+    shape = 17,       
+    size = 3,
+    colour = "grey20"
+  ) +
+  geom_text_repel(
+    data = species_df,
+    aes(x = DCA1, y = DCA2, label = Art),
+    inherit.aes = FALSE,
+    size = 3,
+    colour = "grey20",
+    box.padding = 0.5,
+    point.padding = 0.3,
+    segment.colour = "grey60",
+    max.overlaps = Inf
+  ) +
+  scale_colour_gradient2(
+    low = "#005A8D",
+    mid = "#FFD700",
+    high = "#7A0177",
+    midpoint = 0,
+    breaks = range(dca_df$Transektnummer, na.rm = TRUE),
+    labels = c("Westen", "Osten"),
+    name = "Position im Transekt"
+  ) +
+  labs(
+    title = "DCA Vegetation Kleiner Sumpf, West-Ost Transekt",
+    x = "DCA1",
+    y = "DCA2"
+  ) +
   theme_minimal() +
   theme(
     plot.title = element_text(hjust = 0.5)
   )
 
 
+#Transekt NS
+data_L_NS <- merged_data$site == "Lic" & merged_data$Transekt == "NS"
+comm_L_NS <- comm_matrix[data_L_NS, , drop = FALSE]
 
 
-###ALT
-comm_L <- comm_matrix[
-  weighted_values$site == "Lic",
+comm_L_NS <- comm_L_NS[
+  rowSums(comm_L_NS) > 0,
+  colSums(comm_L_NS) > 0,
+  drop = FALSE
 ]
 
-
-dca <- decorana(comm_L)
+dca <- decorana(comm_L_NS)
 summary(dca)
-
-env_L <- weighted_values %>%
-  filter(site == "Lic")
-fit <- envfit(dca, env_L[, c("Weighted_light",
-    "Weighted_temperature",
-    "Weighted_wetness",
-    "Weighted_nitrogen",
-    "Weighted_alkalinity")])
-fit
-
-plot(dca)
-arrows <- as.data.frame(scores(fit, display = "vectors"))
-arrows$Variable <- rownames(arrows)
-arrows$Variable <- c(
-  "Licht",
-  "Temperatur",
-  "Feuchte",
-  "Stickstoff",
-  "Basengehalt"
-)
 
 dca_scores <- scores(dca, display = "sites")
 dca_df <- as.data.frame(dca_scores)
 dca_df$Name <- rownames(dca_df)
 dca_df$site <- vegdata$site[match(dca_df$Name, vegdata$plot.ID)]
 dca_df$Transektnummer <- vegdata$Transektnummer[match(dca_df$Name, vegdata$plot.ID)]
-dca_df$Distanz <- abs(dca_df$Transektnummer)
 
-ggplot(dca_df, aes(DCA1, DCA2, colour = Distanz)) +
+species_df <- as.data.frame(scores(dca, display = "species", choices = c(1, 2)))
+species_df$Art <- rownames(species_df)
+species_totals <- colSums(comm_MN, na.rm = TRUE)
+species_df <- species_df %>%
+  filter(Art %in% names(species_totals[species_totals > 0]))
+
+ggplot(dca_df, aes(DCA1, DCA2, colour = Transektnummer)) +
   geom_point(size = 3) +
-  scale_colour_gradient(
-    low = "yellow",
-    high = "darkred",
-    name = "Entfernung zur Mitte"
-    )+
-  geom_segment(
-    data = arrows,
-    aes(
-      x = 0, y = 0,
-      xend = DCA1 * 2,
-      yend = DCA2 * 2
-    ),
+  geom_point(
+    data = species_df,
+    aes(x = DCA1, y = DCA2),
     inherit.aes = FALSE,
-    arrow = arrow(length = unit(0.25, "cm")),
-    colour = "black") +
-  geom_text(
-  data = arrows,
-  aes(
-    x = DCA1 * 2.3,
-    y = DCA2 * 2.3,
-    label = Variable
-  ),
-  inherit.aes = FALSE
+    shape = 17,         
+    size = 3,
+    colour = "grey20"
   ) +
-
+  geom_text_repel(
+    data = species_df,
+    aes(x = DCA1, y = DCA2, label = Art),
+    inherit.aes = FALSE,
+    size = 3,
+    colour = "grey20",
+    box.padding = 0.5,
+    point.padding = 0.3,
+    segment.colour = "grey60",
+    max.overlaps = Inf
+  ) +
+  scale_colour_gradient2(
+    low = "#005A8D",
+    mid = "#FFD700",
+    high = "#7A0177",
+    midpoint = 0,
+    breaks = range(dca_df$Transektnummer, na.rm = TRUE),
+    labels = c("Süden", "Norden"),
+    name = "Position im Transekt"
+  ) +
   labs(
-    title = "DCA Vegetation Kleiner Sumpf",
+    title = "DCA Vegetation Kleiner Sumpf, Nord-Süd Transekt",
     x = "DCA1",
     y = "DCA2"
   ) +
-
   theme_minimal() +
   theme(
     plot.title = element_text(hjust = 0.5)
@@ -1509,7 +1816,7 @@ DCAs nur für ein Transekt
 ```{r}
 ###Meusebch NAss Nord-> Süd
 
-idx_MN <- merged_data$site == "Lic" & merged_data$Transekt == "WO"
+idx_MN <- merged_data$site == "Meu_trock" & merged_data$Transekt == "WO"
 comm_MN <- comm_matrix[idx_MN, , drop = FALSE]
 
 
@@ -1523,7 +1830,7 @@ dca <- decorana(comm_MN)
 summary(dca)
 
 env_MN <- merged_data %>%
-  filter(site == "Lic", Transekt=="WO")
+  filter(site == "Meu_trock", Transekt=="WO")
 fit <- envfit(dca, env_MN[, c("Weighted_light",
     "Weighted_temperature",
     "Weighted_wetness",
@@ -1537,8 +1844,10 @@ fit <- envfit(dca, env_MN[, c("Weighted_light",
 fit
 
 plot(dca)
-arrows <- as.data.frame(scores(fit, display = "vectors"))
+arrows <-as.data.frame(scores(fit, display = "vectors"))
 arrows$Variable <- rownames(arrows)
+arrows$p_value <- fit$vectors$pvals
+arrows$r2 <- fit$vectors$r
 arrows$Variable <- c(
   "Licht",
   "Temperatur",
@@ -1551,6 +1860,9 @@ arrows$Variable <- c(
   "Krautschicht",
   "Strauchschicht"
 )
+# nur Umweltvariablen mit signifikanten p-Werten anzeigen
+arrows_sig <- arrows %>%
+  filter(p_value <= 0.05)
 
 dca_scores <- scores(dca, display = "sites")
 dca_df <- as.data.frame(dca_scores)
@@ -1562,13 +1874,13 @@ dca_df$Distanz <- dca_df$Transektnummer
 ggplot(dca_df, aes(DCA1, DCA2, colour = Distanz)) +
   geom_point(size = 3) +
   scale_colour_gradient2(
-  low = "darkblue",
-  mid = "red",
-  high = "darkgreen",
+  low = "#005A8D",
+  mid = "#FFD700",
+  high = "#7A0177",,
   midpoint = 0,
   name = "Position im Transekt")+
   geom_segment(
-    data = arrows,
+    data = arrows_sig,
     aes(
       x = 0, y = 0,
       xend = DCA1 * 2,
@@ -1619,9 +1931,9 @@ ggplot(dca_df, aes(DCA1, DCA2, colour = Distanz)) +
 ) +
 
   scale_colour_gradient2(
-    low = "darkblue",
-    mid = "red",
-    high = "darkgreen",
+    low = "#005A8D",
+    mid = "#FFD700",
+    high = "#7A0177",
     midpoint = 0,
     name = "Position im Transekt"
   ) +
