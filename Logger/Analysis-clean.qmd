@@ -279,8 +279,10 @@ library(readxl)
 library(ggpubr)
 library(rstatix)
 library(afex)
-
+library(lme4)
 library(emmeans)
+#install.packages("performance")
+library(performance)
 ```
 
 # 2 Daten einlesen
@@ -1833,7 +1835,7 @@ plusprecipa <- plusprecipa %>%
   ) %>%
   ungroup()
 #verwende nur Tage ohne Regen, da an Regentagen keine Austrocknung stattfindet
-#Austrocknungsrate wird nur an trockenen Tagen berechnet. Regentag istz also immer Tag 0, es folgen trockene tage, an denen die Luftfeuchte vermutlich abnimmt bis zum nöchsten Regentag
+#Austrocknungsrate wird nur an trockenen Tagen berechnet. Regentag ist also immer Tag 0, es folgen trockene tage, an denen die Luftfeuchte vermutlich abnimmt bis zum nöchsten Regentag
 trockena <- plusprecipa %>%
   filter(
     Regen == FALSE,
@@ -2005,12 +2007,14 @@ ggplot(dat_rLF_L, aes(x = Logger_ID, y = delta_LF)) +
   theme_classic()
 #deltaLF negativ -> Austrocknung
 #deltaLF positiv -> selbst ohne regen wird es feuchter
-#dieser Plot zeigt, in der Mitte nimmt die Luftfeuchte stärker ab als an den Rändern -> kann an Schatten liegen, Dekcung der Bäume, Temperatur usw, dafür brauchen wir ein Model
+#dieser Plot zeigt, in der Mitte nimmt die Luftfeuchte stärker ab als an den Rändern -> kann an Schatten liegen, Deckung der Bäume, Temperatur usw, dafür brauchen wir ein Model
 #Wenn kein model ausreichend Varianz erklärt, müssten andere Methoden verwendet werden, um die Frage zu beantworten
 
 
 #Deckung TL
-read.csv("veg_long.csv", header=T)
+veg_long <- read_excel("veg_long.xlsx")
+read.csv("veg_long.csv", header=T)# funktioniert bei mir irgendwie nicht!?
+
 deckung_TL <- veg_long %>%
   filter(
     Schicht == "TL",
@@ -2059,6 +2063,130 @@ deckung_TL <- deckung_TL %>%
   ) %>%
   ungroup()
 deckung_TL
+```
+
+```{r}
+# Modell zur Klärung der Frage: Was verursacht die starken Schwankungen in der Luftfeuchte 
+# -> Welche Variablen treiben deltaLF?
+
+# Test ob Baumdeckung und Position im Transekt gekoppelt sind - das heißt man schaut erstmal ob man die Baumdeckung als unabhängige Variable verwenden kann
+ggplot(deckung_TL,
+       aes(x = Transektnummer, y = Deckung_TL)) +
+  geom_point() +
+  geom_smooth(method = "lm")
+
+cor.test(deckung_TL$Transektnummer,
+         deckung_TL$Deckung_TL,
+         method = "spearman")
+
+kruskal.test(Deckung_TL ~ site, data = deckung_TL)
+kruskal.test(Deckung_TL ~ Transekt, data = deckung_TL)
+# Baumdeckung scheint weder stark standortabhängig noch transektabhängig zu sein
+
+#################################################################
+#Daten für das Mdell vorbereiten, in model_data zusammenführen
+deckung_clean <- deckung_TL %>%
+  group_by(Standort, logger) %>%
+  summarise(Deckung_TL = mean(Deckung_TL), .groups = "drop")
+
+model_data <- trockenl %>%
+  left_join(deckung_clean, by = c("Standort", "Logger" = "logger"))
+
+table(is.na(model_data$Deckung_TL))
+table(model_data$Standort, is.na(model_data$Deckung_TL))
+str(model_data)
+
+#################################################################
+# Unskaliertes Modell -> Interpretation in Originaleinheiten (physikalisch interpretierbar)
+
+# Skaliertes Modell -> Vergleich der Effektstärken zwischen Prädiktoren möglich (standardisierte Effekte)
+
+#Modell über alle Standorte 
+mod <- lmer(
+  delta_LF ~ Deckung_TL + Tage_seit_Regen + Tp_mean + Standort +
+    (1 | Logger),
+  data = model_data
+)
+summary(mod)
+#Temperatur: hoch signifikant, p = 2.33e-06, Estimate: 0.2149 = wenn die Temperatur steigt, steigt delta_LF
+#Deckung_TL: hoch signifikant, p = 0.000543, Estimate: 0.02067 = wenn Deckung steigt, steigt deltaLF leicht
+#Tage seit Regen: signifikant, p = 0.035003
+#Standort: nicht signifikant, p > 0.05 
+
+#ermöglicht Vergleich der Variabeln, so dass man ermitteln kann welcher Effekt den größten Einfluss hat 
+model_data_scaled <- model_data %>%
+  mutate(
+    delta_LF_z = scale(delta_LF),
+    Deckung_z = scale(Deckung_TL),
+    Regen_z = scale(Tage_seit_Regen),
+    Temp_z = scale(Tp_mean)
+  )
+
+lmer(delta_LF_z ~ Deckung_z + Regen_z + Temp_z + (1 | Logger),
+     data = model_data_scaled)
+#Temperatur: 0.12671 - stärksten Effekt
+#Deckung_TL: 0.11481 - fast den selben Effekt wie Temp 
+#Tage seit Regen: 0.05659 - geringeren Effekt 
+     
+r2(mod)
+#Marginal R² = 0.042 -> Temperatur, Regen, Deckung, Standort erklären 4.2% der Variation in delta_LF
+#Conditional R² = 0.149 -> gesamtes Modell (inkl. Logger) erklärt   14.9% der Variation
+# = Modell erklärt nur einen kleinen Teil der Luftfeuchte-Dynamik!!
+
+################################################################
+#Modell für Standort Meusebach nass
+data_MN <- model_data %>%
+  filter(Standort == "MN")
+
+mod_MN <- lmer(
+  delta_LF ~ Deckung_TL + Tage_seit_Regen + Tp_mean + (1 | Logger),
+  data = data_MN
+)
+summary(mod_MN)
+#Temperatur: nicht signifikant, p = 0,0688
+#Deckung_TL: nicht signifikant, p = 0.5888
+#Tage seit Regen: nicht signifikant, p = 0.0612
+
+###############################################################
+#Modell für Standort Meusebach trocken
+data_MT <- model_data %>%
+  filter(Standort == "MT")
+
+mod_MT <- lmer(
+  delta_LF ~ Deckung_TL + Tage_seit_Regen + Tp_mean + (1 | Logger),
+  data = data_MT
+)
+summary(mod_MT)
+#Temperatur: nicht signifikant, p = 0,243
+#Deckung_TL: nicht signifikant, p = 0.54
+#Tage seit Regen: nicht signifikant, p = 0.144
+
+##############################################################
+#Modell für Standort Lichtenau
+data_L <- model_data %>%
+  filter(Standort == "L")
+
+mod_L <- lmer(
+  delta_LF ~ Deckung_TL + Tage_seit_Regen + Tp_mean + (1 | Logger),
+  data = data_L
+)
+summary(mod_L)
+#Temperatur: signifikant, p = 0,0246, Estimate: 0.129
+#Deckung_TL: nicht signifikant, p = 0.0664
+#Tage seit Regen: nicht signifikant, p = 0.1594
+```
+
+```{r}
+#Test ob Temp und Deckung sich gegenseitig beeinflussen? kann man wahrscheinlich auch einfach als generelles Modell nutzen
+mod_int <- lmer(
+  delta_LF ~ Tp_mean * Deckung_TL +
+    Tage_seit_Regen +
+    Standort +
+    (1 | Logger),
+  data = model_data
+)
+summary(mod_int)
+#Ergebniss: nicht signifikant -> nein tnún sie nicht = Es gibt keinen statistischen Hinweis auf eine Interaktion zw. Temperatur und Bedeckung
 ```
 
 ## 6.4 PCA
