@@ -7,264 +7,7 @@ editor_options:
   chunk_output_type: inline
 ---
 
-**Disclaimer:** Alle Untersuchungen, die sich auf nur einen der drei Standorte spezifisch beziehen wurden für alle drei Standorte durchgeführt, stehen aber oftmals nur für einen Standort im Code. Hier ist einfach die Standortbezeichnung zu ändern, um die Analyse für die weiteren Standorte durchzuführen. Die Standortbezeichnungen sind "L", "MN" und "MT".
-
-# NORMALVERTEILUNG UND SIGNIFIKANZTESTS
-
-hier habe ich alle Methoden mal ausprobiert:
-
-Wir sollten immer auf Normalverteilung testen und dann\
-Normalverteilt -\> repeated measures anova (nimm die zweite methode, die die fehlenden daten entfernt! aber wichtig, die entfernt alle tage, an denen auch nur ein einzelner logger nicht aufgezeichnet hat)
-
-Nicht normalverteilt -\> friedman test
-
-```{r}
-#| label: verschiedene Methoden für Signifikanztestung (Beispiel Lichtenau licht_mean)
-#testen auf normalverteilung
-
-#innerhalb des Standort
-#summary_daily_logger
-
-summary_daily_logger %>%
-  filter(Standort == "L") %>%
-  ggqqplot(
-    x = "Licht_mean",
-    facet.by = "Logger",
-    add = "qqline"
-  )
-summary_daily_logger %>%
-  filter(Standort == "L") %>%
-  ggplot(aes(x = Licht_mean)) +
-  geom_histogram(bins = 10) +
-  facet_wrap(~ Logger, scales = "free") 
-#alle in etwa normalverteilt
-
-#Zwischen den Standorten
-#summary_daily_area
-
-summary_daily_area %>%
-  ggqqplot(
-    x = "Licht_area_mean",
-    facet.by = "Standort",
-    add = "qqline")
-summary_daily_area %>%
-  ggplot(aes(x = Licht_area_mean)) +
-  geom_histogram(bins = 10) +
-  facet_wrap(~ Standort, scales = "free") 
-#nicht normalverteilt
-
-
-
-##Signifikanztets Möglichkeiten
-
-
-#1. T-Tests
-#Annahme der Normalverteilung ->häufig nicht gegeben
-dat_L <- summary_daily_logger %>%
-  filter(Standort == "L") %>%
-  select(Datum, Logger, Licht_summe) %>%
-  pivot_wider(
-    names_from = Logger,
-    values_from = Licht_summe
-  )
-#2.a) händisch
-t.test(dat_L$M, dat_L$N, paired = TRUE) #p-value < 2.2e-16
-t.test(dat_L$M, dat_L$O, paired = TRUE) #p-value < 2.2e-16
-t.test(dat_L$M, dat_L$W, paired = TRUE) #p-value < 2.2e-16
-t.test(dat_L$M, dat_L$S, paired = TRUE) #p-value < 2.2e-16
-t.test(dat_L$N, dat_L$O, paired = TRUE) #p-value = 0.1268
-t.test(dat_L$N, dat_L$W, paired = TRUE) #p-value < 2.2e-16
-t.test(dat_L$N, dat_L$S, paired = TRUE) #p-value < 2.2e-16
-t.test(dat_L$O, dat_L$W, paired = TRUE) #p-value = 8.215e-16
-t.test(dat_L$O, dat_L$S, paired = TRUE) #p-value < 2.2e-16
-t.test(dat_L$W, dat_L$S, paired = TRUE) #p-value < 2.2e-16
-
-#alle Logger signif. unterchidlich außer N&O
-
-#2.b) automatisierte T-tests mit ChatGPT 5.5
-logger <- c("M", "N", "O", "S", "W")
-ergebnisse <- combn(logger, 2, simplify = FALSE)
-tests <- lapply(ergebnisse, function(x) {
-  test <- t.test(
-    dat_L[[x[1]]],
-    dat_L[[x[2]]],
-    paired = TRUE)
-  data.frame(
-    Gruppe1 = x[1],
-    Gruppe2 = x[2],
-    p_Wert = test$p.value,
-    Mittelwert_Diff = mean(dat_L[[x[1]]] - dat_L[[x[2]]],na.rm = TRUE))
-})
-tests_df <- bind_rows(tests)
-tests_df
-
-#plot
-summary_daily_logger %>%
-  filter(Standort == "L") %>%
-  ggplot(aes(x = Logger,
-             fill = Logger,
-             y = Licht_summe)) +
-  geom_boxplot(width = 0.8) +
-  geom_text(
-    data = summary_daily_logger %>%
-      filter(Standort == "L") %>%
-      group_by(Logger) %>%
-      summarise(
-        y = max(Licht_summe, na.rm = TRUE) * 1.08,
-        gruppe = case_when(
-          Logger == "M" ~ "a",
-          Logger == "N" ~ "b",
-          Logger == "O" ~ "b",
-          Logger == "S" ~ "c",
-          Logger == "W" ~ "d"
-        ),
-        .groups = "drop"
-      ),
-    aes(x = Logger, y = y, label = gruppe),
-    inherit.aes = FALSE,
-    size = 6,
-    fontface = "bold"
-  ) +
-  labs(title = "Lichtverhältnisse Kleiner Sumpf",
-       x = "Logger",
-       y = "kumulative Lichtintensität (Lux × Zeit)") +
-  theme_minimal() +
-  theme(legend.position = "none")
-
-
-
-
-
-#3. Testung auf signif. Unterschiede mit mehreren gepaarten T-test  und sqrt transformation um Normalverteilung zu erreichen
-dat_L_sqrt <- summary_daily_logger %>%
-  filter(Standort == "L")%>%
-  mutate(Licht_sqrt = sqrt(Licht_summe)) %>%
-  select(Datum, Logger, Licht_sqrt) %>%
-  pivot_wider(
-    names_from = Logger,
-    values_from = Licht_sqrt
-  )
-
-
-tests <- lapply(ergebnisse, function(x) {
-  test <- t.test(
-    dat_L_sqrt[[x[1]]],
-    dat_L_sqrt[[x[2]]],
-    paired = TRUE)
-  data.frame(
-    Gruppe1 = x[1],
-    Gruppe2 = x[2],
-    p_Wert = test$p.value,
-    Mittelwert_Diff = mean(dat_L_sqrt[[x[1]]] - dat_L_sqrt[[x[2]]],na.rm = TRUE))
-})
-tests_df <- bind_rows(tests)
-tests_df
-
-#alle signif unterschiedl außer N&O
-
-
-#4. Testung auf signif. Unterschiede mit friedman test
-dat_L_fried <- summary_daily_logger %>%
-  filter(Standort == "L") %>%
-  arrange(Logger_ID, Datum)
-
-friedman.test(Licht_mean ~ Logger_ID | Datum, data = dat_L_fried)
-
-pairwise.wilcox.test(
-  dat_L_fried$Licht_mean,
-  dat_L_fried$Logger_ID,
-  paired = TRUE,
-  p.adjust.method = "BH",
-  exact = FALSE
-)
-
-#alle Logger in L unterscheiden sich signif außer N&O
-
-summary_daily_logger %>%
-  filter(Standort == "L") %>%
-  {
-    y_pos <- max(.$Licht_mean, na.rm = TRUE) * 1.08
-    
-    ggplot(., aes(x = Logger, fill = Logger, y = Licht_mean)) +
-      geom_boxplot(width = 0.8) +
-      annotate(
-        "text",
-        x = c("M", "N", "O", "S", "W"),
-        y = y_pos,
-        label = c("a", "b", "b", "c", "d"),
-        size = 6
-      ) +
-      coord_cartesian(ylim = c(NA, y_pos * 1.08)) +
-      labs(
-        title = "Licht mean Kleiner Sumpf",
-        x = "Logger",
-        y = "tägliche Lichtsumme"
-      )
-  }
-
-
-#5. Test mit repeated measures anova
-
-
-res <- anova_test(
-  data = dat_L_fried,
-  dv = Licht_mean,
-  wid = Datum,
-  within = Logger
-)
-
-get_anova_table(res)
-
-pwc <- dat_L_fried %>%
-  pairwise_t_test(
-    Licht_mean ~ Logger, paired = TRUE,
-    p.adjust.method = "bonferroni"
-  )
-pwc
-
-#alle logger in L unterscheiden sich signif. außer N&O
-
-#5. b) repeated measure anova, die mit den ausgefallenen Loggern umegehen kann. Besser diese Variante verwenden
-#(hier ist das beispiel nicht L, licht_mean!)
-dat_MT <- summary_daily_logger %>%
-  filter(
-    Standort == "MT",
-    is.finite(rLF_mean)
-  ) %>%
-  mutate(
-    Datum = factor(Datum),
-    Logger = factor(Logger))
-
-ANOVA_MT <- aov_car(
-  rLF_mean ~ Logger + Error(Datum / Logger),
-  data = dat_MT)
-summary(ANOVA_MT)
-
-PostHoc_MT <- emmeans(ANOVA_MT, specs = "Logger")
-pairs(PostHoc_MT, adjust = "bonferroni")
-
-
-
-# 1. ein model -> chatgpt
-
-mod_L_light <- lmer(log10(Licht_summe + 1) ~ Logger + (1|Datum),
-                    data = summary_daily_logger %>%
-                      filter(Standort == "L"))
-summary(mod_L_light)
-coefs <- fixef(mod_L_light)
-intercept_lux <- 10^(coefs[1]) - 1
-prozent <- (10^(coefs[-1]) - 1) * 100
-#ODER
-mod_light_L <- lmer(
-  Licht_summe ~ Logger + (1|Datum),
-  data = summary_daily_logger %>%
-    filter(Standort == "L")
-)
-library(emmeans)
-pairs <- emmeans(mod_light_L, pairwise ~ Logger)
-pairs
-# alle signif unterschiedlich außer N&O
-```
+**Disclaimer:** Alle Untersuchungen, die sich auf nur einen der drei Standorte spezifisch beziehen wurden für alle drei Standorte durchgeführt, stehen aber oftmals nur für einen Standort im Code. Hier ist einfach die Standortbezeichnung zu ändern, um die Analyse für die weiteren Standorte durchzuführen. Die Standortbezeichnungen sind "L" (Kleiner Sumpf), "MN" (Auf der Pfalz) und "MT" (Fuchshügel).
 
 # 1 genutzte Packages
 
@@ -281,7 +24,6 @@ library(rstatix)
 library(afex)
 library(lme4)
 library(emmeans)
-#install.packages("performance")
 library(performance)
 ```
 
@@ -555,11 +297,11 @@ str(all_loggers)
 #write.csv(all_loggers, "all_loggers.csv")
 ```
 
-# 5 Summaries erstellen
+# 4 Summaries erstellen
 
-## 5.1 Summary pro Tag
+## 4.1 Summary pro Tag
 
-### 5.1.1 für jeden Logger
+### 4.1.1 für jeden Logger
 
 aggregiert die Daten für jeden Tag
 
@@ -613,7 +355,7 @@ str(summary_daily_logger)
   
 ```
 
-### 5.1.2 für jeden Standort
+### 4.1.2 für jeden Standort
 
 aggregiert die Daten für jeden Tag und für jede der drei Flächen (5 Logger pro Fläche aggregiert)
 
@@ -663,9 +405,9 @@ summary_daily_area <- all_loggers %>%
 str(summary_daily_area)
 ```
 
-## 5.2 Summary pro Logger
+## 4.2 Summary pro Logger
 
-### 5.2.1 Summary über alle Daten
+### 4.2.1 Summary über alle Daten
 
 zeigt die Extrema, SD usw. über den gesamten Aufnahmezeitraum
 
@@ -736,7 +478,7 @@ str(summary_logger_year)
 #write.csv(summary_logger_year, "summary_logger_year.csv")
 ```
 
-### 5.2.2 Summary über SD & range tagesaggregierter Daten
+### 4.2.2 Summary über SD & range tagesaggregierter Daten
 
 beantwortet die Frage, wie stark die Parameter an einem typischen Tag schwanken
 
@@ -774,11 +516,11 @@ sd_summary_logger <- summary_daily_logger %>%
 str(sd_summary_logger)
 ```
 
-# 6. Analyse & Plots einzelner Parameter
+# 5. Analyse & Plots Vergleich innerhalb der Flächen bzw. zwischen den Loggern
 
-## 6.1 Licht
+## 5.1 Licht
 
-### 6.1.1 Test auf Normalverteilung
+### 5.1.1 Test auf Normalverteilung
 
 ```{r}
 #Vergleich Tagessumme
@@ -797,7 +539,12 @@ summary_daily_logger %>%
 #eher keine Normalvertilung gegeben
 ```
 
-### 6.1.2 Signifikanztest
+### 5.1.2 Signifikanztest
+
+Gilt für alle Signifikanztests: Bei Normalverteilung -\> repeated measures anova;\
+keine Normalverteilung -\> friedman-Test
+
+ACHTUNG: Anova benötigt gleiche Zeitreihen. Das heißt, da wo einzelne Logger ausgefallen sind, werden Daten auch anderen Loggern nicht mit in die Anova eingerechnet!! Die Ergebnisse sind daher etwas vorsichtig zu betrachten! Beim friedman-test werden die Tage mit ausgefallenen Loggern ebenfalls entfernt!
 
 ```{r}
 #L
@@ -811,6 +558,12 @@ pairwise.wilcox.test(
   paired = TRUE,
   p.adjust.method = "BH",
   exact = FALSE)
+#Friedman chi-squared = 511.11, df = 4, p-value < 2.2e-16
+#   LM      LN      LO      LS     
+#LN < 2e-16 -       -       -      
+#LO < 2e-16 0.15    -       -      
+#LS < 2e-16 < 2e-16 < 2e-16 -      
+#LW < 2e-16 < 2e-16 2.6e-14 < 2e-16
 
 #MN
 #entfernen der Tage notwendig, an denen ein oder mehrere logger ausgefallen sind
@@ -830,6 +583,12 @@ pairwise.wilcox.test(
   paired = TRUE,
   p.adjust.method = "BH",
   exact = FALSE)
+#Friedman chi-squared = 310.1, df = 4, p-value < 2.2e-16
+#    MNM     MNN     MNO     MNS    
+#MNN 0.029   -       -       -      
+#MNO < 2e-16 3.1e-16 -       -      
+#MNS < 2e-16 < 2e-16 4.5e-15 -      
+#MNW < 2e-16 < 2e-16 0.405   2.1e-14
 
 #MT
 #entfernen der Tage notwendig, an denen ein oder mehrere logger ausgefallen sind
@@ -849,28 +608,15 @@ pairwise.wilcox.test(
   paired = TRUE,
   p.adjust.method = "BH",
   exact = FALSE)
+#Friedman chi-squared = 240.3, df = 4, p-value < 2.2e-16
+#    MTM     MTN     MTO     MTS    
+#MTN 1.4e-08 -       -       -      
+#MTO 0.010   < 2e-16 -       -      
+#MTS 3.9e-16 < 2e-16 < 2e-16 -      
+#MTW 0.039   < 2e-16 0.577   9.1e-16
 ```
 
-Die Logger stehen auf den verschiedenen flächen mal mehr oder weniger beschattet. Deshalb werden zuerst nur die mittleren Logger verglichen, da sie am meisten exponiert sind.
-
-```{r}
-#| label: violinplot central logger
-all_loggers %>%
-  filter(Logger == "M", Licht_lux > 1) %>%
-  ggplot(aes(x = Standort, fill = Standort, y = Licht_lux)) +
-  geom_boxplot(width = 0.1, outlier.colour = "red") +
-  geom_violin(na.rm = TRUE, alpha = 0.5) +
-  scale_x_discrete(labels = c("L" = "Kleiner Sumpf", "MN" = "Auf der Pfalz", "MT" = "Fuchshügel")) +
-  labs(title = "Lichtverteilung – mittlere Logger (nur Tag)", x = "Standort", y = "Licht (lux)") +
-  theme(
-    legend.position = "none"
-  )
-#ggsave("light_violinplot.png", width = 6, height=4)
-```
-
-Violinplot zeigt stark rechtsschiefe Verteilung der Daten, selbst wenn die Nachtwerte ausgeklammert werden -\> sollte bei Licht genauso sein
-
-Vergleich innerhalb der Flächen besser mit Lichtsumme
+### 5.1.3 Plots
 
 ```{r}
 summary_daily_logger %>%
@@ -898,28 +644,7 @@ summary_daily_logger %>%
        y="tägliche Lichtsumme")
 ```
 
-```{r}
-#| label: lineplot lightsum per day
-ggplot(summary_daily_area,aes(x = Datum, y = Licht_summe, color = Standort)) +
-  geom_line(linewidth = 0.9) +
-  scale_color_discrete(
-    labels = c("L" = "Kleiner Sumpf",
-               "MN" = "Auf der Pfalz",
-               "MT" = "Fuchshügel"))+
-  labs(
-    title = "tägliche Lichtsumme im Beobachtungszeitraum (Messintervall 10min)",
-    x = "Datum",
-    y = "tägliche Lichtsumme",
-    color = "Standort"
-  ) +
-  theme_minimal() +
-  theme(
-    plot.title = element_text(hjust = 0.5)
-  )
-
-```
-
-## 6.2 Temperatur
+## 5.2 Temperatur
 
 Die Lufttemperatur wurde von jedem Datenlogger sowohl in voller Exposition als auch in einem strahlungsgeschützten Gehäuse aufgezeichnet. Da exponierte Sensoren durch direkte Sonneneinstrahlung zusätzliche Erwärmung erfahren können, wurden für die Berechnung der Mittelwerte ausschließlich die Messungen der strahlungsgeschützten Sensoren verwendet. Die exponierten Messungen wurden für die Extremwerte herangezogen.
 
@@ -964,11 +689,8 @@ daily_logger_extrema <- all_loggers %>%
 
     ## SCHATTEN
 #    Temp_schatten_max =max(Temp_schatten_C, na.rm = T),
-
 #    Time_schatten_max = DateTime[which.max(replace_na(Temp_schatten_C, -Inf))],
-
 #    Temp_schatten_min =min(Temp_schatten_C, na.rm = T),
-
 #    Time_schatten_min =DateTime[which.min(replace_na(Temp_schatten_C, Inf))], 
     .groups = "drop")
 
@@ -999,7 +721,7 @@ extrema_logger <- daily_logger_extrema %>%
 str(extrema_logger)
 ```
 
-### 6.2.1 Test auf Normalverteilung
+### 5.2.1 Test auf Normalverteilung
 
 ```{r}
 #Vergleich Tagesmittelwert (Schatten)
@@ -1028,18 +750,18 @@ summary_daily_logger %>%
   facet_grid(Standort ~ Logger, scales = "free") 
 #normalverteilt
 
-#vergleich tägliche sd (Sonne)
+#vergleich tägliche range (Sonne)
 summary_daily_logger %>%
   ggqqplot(
-    x = "Temp_sonne_sd",
+    x = "Temp_sonne_range",
     facet.by = c("Standort", "Logger"),
     add = "qqline")
 
 summary_daily_logger %>%
-  ggplot(aes(x = Temp_sonne_sd)) +
+  ggplot(aes(x = Temp_sonne_range)) +
   geom_histogram(bins = 10) +
   facet_grid(Standort ~ Logger, scales = "free") 
-#normalverteilt
+#nicht normalverteilt
 
 #Vergleich Tagesmaxima (Sonne)
 summary_daily_logger %>%
@@ -1055,7 +777,7 @@ summary_daily_logger %>%
 #nicht normalverteilt
 ```
 
-### 6.2.2 Signifikanztest
+### 5.2.2 Signifikanztest
 
 ```{r}
 #vegleich tagesmittelwerte
@@ -1077,6 +799,17 @@ summary(ANOVA_MT)
 PostHoc_MT <- emmeans(ANOVA_MT, specs = "Logger")
 pairs(PostHoc_MT, adjust = "bonferroni")
 # 66 Tage wurden wegen fehlender Werte entfernt
+# contrast estimate     SE df t.ratio p.value
+# M - N     -0.1753 0.0368 79  -4.768 <0.0001
+# M - O     -0.0899 0.0197 79  -4.552  0.0002
+# M - S      0.0200 0.0290 79   0.692  1.0000
+# M - W     -0.4315 0.0465 79  -9.284 <0.0001
+# N - O      0.0855 0.0344 79   2.484  0.1510
+# N - S      0.1954 0.0314 79   6.218 <0.0001
+# N - W     -0.2562 0.0436 79  -5.871 <0.0001
+# O - S      0.1099 0.0260 79   4.234  0.0006
+# O - W     -0.3417 0.0444 79  -7.695 <0.0001
+# S - W     -0.4516 0.0455 79  -9.915 <0.0001
 
 #MN
 dat_MN <- summary_daily_logger %>%
@@ -1096,6 +829,17 @@ summary(ANOVA_MN)
 PostHoc_MN <- emmeans(ANOVA_MN, specs = "Logger")
 pairs(PostHoc_MN, adjust = "bonferroni")
 #51 Tage wurden wegen fehlender Werte entfernt
+# contrast estimate     SE df t.ratio p.value
+# M - N     -0.5132 0.0349 94 -14.708 <0.0001
+# M - O     -0.0111 0.0157 94  -0.709  1.0000
+# M - S     -0.1126 0.0201 94  -5.616 <0.0001
+# M - W     -0.3656 0.0300 94 -12.175 <0.0001
+# N - O      0.5020 0.0310 94  16.210 <0.0001
+# N - S      0.4005 0.0241 94  16.616 <0.0001
+# N - W      0.1476 0.0163 94   9.075 <0.0001
+# O - S     -0.1015 0.0166 94  -6.107 <0.0001
+# O - W     -0.3544 0.0270 94 -13.146 <0.0001
+# S - W     -0.2529 0.0224 94 -11.300 <0.0001
 
 #L
 dat_L <- summary_daily_logger %>%
@@ -1114,6 +858,17 @@ summary(ANOVA_L)
 
 PostHoc_L <- emmeans(ANOVA_L, specs = "Logger")
 pairs(PostHoc_L, adjust = "bonferroni")
+# contrast estimate     SE  df t.ratio p.value
+# M - N     -0.4008 0.0333 145 -12.041 <0.0001
+# M - O     -0.0953 0.0264 145  -3.608  0.0042
+# M - S      0.0989 0.0262 145   3.774  0.0023
+# M - W      0.1295 0.0359 145   3.605  0.0043
+# N - O      0.3055 0.0185 145  16.510 <0.0001
+# N - S      0.4997 0.0323 145  15.481 <0.0001
+# N - W      0.5303 0.0298 145  17.807 <0.0001
+# O - S      0.1942 0.0239 145   8.128 <0.0001
+# O - W      0.2247 0.0306 145   7.347 <0.0001
+# S - W      0.0305 0.0274 145   1.113  1.0000
 ```
 
 ```{r}
@@ -1136,6 +891,17 @@ summary(ANOVA_MT)
 PostHoc_MT <- emmeans(ANOVA_MT, specs = "Logger")
 pairs(PostHoc_MT, adjust = "bonferroni")
 # 66 Tage wurden wegen fehlender Werte entfernt
+# contrast estimate     SE df t.ratio p.value
+# M - N     -0.0142 0.0258 79  -0.551  1.0000
+# M - O      0.3784 0.0231 79  16.364 <0.0001
+# M - S      0.6660 0.0497 79  13.398 <0.0001
+# M - W      0.5410 0.0403 79  13.422 <0.0001
+# N - O      0.3927 0.0392 79  10.007 <0.0001
+# N - S      0.6803 0.0599 79  11.356 <0.0001
+# N - W      0.5552 0.0511 79  10.872 <0.0001
+# O - S      0.2876 0.0432 79   6.658 <0.0001
+# O - W      0.1626 0.0382 79   4.255  0.0006
+# S - W     -0.1250 0.0184 79  -6.780 <0.0001
 
 #MN
 dat_MN <- summary_daily_logger %>%
@@ -1155,6 +921,18 @@ summary(ANOVA_MN)
 PostHoc_MN <- emmeans(ANOVA_MN, specs = "Logger")
 pairs(PostHoc_MN, adjust = "bonferroni")
 #51 Tage wurden wegen fehlender Werte entfernt
+# contrast estimate     SE df t.ratio p.value
+# M - N     -0.1553 0.0194 94  -8.019 <0.0001
+# M - O      0.0973 0.0171 94   5.671 <0.0001
+# M - S      0.2510 0.0154 94  16.317 <0.0001
+# M - W      0.1724 0.0185 94   9.300 <0.0001
+# N - O      0.2525 0.0279 94   9.048 <0.0001
+# N - S      0.4062 0.0247 94  16.475 <0.0001
+# N - W      0.3277 0.0229 94  14.285 <0.0001
+# O - S      0.1537 0.0224 94   6.848 <0.0001
+# O - W      0.0752 0.0256 94   2.936  0.0418
+# S - W     -0.0785 0.0172 94  -4.558  0.0002
+
 
 #L
 dat_L <- summary_daily_logger %>%
@@ -1173,65 +951,89 @@ summary(ANOVA_L)
 
 PostHoc_L <- emmeans(ANOVA_L, specs = "Logger")
 pairs(PostHoc_L, adjust = "bonferroni")
+# M - N       0.389 0.0319 145  12.185 <0.0001
+# M - O       0.603 0.0358 145  16.864 <0.0001
+# M - S       1.226 0.0585 145  20.970 <0.0001
+# M - W       0.917 0.0558 145  16.443 <0.0001
+# N - O       0.214 0.0186 145  11.539 <0.0001
+# N - S       0.837 0.0457 145  18.329 <0.0001
+# N - W       0.528 0.0370 145  14.263 <0.0001
+# O - S       0.622 0.0419 145  14.863 <0.0001
+# O - W       0.313 0.0368 145   8.519 <0.0001
+# S - W      -0.309 0.0293 145 -10.542 <0.0001
 ```
 
 ```{r}
-#vegleich tägliche sd (Sonne)
-#MT
-dat_MT <- summary_daily_logger %>%
-  filter(
-    Standort == "MT",
-    is.finite(Temp_sonne_sd)
-  ) %>%
-  mutate(
-    Datum = factor(Datum),
-    Logger = factor(Logger))
-
-ANOVA_MT <- aov_car(
-  Temp_sonne_sd ~ Logger + Error(Datum / Logger),
-  data = dat_MT)
-summary(ANOVA_MT)
-
-PostHoc_MT <- emmeans(ANOVA_MT, specs = "Logger")
-pairs(PostHoc_MT, adjust = "bonferroni")
-# 66 Tage wurden wegen fehlender Werte entfernt
-
-#MN
-dat_MN <- summary_daily_logger %>%
-  filter(
-    Standort == "MN",
-    is.finite(Temp_sonne_sd)
-  ) %>%
-  mutate(
-    Datum = factor(Datum),
-    Logger = factor(Logger))
-
-ANOVA_MN <- aov_car(
-  Temp_sonne_sd ~ Logger + Error(Datum / Logger),
-  data = dat_MN)
-summary(ANOVA_MN)
-
-PostHoc_MN <- emmeans(ANOVA_MN, specs = "Logger")
-pairs(PostHoc_MN, adjust = "bonferroni")
-#51 Tage wurden wegen fehlender Werte entfernt
+#vegleich tägliche range (Sonne) 
 
 #L
-dat_L <- summary_daily_logger %>%
+dat_L_fried <- summary_daily_logger %>%
+  filter(Standort == "L") %>%
+  arrange(Logger_ID, Datum)
+friedman.test(Temp_sonne_range ~ Logger_ID | Datum, data = dat_L_fried)
+pairwise.wilcox.test(
+  dat_L_fried$Temp_sonne_range,
+  dat_L_fried$Logger_ID,
+  paired = TRUE,
+  p.adjust.method = "BH",
+  exact = FALSE)
+#Friedman chi-squared = 316.74, df = 4, p-value < 2.2e-16
+#   LM      LN      LO      LS     
+#LN 5.8e-08 -       -       -      
+#LO 1.5e-10 0.0516  -       -      
+#LS < 2e-16 < 2e-16 < 2e-16 -      
+#LW 4.2e-09 0.0014  0.0557  < 2e-16
+
+
+#MN
+#entfernen der Tage notwendig, an denen ein oder mehrere logger ausgefallen sind
+dat_MN_fried <- summary_daily_logger %>%
   filter(
-    Standort == "L",
-    is.finite(Temp_sonne_sd)
+    Standort == "MN",
+    is.finite(Temp_sonne_range)
   ) %>%
-  mutate(
-    Datum = factor(Datum),
-    Logger = factor(Logger))
+  group_by(Datum) %>%
+  filter(n_distinct(Logger_ID) == 5) %>%
+  ungroup() %>%
+  arrange(Logger_ID, Datum)
+friedman.test(Temp_sonne_range ~ Logger_ID | Datum, data = dat_MN_fried)
+pairwise.wilcox.test(
+  dat_MN_fried$Temp_sonne_range,
+  dat_MN_fried$Logger_ID,
+  paired = TRUE,
+  p.adjust.method = "BH",
+  exact = FALSE)
+#Friedman chi-squared = 188.25, df = 4, p-value < 2.2e-16
+#    MNM     MNN     MNO     MNS    
+#MNN 7.4e-06 -       -       -      
+#MNO 2.2e-08 3.7e-10 -       -      
+#MNS 2.8e-15 2.6e-16 2.9e-08 -      
+#MNW 1.7e-05 2.7e-15 0.33    3.1e-13
 
-ANOVA_L <- aov_car(
-  Temp_sonne_sd ~ Logger + Error(Datum / Logger),
-  data = dat_L)
-summary(ANOVA_L)
-
-PostHoc_L <- emmeans(ANOVA_L, specs = "Logger")
-pairs(PostHoc_L, adjust = "bonferroni")
+#MT
+#entfernen der tage notwendig, an denen ein oder mehrere Logger ausgefallen sind
+dat_MT_fried <- summary_daily_logger %>%
+  filter(
+    Standort == "MT",
+    is.finite(Temp_sonne_range)
+  ) %>%
+  group_by(Datum) %>%
+  filter(n_distinct(Logger_ID) == 5) %>%
+  ungroup() %>%
+  arrange(Logger_ID, Datum)
+friedman.test(Temp_sonne_range ~ Logger_ID | Datum, data = dat_MT_fried)
+pairwise.wilcox.test(
+  dat_MT_fried$Temp_sonne_range,
+  dat_MT_fried$Logger_ID,
+  paired = TRUE,
+  p.adjust.method = "BH",
+  exact = FALSE)
+#Friedman chi-squared = 330.75, df = 4, p-value < 2.2e-16
+#    MTM     MTN     MTO     MTS    
+#MTN 0.00042 -       -       -      
+#MTO < 2e-16 < 2e-16 -       -      
+#MTS < 2e-16 < 2e-16 < 2e-16 -      
+#MTW 1.1e-07 5.1e-16 2.1e-05 < 2e-16
 ```
 
 ```{r}
@@ -1248,6 +1050,12 @@ pairwise.wilcox.test(
   paired = TRUE,
   p.adjust.method = "BH",
   exact = FALSE)
+#Friedman chi-squared = 292.49, df = 4, p-value < 2.2e-16
+#   LM     LN     LO     LS    
+#LN 0.1198 -      -      -     
+#LO 0.5432 0.0260 -      -     
+#LS <2e-16 <2e-16 <2e-16 -     
+#LW 0.0999 0.0069 0.1905 <2e-16
 
 #MN
 #entfernen der Tage notwendig, an denen ein oder mehrere logger ausgefallen sind
@@ -1267,6 +1075,12 @@ pairwise.wilcox.test(
   paired = TRUE,
   p.adjust.method = "BH",
   exact = FALSE)
+#Friedman chi-squared = 181.93, df = 4, p-value < 2.2e-16
+#    MNM     MNN     MNO     MNS    
+#MNN 7.8e-09 -       -       -      
+#MNO 6.5e-07 6.7e-11 -       -      
+#MNS 1.2e-14 2.6e-16 2.4e-07 -      
+#MNW 0.0054  3.4e-15 0.0691  8.7e-14
 
 #MT
 #entfernen der Tage notwendig, an denen ein oder mehrere logger ausgefallen sind
@@ -1286,9 +1100,15 @@ pairwise.wilcox.test(
   paired = TRUE,
   p.adjust.method = "BH",
   exact = FALSE)
+#Friedman chi-squared = 313.47, df = 4, p-value < 2.2e-16
+#    MTM     MTN     MTO     MTS    
+#MTN 5.5e-05 -       -       -      
+#MTO < 2e-16 < 2e-16 -       -      
+#MTS < 2e-16 < 2e-16 < 2e-16 -      
+#MTW 0.0047  1.3e-11 5.1e-08 < 2e-16
 ```
 
-### 6.2.3 Plots
+### 5.2.3 Plots
 
 Vergleich innerer und äußerer Sensor
 
@@ -1316,49 +1136,7 @@ summary_daily_logger %>%
   theme_minimal()
 ```
 
-Extrema und Mittelwerte
-
-#der plot braucht noch erklärung, dass der mitelwert im schatten berechnet wurde und die extrema in der sonne und dass die zahlen als datum zu lesen sind
-
-```{r}
-#| label: temperature ranges all areas
-extrema_logger <- extrema_logger %>%
-  left_join(summary_logger_year %>%
-              select(Standort, Logger, Logger_ID, Tempschatten_Jahresmittel),
-            by = c("Standort","Logger","Logger_ID"))
-str(extrema_logger)
-
-flaechen_namen <- c(
-  "L" = "Kleiner Sumpf",
-  "MN" = "Auf der Pfalz",
-  "MT" = "Fuchshügel")
-
-ggplot(extrema_logger, aes(x = Logger)) +
-  geom_linerange(aes(ymin = Sonne_min, ymax = Sonne_max, color = Standort),
-                 size = 1) +
-  geom_point(aes(y = Tempschatten_Jahresmittel, color = Standort),
-             size = 3) +
-  geom_text(aes(y = Sonne_min, label = format(Sonne_min_Zeit, "%d.%m.")),
-            vjust = 1.5,
-            size = 3,
-            check_overlap = TRUE) +
-  geom_text(aes(y = Sonne_max, label = format(Sonne_max_Zeit, "%d.%m.")),
-            vjust = -0.5,
-            size = 3,
-            check_overlap = TRUE) +
-  facet_wrap(~Standort, scales = "free_x", nrow = 1, labeller = labeller(Standort = flaechen_namen))+
-  theme_bw() +
-  theme(axis.text.x = element_text(angle = 45, hjust = 1),legend.position = "none") +
-  labs(
-    x = "Logger",
-    y = "Temperatur [°C]",
-    title = "Temperaturspitzen und Mittelwert pro Logger und Standort"
-  )
-```
-
-Extrema im Beobachtungszeitraum
-
-#der ist super unübersichtlich, für transektergleiche vlt eher mit mittelwerten arbeiten oder wenigstens monats- oder wochenmittelwerte nd nicht tagesmittelwerte, das hat zu viel noise
+Extrema im Beobachtungszeitraum, Transektvergleich
 
 ```{r}
 #| label: lineplot Lichtenau Nord-Sued mean&max&min temperature
@@ -1396,14 +1174,10 @@ ggplot(
   )
 ```
 
-Lichtenau Nord-Süd-Gradient: im süden ist es bedeutend kälter (maximum liegt weit unter beiden anderen loggern), mitte besonders gegen ende der vegetationsperiode mit größerem ausschlag, da maximum und mean etwa mit den anderen mithalten aber minimum sinkt ab -\> warum?
-
-ist dieses muster auf allen flächen so? dass süden kalt ist ergibt ja sinn, weil am wenigsten sonne
-
 Standorte einzeln
 
 ```{r}
-#| label: boxplot of mean temperature in each area
+#| label: boxplot of mean temperature, max temperature & standard deviation in each area
 #Boxplots - Vergleich der Logger der einzelnen Flächen (nur der innere Logger)
 
 summary_daily_logger %>%
@@ -1441,83 +1215,48 @@ summary_daily_logger %>%
   ) +
   theme_minimal() +
   theme(legend.position = "none")
-```
 
-#den plot mit extremwerten wiederholen!!
-
-alle Standorte gemeinsam
-
-Von dem Plot gibt es 2 Varianten: EInmal jeder STandort einzeln und einmal alle Standorte in einem PLot
-
-```{r}
-#| label: boxplot of mean temperature all areas
-# eben erzeugter Plot für alle 3 Flächen
+#Tagesmaxima
 summary_daily_logger %>%
-  filter(Standort %in% c("L", "MN", "MT"),
-         Logger %in% c("M", "N", "O", "S", "W")) %>%
-  ggplot(aes(x = Logger, y = Temp_schatten_mean, fill = Logger)) +
+  filter(Standort == "L", Logger %in% c("M", "N", "O", "S", "W"))%>%
+  ggplot(aes(x = Logger, y = Temp_sonne_max, fill = Logger)) +
   geom_boxplot() +
   labs(
-    title = "Vergleich der Tagesmitteltemperatur des inneren Sensors pro Logger",
-    x = "Loggerstandort",
-    y = "Tagesmitteltemperatur (°C)"
+    title = "Tageshöchsttemperaturen - Kleiner Sumpf",
+    x = "Logger",
+    y = "Tageshöchsttemperatur (°C)"
   ) +
   theme_minimal() +
-  theme(legend.position = "none") +
-  facet_wrap(~Standort, ncol = 1, scales = "free_y")
-
-#ggsave("boxplot_temp_mean_loggers.png", width = 6, height = 20) 
+  theme(legend.position = "none") 
 
 summary_daily_logger %>%
-  filter(Standort %in% c("L", "MN", "MT"),
-         Logger %in% c("M", "N", "O", "S", "W")) %>%
-  ggplot(aes(x = Standort, y = Temp_schatten_mean, fill = Logger)) +
-  geom_boxplot(position = position_dodge(width = 0.8), width =0.7) +
+  filter(Standort == "MN", Logger %in% c("M", "N", "O", "S", "W"))%>%
+  ggplot(aes(x = Logger, y = Temp_sonne_max, fill = Logger)) +
+  geom_boxplot() +
   labs(
-    title = "Vergleich der Tagesmitteltemperatur des inneren Sensors pro Logger",
-    x = "Loggerstandort",
-    y = "Tagesmitteltemperatur (°C)",
-    fill = "Standort"
-  ) +
-  theme_minimal()
-
-
-summary_daily_area %>%
-  ggplot(aes(x = Standort, y = Temp_area_schatten_mean, fill = Standort)) +
-  geom_boxplot(position = position_dodge(width = 0.8), width =0.7) +
-  labs(
-    title = "Vergleich der Tagesmitteltemperatur des inneren Sensors pro Standort",
-    x = "Standort",
-    y = "Tagesmitteltemperatur (°C)",
-    fill = "Standort"
-  ) +
-  theme_minimal()
-```
-
-```{r}
-#| label: lineplot mean temp & time
-ggplot(summary_daily_area,aes(x = Datum, y = Temp_area_schatten_mean, color = Standort)) +
-  geom_line(linewidth = 0.7) +
-  scale_color_discrete(
-    labels = c("L" = "Kleiner Sumpf",
-               "MN" = "Auf der Pfalz",
-               "MT" = "Fuchshügel"))+
-  labs(
-    title = "Tagesmitteltemperatur im Beobachtungszeitraum",
-    x = "Datum",
-    y = "Flächenmittel Temperatur (°C)",
-    color = "Standort"
+    title = "Tageshöchsttemperaturen  - Auf der Pfalz",
+    x = "Logger",
+    y = "Tageshöchsttemperatur (°C)"
   ) +
   theme_minimal() +
-  theme(
-    plot.title = element_text(hjust = 0.5)
-  )
-#ggsave("area_mean_temp_in_year.png", width = 20, height = 6) 
+  theme(legend.position = "none")
+
+summary_daily_logger %>%
+  filter(Standort == "MT", Logger %in% c("M", "N", "O", "S", "W"))%>%
+  ggplot(aes(x = Logger, y = Temp_sonne_max, fill = Logger)) +
+  geom_boxplot() +
+  labs(
+    title = "Tageshöchsttemperaturen  - Fuchshügel",
+    x = "Logger",
+    y = "Tageshöchsttemperatur (°C)"
+  ) +
+  theme_minimal() +
+  theme(legend.position = "none")
 ```
 
-## 6.3 Luftfeuchte und Taupunkt
+## 5.3 Luftfeuchte und Taupunkt
 
-### 6.3.1 Test auf Normalverteilung
+### 5.3.1 Test auf Normalverteilung
 
 ```{r}
 #Vergleich Tagesmittelwerte
@@ -1550,9 +1289,7 @@ summary_daily_logger %>%
   theme_minimal()
 ```
 
-### 6.3.2 Signifikanztest
-
-ACHTUNG: Anova benötigt gleiche Zeitreihen. Das heißt, da wo einzelne Logger ausgefallen sind, werden Daten auch anderen Loggern nicht mit in die Anova eingerechnet!! Die Ergebnisse sind daher etwas vorsichtig zu betrachten!
+### 5.3.2 Signifikanztest
 
 ```{r}
 #Vergleich Tagesmittelwerte
@@ -1574,6 +1311,17 @@ summary(ANOVA_MT)
 PostHoc_MT <- emmeans(ANOVA_MT, specs = "Logger")
 pairs(PostHoc_MT, adjust = "bonferroni")
 # 66 Tage wurden wegen fehlender Werte entfernt
+# contrast estimate    SE df t.ratio p.value
+# M - N       2.002 0.201 79   9.953 <0.0001
+# M - O       2.638 0.164 79  16.052 <0.0001
+# M - S       0.876 0.113 79   7.781 <0.0001
+# M - W       7.931 0.234 79  33.907 <0.0001
+# N - O       0.636 0.218 79   2.916  0.0461
+# N - S      -1.125 0.208 79  -5.405 <0.0001
+# N - W       5.930 0.281 79  21.121 <0.0001
+# O - S      -1.761 0.210 79  -8.378 <0.0001
+# O - W       5.294 0.347 79  15.240 <0.0001
+# S - W       7.055 0.218 79  32.406 <0.0001
 
 #MN
 dat_MN <- summary_daily_logger %>%
@@ -1593,6 +1341,17 @@ summary(ANOVA_MN)
 PostHoc_MN <- emmeans(ANOVA_MN, specs = "Logger")
 pairs(PostHoc_MN, adjust = "bonferroni")
 #51 Tage wurden wegen fehlender Werte entfernt
+# contrast estimate    SE df t.ratio p.value
+# M - N       3.957 0.145 94  27.240 <0.0001
+# M - O       0.411 0.136 94   3.015  0.0330
+# M - S       1.344 0.107 94  12.512 <0.0001
+# M - W       4.950 0.221 94  22.449 <0.0001
+# N - O      -3.546 0.212 94 -16.743 <0.0001
+# N - S      -2.613 0.125 94 -20.835 <0.0001
+# N - W       0.993 0.204 94   4.877 <0.0001
+# O - S       0.933 0.151 94   6.167 <0.0001
+# O - W       4.539 0.314 94  14.463 <0.0001
+# S - W       3.606 0.233 94  15.462 <0.0001
 
 #L
 dat_L <- summary_daily_logger %>%
@@ -1611,6 +1370,17 @@ summary(ANOVA_L)
 
 PostHoc_L <- emmeans(ANOVA_L, specs = "Logger")
 pairs(PostHoc_L, adjust = "bonferroni")
+# contrast estimate    SE  df t.ratio p.value
+# M - N        1.39 0.179 145   7.803 <0.0001
+# M - O       -2.54 0.188 145 -13.510 <0.0001
+# M - S       -0.69 0.182 145  -3.788  0.0022
+# M - W       -5.38 0.254 145 -21.197 <0.0001
+# N - O       -3.94 0.263 145 -14.988 <0.0001
+# N - S       -2.08 0.287 145  -7.250 <0.0001
+# N - W       -6.77 0.348 145 -19.461 <0.0001
+# O - S        1.85 0.273 145   6.800 <0.0001
+# O - W       -2.83 0.316 145  -8.976 <0.0001
+# S - W       -4.69 0.238 145 -19.659 <0.0001
 ```
 
 ```{r}
@@ -1633,6 +1403,17 @@ summary(ANOVA_MT)
 PostHoc_MT <- emmeans(ANOVA_MT, specs = "Logger")
 pairs(PostHoc_MT, adjust = "bonferroni")
 # 66 Tage wurden wegen fehlender Werte entfernt
+# contrast estimate    SE df t.ratio p.value
+# M - N       0.857 0.106 79   8.080 <0.0001
+# M - O       0.640 0.104 79   6.127 <0.0001
+# M - S       1.478 0.113 79  13.023 <0.0001
+# M - W       2.392 0.175 79  13.642 <0.0001
+# N - O      -0.218 0.146 79  -1.495  1.0000
+# N - S       0.620 0.130 79   4.784 <0.0001
+# N - W       1.534 0.150 79  10.209 <0.0001
+# O - S       0.838 0.121 79   6.916 <0.0001
+# O - W       1.752 0.193 79   9.097 <0.0001
+# S - W       0.914 0.113 79   8.122 <0.0001
 
 #MN
 dat_MN <- summary_daily_logger %>%
@@ -1652,6 +1433,17 @@ summary(ANOVA_MN)
 PostHoc_MN <- emmeans(ANOVA_MN, specs = "Logger")
 pairs(PostHoc_MN, adjust = "bonferroni")
 #51 Tage wurden wegen fehlender Werte entfernt
+# contrast estimate     SE df t.ratio p.value
+# M - N       0.119 0.0763 94   1.564  1.0000
+# M - O       0.264 0.1190 94   2.220  0.2885
+# M - S       0.484 0.0612 94   7.900 <0.0001
+# M - W       2.004 0.1270 94  15.770 <0.0001
+# N - O       0.144 0.1470 94   0.981  1.0000
+# N - S       0.364 0.0779 94   4.677 <0.0001
+# N - W       1.885 0.1060 94  17.797 <0.0001
+# O - S       0.220 0.1070 94   2.048  0.4338
+# O - W       1.740 0.1850 94   9.429 <0.0001
+# S - W       1.520 0.1130 94  13.489 <0.0001
 
 #L
 dat_L <- summary_daily_logger %>%
@@ -1670,7 +1462,20 @@ summary(ANOVA_L)
 
 PostHoc_L <- emmeans(ANOVA_L, specs = "Logger")
 pairs(PostHoc_L, adjust = "bonferroni")
+# contrast estimate     SE  df t.ratio p.value
+# M - N       1.271 0.0921 145  13.792 <0.0001
+# M - O       2.093 0.1110 145  18.779 <0.0001
+# M - S       3.112 0.1820 145  17.134 <0.0001
+# M - W       4.920 0.1900 145  25.961 <0.0001
+# N - O       0.822 0.1080 145   7.628 <0.0001
+# N - S       1.841 0.1890 145   9.758 <0.0001
+# N - W       3.649 0.1660 145  22.017 <0.0001
+# O - S       1.019 0.1710 145   5.960 <0.0001
+# O - W       2.827 0.1960 145  14.417 <0.0001
+# S - W       1.808 0.1550 145  11.679 <0.0001
 ```
+
+### 5.3.3 Plots
 
 ```{r}
 #| label: boxplot of mean humidity each area
@@ -1729,7 +1534,6 @@ summary_daily_logger %>%
   theme(legend.position = "none") +
   facet_wrap(~Standort, ncol = 1, scales = "free_y")
 
-#ggsave("boxplot_humidity_mean_loggers.png", width = 6, height = 20) 
 
 summary_daily_logger %>%
   filter(Standort %in% c("L", "MN", "MT"),
@@ -1745,23 +1549,7 @@ summary_daily_logger %>%
   theme_minimal()
 ```
 
-```{r}
-#| label: lineplot mean humidity & time
-ggplot(summary_daily_area,aes(x = Datum, y = rLF_area_mean, color = Standort)) +
-  geom_line(linewidth = 0.7) +
-  labs(
-    title = "Luftfeuchte im Beobachtungszeitraum",
-    x = "Datum",
-    y = "Flächenmittel Temperatur (°C)",
-    color = "Standort"
-  ) +
-  theme_minimal() +
-  theme(
-    plot.title = element_text(hjust = 0.5)
-  )
-```
-
-### 6.3.2 Niederschlagsereignisse
+### 5.3.4 Niederschlagsereignisse -\> Vergleich zwischen Standorten UND Loggern
 
 ```{r}
 #| label: Niederschlagsereignisse von externer Klimastation
@@ -1770,8 +1558,8 @@ str(precip)
 precip <- rename(precip, Datum = Date)
 precip%>%
   ggplot(aes(x = Datum, y = `rain (mm)`)) + geom_line()
-
-# Join mit AREA summary
+####################################################################
+# Join mit AREA summary (Vergleich zwischen den 3 Standorten)
 plusprecipa <- left_join(summary_daily_area, precip, by = "Datum")
 str(plusprecipa)
 plusprecipa <- plusprecipa %>%
@@ -1841,18 +1629,6 @@ trockena <- plusprecipa %>%
     Regen == FALSE,
     !is.na(Tage_seit_Regen))
 
-#mod <- lm(
-#  rLF_area_mean ~ Tage_seit_Regen * Standort,
-#  data = trockena
-#)
-#plot(mod)
-#summary(mod)
-#Tage seit Regen erklärt signifikant die Abnahme in LF (logisch)
-#L: LF nimmt 1,8% pro Tag ab
-#MN: LF nimmt 1,8%+0,5%= 2,3% pro Tag ab
-#MT LF nimmt 1,8%+0,1%= 1,9% pro Tag ab
-#Unterschiede zwischen Flächen nicht signifikant
-#anova(mod)
 
 ggplot(trockena,
        aes(x = Tage_seit_Regen,
@@ -1867,7 +1643,8 @@ ggplot(trockena,
     color = "Standort"
   )
 
-# Join mit LOGGER summary -> selbes wie eben für area-summary gemacht wurde
+########################################################
+#Join mit LOGGER summary -> selbes wie eben für area-summary gemacht wurde (Vergleich innerhalb der Flächen bzw. zwischen den Loggern)
 
 plusprecipl <- left_join(summary_daily_logger, precip, by = "Datum")
 str(plusprecipl)
@@ -1936,15 +1713,6 @@ trockenl <- plusprecipl %>%
     Regen == FALSE,
     !is.na(Tage_seit_Regen))
 
-mod <-trockenl%>%
-  filter(Standort =="MN")%>%
-  {lm(
-    rLF_mean ~ Tage_seit_Regen * Logger_ID,
-    data=.)}
-plot(mod)
-summary(mod)
-anova(mod)
-
 trockenl %>%
   filter(Standort=="MN")%>%
   ggplot(aes(x = Tage_seit_Regen,
@@ -1991,6 +1759,8 @@ pairwise.wilcox.test(
   p.adjust.method = "BH",
   exact = FALSE
 )
+# signif Unterschiede zwischen allen Loggern in Lichtenau
+
 #boxplot
 dat_rLF_L %>%
   group_by(Logger_ID) %>%
@@ -2010,7 +1780,7 @@ ggplot(dat_rLF_L, aes(x = Logger_ID, y = delta_LF)) +
 #dieser Plot zeigt, in der Mitte nimmt die Luftfeuchte stärker ab als an den Rändern -> kann an Schatten liegen, Deckung der Bäume, Temperatur usw, dafür brauchen wir ein Model
 #Wenn kein model ausreichend Varianz erklärt, müssten andere Methoden verwendet werden, um die Frage zu beantworten
 
-
+#Für ein Modell, was die Austrockunungsrate deltaLF vorhersagt, benötigt man dieDeckung der Tree layer an den Loggerstandpunkten. Die Tabelle veg_long wurde in der Vegetationsanalyse im Ordner vegetation erzeugt und von dort exportiert
 #Deckung TL
 veg_long <- read_excel("veg_long.xlsx")
 read.csv("veg_long.csv", header=T)# funktioniert bei mir irgendwie nicht!?
@@ -2045,22 +1815,16 @@ deckung_TL <- deckung_TL %>%
   mutate(
     logger = case_when(
       Transektnummer == 0 ~ "M",
-      
       Transekt == "NS" &
         Transektnummer == min(Transektnummer, na.rm = TRUE) ~ "S",
-      
       Transekt == "NS" &
         Transektnummer == max(Transektnummer, na.rm = TRUE) ~ "N",
-      
       Transekt == "WO" &
         Transektnummer == min(Transektnummer, na.rm = TRUE) ~ "W",
-      
       Transekt == "WO" &
         Transektnummer == max(Transektnummer, na.rm = TRUE) ~ "O",
-      
       TRUE ~ NA_character_
-    )
-  ) %>%
+    )) %>%
   ungroup()
 deckung_TL
 ```
@@ -2208,112 +1972,14 @@ summary(mod_int)
 #Ergebniss: nicht signifikant -> nein tnún sie nicht = Es gibt keinen statistischen Hinweis auf eine Interaktion zw. Temperatur und Bedeckung
 ```
 
-## 6.4 PCA
-
-PCA für alle Logger und alle Parameter
+## 5.4 PCA für einzelnen Standort
 
 ```{r}
-#| label: PCA with 2 plots
-#nur Temp_schatten für bessere Vergleichbarkeit
-df_pca <- summary_logger_year %>%
-  select(Standort, Logger, Tempschatten_Jahresmittel,Licht_Jahresmittel, rLF_Jahresmittel)
-
-decorana(df_pca[, c("Tempschatten_Jahresmittel",
-                      "Licht_Jahresmittel", "rLF_Jahresmittel")])
-pca <- rda(df_pca[, c("Tempschatten_Jahresmittel",
-                      "Licht_Jahresmittel","rLF_Jahresmittel")],
-           scale = TRUE)
-summary(pca)
-screeplot(pca)
-biplot(pca)
-
-
-site_scores <- scores(pca, display = "sites")
-var_scores  <- scores(pca, display = "species")
-
-sites <- data.frame(site_scores,
-                    Standort = df_pca$Standort,
-                    Logger   = df_pca$Logger)
-
-vars <- data.frame(var_scores,
-                   Variable = rownames(var_scores))
-eig <- summary(pca)$cont$importance[2, ]
-vars <- data.frame(var_scores,
-                   Variable = rownames(var_scores))
-vars$Label <- c("Temperatur", "Licht", "Luftfeuchte") 
-
-ggplot() +
-  stat_ellipse(data = sites,
-               aes(PC1, PC2, fill=Standort),
-               geom="polygon",
-               alpha = 0.2,
-               show.legend = F) +
-  geom_point(data = sites,
-             aes(PC1, PC2, color = Standort),
-             size = 3) +
-  geom_text(data = sites,
-            aes(PC1, PC2, label = Logger, color = Standort),
-            vjust = -1, show.legend = F) +
-  geom_segment(data = vars,
-               aes(x = 0, y = 0,
-                   xend = PC1, yend = PC2),
-               arrow = arrow(length = unit(0.25, "cm")),
-               color = "black") +
-  geom_text(data = vars,
-            aes(PC1, PC2, label = Label),
-            color = "black",
-            vjust = -0.5, hjust= 0.3) +
-  xlab(paste0("PC1 (", round(eig[1]*100,1), "%)")) +
-  ylab(paste0("PC2 (", round(eig[2]*100,1), "%)")) +
-  theme_bw() +
-  coord_fixed(ratio = 0.7)
-
-
-
-
-# Hull-Funktion für jeden Standort
-hulls <- sites %>%
-  dplyr::group_by(Standort) %>%
-  dplyr::slice(chull(PC1, PC2))  
-vars$LabelX <- vars$PC1 * c(2.1, 1.7, 1.4)
-vars$LabelY <- vars$PC2 * c(1.5, 2, 1.8)
-
-ggplot() +
-  geom_polygon(data = hulls,
-               aes(x = PC1, y = PC2, fill = Standort),
-               alpha = 0.2, show.legend = F) +
-  geom_point(data = sites,
-             aes(PC1, PC2, color = Standort),
-             size = 3) +
-  geom_text(data = sites,
-            aes(PC1, PC2, label = Logger, color = Standort),
-            vjust = -1, show.legend = F) +
-  geom_segment(data = vars,
-               aes(x = 0, y = 0,
-                   xend = PC1 * 1.5,
-                   yend = PC2 * 1.5),
-               arrow = arrow(length = unit(0.25, "cm")),
-               color = "black") +
-  geom_text(data = vars,
-            aes(x=LabelX, y=LabelY, label = Label),
-            color = "black") +
-  xlab(paste0("PC1 (", round(eig[1]*100,1), "%)")) +
-  ylab(paste0("PC2 (", round(eig[2]*100,1), "%)")) +
-  theme_classic() +
-  coord_cartesian(xlim = c(-2, 2), ylim = c(-2, 2))
-
-#theme_classic im zweiten plot, während theme_bw im ersten
-```
-
-PCA für jeden Standort einzeln
-
-```{r}
-
+#Beispiel Lichtenau, andere Standorte durch Ersetzung zu analysieren
 df_pca_L <- summary_daily_logger %>%
   filter(Standort =="MT")%>%
   select(Standort, Logger, Temp_schatten_mean,Licht_summe, rLF_mean)
 
-#decorana(df_pca_L[, c("Temp_schatten_mean","Licht_summe", "rLF_mean")])
 pca <- rda(df_pca_L[, c("Temp_schatten_mean","Licht_summe", "rLF_mean")],
            scale = TRUE)
 summary(pca)
@@ -2362,18 +2028,14 @@ ggplot() +
   theme_bw() +
   coord_fixed(ratio = 0.7)
 
-
+#keine Gruppierungen zu erkennen
 ```
 
-##### *Mögliche Analyse:*
+# 6. Analyse und Plots - Vergleich zw. den drei Flächen
 
-PCA für jeden Standort einzeln
+## 6.1 Licht
 
-# 7. Analyse und Plots - Vergleich zw. den drei Flächen
-
-## 7.1 Licht
-
-### 7.1.1 Test auf Normalverteilung
+### 6.1.1 Test auf Normalverteilung
 
 ```{r}
 summary_daily_area %>%
@@ -2391,7 +2053,7 @@ summary_daily_area %>%
 #eher keine Normalverteilung gegeben 
 ```
 
-### 7.1.2 Signifikanztest
+### 6.1.2 Signifikanztest
 
 ```{r}
 dat_licht <- summary_daily_area %>%
@@ -2415,7 +2077,7 @@ pairwise.wilcox.test(
 #Alle drei Flächen unterscheiden sich signifikant voneinander im Lichtniveau.
 ```
 
-### 7.1.3 Plots
+### 6.1.3 Plots
 
 ```{r}
 summary_daily_area %>%
@@ -2434,9 +2096,49 @@ summary_daily_area %>%
   )
 ```
 
-## 7.2 Temperatur
+Violinplot mittltler Logger
 
-### 7.2.1 Test auf Normalverteilung
+Die Logger stehen auf den verschiedenen flächen mal mehr oder weniger beschattet. Deshalb werden zuerst nur die mittleren Logger verglichen, da sie am meisten exponiert sind.
+
+```{r}
+#| label: violinplot central logger
+all_loggers %>%
+  filter(Logger == "M", Licht_lux > 1) %>%
+  ggplot(aes(x = Standort, fill = Standort, y = Licht_lux)) +
+  geom_boxplot(width = 0.1, outlier.colour = "red") +
+  geom_violin(na.rm = TRUE, alpha = 0.5) +
+  scale_x_discrete(labels = c("L" = "Kleiner Sumpf", "MN" = "Auf der Pfalz", "MT" = "Fuchshügel")) +
+  labs(title = "Lichtverteilung – mittlere Logger (nur Tag)", x = "Standort", y = "Licht (lux)") +
+  theme(
+    legend.position = "none"
+  )
+```
+
+Violinplot zeigt stark rechtsschiefe Verteilung der Daten, selbst wenn die Nachtwerte ausgeklammert werden -\> logisch beim Licht
+
+```{r}
+#| label: lineplot lightsum per day
+ggplot(summary_daily_area,aes(x = Datum, y = Licht_summe, color = Standort)) +
+  geom_line(linewidth = 0.9) +
+  scale_color_discrete(
+    labels = c("L" = "Kleiner Sumpf",
+               "MN" = "Auf der Pfalz",
+               "MT" = "Fuchshügel"))+
+  labs(
+    title = "tägliche Lichtsumme im Beobachtungszeitraum (Messintervall 10min)",
+    x = "Datum",
+    y = "tägliche Lichtsumme",
+    color = "Standort"
+  ) +
+  theme_minimal() +
+  theme(
+    plot.title = element_text(hjust = 0.5)
+  )
+```
+
+## 6.2 Temperatur
+
+### 6.2.1 Test auf Normalverteilung
 
 ```{r}
 #Vergleich Tagesmittelwert (Schatten)
@@ -2493,7 +2195,7 @@ summary_daily_area %>%
 
 ```
 
-### 7.2.2 Signifikanztest
+### 6.2.2 Signifikanztest
 
 ```{r}
 dat_area <- summary_daily_area %>%
@@ -2592,7 +2294,7 @@ pairwise.wilcox.test(
 #Alle drei Flächen unterscheiden sich signifikant in den Temperaturmaxima. 
 ```
 
-### 7.2.3 Plots
+### 6.2.3 Plots
 
 ```{r}
 summary_daily_area %>%
@@ -2626,9 +2328,113 @@ summary_daily_area %>%
   )
 ```
 
-## 7.3 Luftfeuchte (und Taupunkt)
+```{r}
+#| label: temperature ranges all areas
+extrema_logger <- extrema_logger %>%
+  left_join(summary_logger_year %>%
+              select(Standort, Logger, Logger_ID, Tempschatten_Jahresmittel),
+            by = c("Standort","Logger","Logger_ID"))
+str(extrema_logger)
 
-### 7.3.1 Test auf Normalverteilung
+flaechen_namen <- c(
+  "L" = "Kleiner Sumpf",
+  "MN" = "Auf der Pfalz",
+  "MT" = "Fuchshügel")
+
+ggplot(extrema_logger, aes(x = Logger)) +
+  geom_linerange(aes(ymin = Sonne_min, ymax = Sonne_max, color = Standort),
+                 size = 1) +
+  geom_point(aes(y = Tempschatten_Jahresmittel, color = Standort),
+             size = 3) +
+  geom_text(aes(y = Sonne_min, label = format(Sonne_min_Zeit, "%d.%m.")),
+            vjust = 1.5,
+            size = 3,
+            check_overlap = TRUE) +
+  geom_text(aes(y = Sonne_max, label = format(Sonne_max_Zeit, "%d.%m.")),
+            vjust = -0.5,
+            size = 3,
+            check_overlap = TRUE) +
+  facet_wrap(~Standort, scales = "free_x", nrow = 1, labeller = labeller(Standort = flaechen_namen))+
+  theme_bw() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1),legend.position = "none") +
+  labs(
+    x = "Logger",
+    y = "Temperatur [°C]",
+    title = "Temperaturspitzen und Mittelwert pro Logger und Standort"
+  )
+```
+
+der Plot zeigt die Range der Temperatur im Aufnahmezeitraum (in der Sonne)-\> Linien, die Mitteltemperatur (im Schatten) über den Aufnahmezeitraum -\> Punkte, und das Datum, an dem die absolute Maximal- bzw Minimaltemperatur des gesamten Aufnahmezeitraumes am jeweiligen Logger erreicht wurde -\> Beschriftungen oben und unten
+
+Es ist möglich, dass der Zeitraum, in dem einige Logger ausgefallen sind, höhere bzw niedrigere temperaturen aufweist, die nicht aufgezeichnet werden konnten!
+
+```{r}
+#| label: boxplot of mean temperature all areas
+#hier gibt es 3 verschiedene layout für denselben Plot
+summary_daily_logger %>%
+  filter(Standort %in% c("L", "MN", "MT"),
+         Logger %in% c("M", "N", "O", "S", "W")) %>%
+  ggplot(aes(x = Logger, y = Temp_schatten_mean, fill = Logger)) +
+  geom_boxplot() +
+  labs(
+    title = "Vergleich der Tagesmitteltemperatur des inneren Sensors pro Logger",
+    x = "Loggerstandort",
+    y = "Tagesmitteltemperatur (°C)"
+  ) +
+  theme_minimal() +
+  theme(legend.position = "none") +
+  facet_wrap(~Standort, ncol = 1, scales = "free_y")
+
+
+summary_daily_logger %>%
+  filter(Standort %in% c("L", "MN", "MT"),
+         Logger %in% c("M", "N", "O", "S", "W")) %>%
+  ggplot(aes(x = Standort, y = Temp_schatten_mean, fill = Logger)) +
+  geom_boxplot(position = position_dodge(width = 0.8), width =0.7) +
+  labs(
+    title = "Vergleich der Tagesmitteltemperatur des inneren Sensors pro Logger",
+    x = "Loggerstandort",
+    y = "Tagesmitteltemperatur (°C)",
+    fill = "Standort"
+  ) +
+  theme_minimal()
+
+
+summary_daily_area %>%
+  ggplot(aes(x = Standort, y = Temp_area_schatten_mean, fill = Standort)) +
+  geom_boxplot(position = position_dodge(width = 0.8), width =0.7) +
+  labs(
+    title = "Vergleich der Tagesmitteltemperatur des inneren Sensors pro Standort",
+    x = "Standort",
+    y = "Tagesmitteltemperatur (°C)",
+    fill = "Standort"
+  ) +
+  theme_minimal()
+```
+
+```{r}
+#| label: lineplot mean temp & time
+ggplot(summary_daily_area,aes(x = Datum, y = Temp_area_schatten_mean, color = Standort)) +
+  geom_line(linewidth = 0.7) +
+  scale_color_discrete(
+    labels = c("L" = "Kleiner Sumpf",
+               "MN" = "Auf der Pfalz",
+               "MT" = "Fuchshügel"))+
+  labs(
+    title = "Tagesmitteltemperatur im Beobachtungszeitraum",
+    x = "Datum",
+    y = "Flächenmittel Temperatur (°C)",
+    color = "Standort"
+  ) +
+  theme_minimal() +
+  theme(
+    plot.title = element_text(hjust = 0.5)
+  )
+```
+
+## 6.3 Luftfeuchte (und Taupunkt)
+
+### 6.3.1 Test auf Normalverteilung
 
 ```{r}
 #Vergleich Tagesmittelwerte
@@ -2658,7 +2464,7 @@ summary_daily_area %>%
 #eher keine Normalverteilung gegeben 
 ```
 
-### 7.3.2 Signifikanztest
+### 6.3.2 Signifikanztest
 
 ```{r}
 dat_rLF <- summary_daily_area %>%
@@ -2704,7 +2510,7 @@ pairwise.wilcox.test(
 #Es gibt einen signifikanten Unterschied in der Variabilität der relativen Luftfeuchte zwischen den Flächen 1 (MT) und 3 (L).
 ```
 
-### 7.3.3 Plots
+### 6.3.3 Plots
 
 ```{r}
 summary_daily_area %>%
@@ -2723,35 +2529,108 @@ summary_daily_area %>%
   )
 ```
 
-# Licht und Luftfeuchte
+```{r}
+#| label: lineplot mean humidity & time
+ggplot(summary_daily_area,aes(x = Datum, y = rLF_area_mean, color = Standort)) +
+  geom_line(linewidth = 0.7) +
+  labs(
+    title = "Luftfeuchte im Beobachtungszeitraum",
+    x = "Datum",
+    y = "Flächenmittel Temperatur (°C)",
+    color = "Standort"
+  ) +
+  theme_minimal() +
+  theme(
+    plot.title = element_text(hjust = 0.5)
+  )
+```
 
-2 Gedanken: Beschattung begrenzt Verdunstung -\> hohe Luftfeuchte an den Rändern
-
-beschattende Bäume ziehen viel Wasser -\> niedrige Luftfeuchte an den Rändern
-
-hier fehlt eigentlich noch was zur tree layer würd ich sagen
+## 6.4 PCA
 
 ```{r}
-summary_daily_logger %>%
-  group_by(Standort) %>%
-  summarise(
-    korrelation = cor(Licht_summe,
-                      rLF_mean,
-                      use = "complete.obs",
-                      method = "spearman")
-  )
+#| label: PCA with 2 plots
+#nur Temp_schatten für bessere Vergleichbarkeit
+df_pca <- summary_logger_year %>%
+  select(Standort, Logger, Tempschatten_Jahresmittel,Licht_Jahresmittel, rLF_Jahresmittel)
 
-mod_L <- lmer(
-  rLF_mean ~ Licht_summe + Logger + (1|Datum),
-  data = summary_daily_logger %>%
-    filter(Standort == "L")
-)
-summary(mod_L)
+pca <- rda(df_pca[, c("Tempschatten_Jahresmittel",
+                      "Licht_Jahresmittel","rLF_Jahresmittel")],
+           scale = TRUE)
+summary(pca)
+screeplot(pca)
+biplot(pca)
 
-mod_light <- lmer(
-  rLF_mean ~ Licht_summe + (1|Datum),
-  data = summary_daily_logger %>%
-    filter(Standort == "L")
-)
-summary(mod_light)
+
+site_scores <- scores(pca, display = "sites")
+var_scores  <- scores(pca, display = "species")
+
+sites <- data.frame(site_scores,
+                    Standort = df_pca$Standort,
+                    Logger   = df_pca$Logger)
+
+vars <- data.frame(var_scores,
+                   Variable = rownames(var_scores))
+eig <- summary(pca)$cont$importance[2, ]
+vars <- data.frame(var_scores,
+                   Variable = rownames(var_scores))
+vars$Label <- c("Temperatur", "Licht", "Luftfeuchte") 
+
+ggplot() +
+  stat_ellipse(data = sites,
+               aes(PC1, PC2, fill=Standort),
+               geom="polygon",
+               alpha = 0.2,
+               show.legend = F) +
+  geom_point(data = sites,
+             aes(PC1, PC2, color = Standort),
+             size = 3) +
+  geom_text(data = sites,
+            aes(PC1, PC2, label = Logger, color = Standort),
+            vjust = -1, show.legend = F) +
+  geom_segment(data = vars,
+               aes(x = 0, y = 0,
+                   xend = PC1, yend = PC2),
+               arrow = arrow(length = unit(0.25, "cm")),
+               color = "black") +
+  geom_text(data = vars,
+            aes(PC1, PC2, label = Label),
+            color = "black",
+            vjust = -0.5, hjust= 0.3) +
+  xlab(paste0("PC1 (", round(eig[1]*100,1), "%)")) +
+  ylab(paste0("PC2 (", round(eig[2]*100,1), "%)")) +
+  theme_bw() +
+  coord_fixed(ratio = 0.7)
+
+
+# Hull-Funktion für jeden Standort
+hulls <- sites %>%
+  dplyr::group_by(Standort) %>%
+  dplyr::slice(chull(PC1, PC2))  
+vars$LabelX <- vars$PC1 * c(2.1, 1.7, 1.4)
+vars$LabelY <- vars$PC2 * c(1.5, 2, 1.8)
+
+ggplot() +
+  geom_polygon(data = hulls,
+               aes(x = PC1, y = PC2, fill = Standort),
+               alpha = 0.2, show.legend = F) +
+  geom_point(data = sites,
+             aes(PC1, PC2, color = Standort),
+             size = 3) +
+  geom_text(data = sites,
+            aes(PC1, PC2, label = Logger, color = Standort),
+            vjust = -1, show.legend = F) +
+  geom_segment(data = vars,
+               aes(x = 0, y = 0,
+                   xend = PC1 * 1.5,
+                   yend = PC2 * 1.5),
+               arrow = arrow(length = unit(0.25, "cm")),
+               color = "black") +
+  geom_text(data = vars,
+            aes(x=LabelX, y=LabelY, label = Label),
+            color = "black") +
+  xlab(paste0("PC1 (", round(eig[1]*100,1), "%)")) +
+  ylab(paste0("PC2 (", round(eig[2]*100,1), "%)")) +
+  theme_bw() +
+  coord_cartesian(xlim = c(-2, 2), ylim = c(-2, 2))
+
 ```
