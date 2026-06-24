@@ -65,7 +65,7 @@ Kennzahlen_standort <- Wassertiefen %>%
 Kennzahlen_standort
 ```
 
-## 3.2 Jahresverlauf der Wassertiefe (MT vs MN vs L)
+#### 3.1.1 Wasserstandsschwankungen
 
 ```{r}
 # Mittelwerte pro Tag/ pro Standort berechnen 
@@ -74,6 +74,166 @@ WT_mittel <- Wassertiefen %>%
   summarise(WT_mean = mean(Wassertiefe, na.rm = TRUE)) %>% 
   ungroup()
 ```
+
+```{r}
+# welcher Standort hat die größten Wasserstandsschwankungen?
+
+# Standardabweichung = wie stark der Wasserstand typischerweise um seinen Mittelwert schwankt
+# Spannweite des Wasserstands = extremste Unterschiede zwischen dem höchsten und niedrigsten gemessenen Wasserstand
+# für die einzelnen Messpunkte auch aus den Kennzahlen_messpunkt ersichtlich
+
+#Schwankung pro Standort (über Tagesmittelwerte)
+WT_var_st <- WT_mittel %>%
+  group_by(Standort) %>%
+  summarise(
+    sd_WT = sd(WT_mean, na.rm = TRUE),
+    range_WT = max(WT_mean, na.rm = TRUE) - min(WT_mean, na.rm = TRUE)
+  ) %>%
+  arrange(desc(sd_WT))
+
+WT_var_st
+```
+
+#### 3.1.2 Häufigkeit der Wasserstände
+
+```{r}
+# welcher Standort hat die meisten trocken gefallenen Tage, welcher die wenigsten (= Beständigkeit des Gewässers/Wasserspiegel)
+
+WT_trocken_mp <- Wassertiefen %>%
+  group_by(Standort, Messpunkt) %>%
+  summarise(
+    trockene_Tage = sum(Wassertiefe <= 1, na.rm = TRUE),
+    gesamt_Messungen = n(),
+    anteil_trocken = trockene_Tage / gesamt_Messungen
+  ) %>%
+  arrange(Standort, desc(trockene_Tage))
+
+WT_trocken_mp
+
+```
+
+```{r}
+# Histogramm zur Häufigkeit der Wasserstände je Standort 
+ggplot(Wassertiefen, aes(x = Wassertiefe, fill = Standort)) +
+  geom_histogram(binwidth = 5, alpha = 0.7) +
+  facet_wrap(~Standort) +
+  theme_minimal() +
+  labs(title = "Verteilung der Wasserstände pro Standort",
+       x = "Wasserstand (cm)",
+       y = "Anzahl der Messungen")
+
+# Histogramm zur Häufigkeit der Wasserstände je Standort ohne Messpunkt 4 bei Lihtenau 
+ggplot(
+  Wassertiefen %>%
+    filter(!(Standort == "L" & Messpunkt == 4)) %>%
+    mutate(Standort = factor(Standort, levels = c("MT", "MN", "L"))),
+  aes(x = Wassertiefe, fill = Standort)
+) +
+  geom_histogram(binwidth = 5, alpha = 0.7) +
+  facet_wrap(~Standort) +
+  labs(
+    title = "",
+    x = "Wasserstand (cm)",
+    y = "Anzahl der Messungen",
+    fill = "Fläche"              
+  ) +
+  scale_fill_manual(
+    values = c(
+      "MT" = "#D55E00",
+      "MN" = "#6495ED",
+      "L"  = "#006400"
+    ),
+    labels = c(                  
+      "MT" = "1",
+      "MN" = "2",
+      "L"  = "3"
+    )
+  ) +
+  theme(
+    axis.title.x = element_text(size = 16),
+    axis.title.y = element_text(size = 16),
+    
+    axis.text.x = element_text(size = 14),
+    axis.text.y = element_text(size = 14),
+    
+    legend.title = element_text(size = 15),
+    legend.text = element_text(size = 14),
+    
+    panel.grid.major = element_line(color = "grey75"),
+    panel.grid.minor = element_line(color = "grey85"),
+    
+    axis.ticks = element_blank(),
+    
+    panel.background = element_rect(fill = "white", color = NA),
+    
+    strip.background = element_blank(),  # graue Balken entfernen
+    strip.text = element_blank()         # MT/MN/L entfernen
+  )
+```
+
+```{r}
+# Histogramm zur Häufigkeit der Wasserstände je Messpunkt und Standort 
+Wassertiefen$Standort <- as.factor(Wassertiefen$Standort)
+Wassertiefen$Messpunkt <- as.factor(Wassertiefen$Messpunkt)
+
+standort_L <- Wassertiefen %>% 
+  filter(Standort == "L")
+standort_L <- Wassertiefen %>%
+  filter(Standort == "L", Messpunkt != "4")#ohne Messpunkt 4 (verzerrt Daten)
+standort_MN <- Wassertiefen %>% 
+  filter(Standort == "MN")
+standort_MT <- Wassertiefen %>% 
+  filter(Standort == "MT")
+
+ggplot(standort_L, aes(x = Wassertiefe, fill = factor(Messpunkt))) +
+  geom_histogram(binwidth = 5, alpha = 0.7) +
+  facet_wrap(~Messpunkt) +
+  labs(
+    title = "",
+    x = "Wasserstand (cm)",
+    y = "Anzahl Messungen",
+    fill = "Messstelle"
+  ) +
+  scale_fill_manual(
+    values = c(
+      "1" = "#F8766D",
+      "2" = "#7CAE00",
+      "3" = "#00BFC4",
+      "4" = "#C77CFF"
+    )
+  ) +
+  theme(
+    axis.title.x = element_text(size = 16),
+    axis.title.y = element_text(size = 16),
+    
+    axis.text.x = element_text(size = 14),
+    axis.text.y = element_text(size = 14),
+    
+    legend.title = element_text(size = 15),
+    legend.text = element_text(size = 14),
+    
+    panel.grid.major = element_line(color = "grey75"),
+    panel.grid.minor = element_line(color = "grey85"),
+    
+    axis.ticks = element_blank(),
+    
+    panel.background = element_rect(fill = "white", color = NA),
+    
+    strip.background = element_blank(),
+    strip.text = element_blank()
+  )
+```
+
+```{r}
+#ggsave(
+#  "Histogramm_Häufigkeit der Wasserstände_Fläche 3 (ohne MS4).png",
+#  width = 10,
+#  height = 6,
+#  dpi = 300
+#)
+```
+
+## 3.2 Jahresverlauf der Wassertiefe (MT vs MN vs L)
 
 ```{r}
 # Liniendiagramm - Jahresverlauf
@@ -377,326 +537,4 @@ plot_lin1(Wassertiefen, "L", titel="")
 plot_box(Wassertiefen, st="L",
          titel="",
          x_name="Lichtenau")
-```
-
-# 4 Relevante Fragen
-
-(da die Diagramme ggf. ein falsches Bild vermitteln)
-
-### Wasserstandsschwankungen
-
-```{r}
-# welcher Standort hat die größten Wasserstandsschwankungen?
-
-# Standardabweichung = wie stark der Wasserstand typischerweise um seinen Mittelwert schwankt
-# Spannweite des Wasserstands = extremste Unterschiede zwischen dem höchsten und niedrigsten gemessenen Wasserstand
-
-#Schwankung pro Standort (über Tagesmittelwerte)
-WT_var_st <- WT_mittel %>%
-  group_by(Standort) %>%
-  summarise(
-    sd_WT = sd(WT_mean, na.rm = TRUE),
-    range_WT = max(WT_mean, na.rm = TRUE) - min(WT_mean, na.rm = TRUE)
-  ) %>%
-  arrange(desc(sd_WT))
-
-WT_var_st
-
-```
-
-```{r}
-# Schwankung pro Messpunkt innerhalb eines Standorts
-WT_var_mp <- Wassertiefen %>%
-  group_by(Standort, Messpunkt) %>%
-  summarise(
-    sd_WT = sd(Wassertiefe, na.rm = TRUE),
-    range_WT = max(Wassertiefe, na.rm = TRUE) - min(Wassertiefe, na.rm = TRUE)
-  ) %>%
-  arrange(desc(sd_WT))
-
-WT_var_mp
-```
-
-```{r}
-# welcher Standort hat die meisten trocken gefallenen Tage, welcher die wenigsten (= Beständigkeit des Gewässers/Wasserspiegel)
-
-# auch daraus kann man ggf ableiten, welches Gewässer das Wasser besser hält und Faktoren ableiten, warum es bei den anderen nicht so ist -> naturschutzfachliche Maßnahmen ggf ableiten/überdenken
-
-WT_trocken_mp <- Wassertiefen %>%
-  group_by(Standort, Messpunkt) %>%
-  summarise(
-    trockene_Tage = sum(Wassertiefe <= 1, na.rm = TRUE),
-    gesamt_Messungen = n(),
-    anteil_trocken = trockene_Tage / gesamt_Messungen
-  ) %>%
-  arrange(Standort, desc(trockene_Tage))
-
-WT_trocken_mp
-
-```
-
-### Häufigkeit der Wasserstände
-
-```{r}
-# Histogramm zur Häufigkeit der Wasserstände je Standort 
-ggplot(Wassertiefen, aes(x = Wassertiefe, fill = Standort)) +
-  geom_histogram(binwidth = 5, alpha = 0.7) +
-  facet_wrap(~Standort) +
-  theme_minimal() +
-  labs(title = "Verteilung der Wasserstände pro Standort",
-       x = "Wasserstand (cm)",
-       y = "Anzahl der Messungen")
-
-# Histogramm zur Häufigkeit der Wasserstände je Standort ohne Messpunkt 4 bei Lihtenau 
-ggplot(
-  Wassertiefen %>%
-    filter(!(Standort == "L" & Messpunkt == 4)) %>%
-    mutate(Standort = factor(Standort, levels = c("MT", "MN", "L"))),
-  aes(x = Wassertiefe, fill = Standort)
-) +
-  geom_histogram(binwidth = 5, alpha = 0.7) +
-  facet_wrap(~Standort) +
-  labs(
-    title = "",
-    x = "Wasserstand (cm)",
-    y = "Anzahl der Messungen",
-    fill = "Fläche"              
-  ) +
-  scale_fill_manual(
-    values = c(
-      "MT" = "#D55E00",
-      "MN" = "#6495ED",
-      "L"  = "#006400"
-    ),
-    labels = c(                  
-      "MT" = "1",
-      "MN" = "2",
-      "L"  = "3"
-    )
-  ) +
-  theme(
-    axis.title.x = element_text(size = 16),
-    axis.title.y = element_text(size = 16),
-
-    axis.text.x = element_text(size = 14),
-    axis.text.y = element_text(size = 14),
-
-    legend.title = element_text(size = 15),
-    legend.text = element_text(size = 14),
-
-    panel.grid.major = element_line(color = "grey75"),
-    panel.grid.minor = element_line(color = "grey85"),
-
-    axis.ticks = element_blank(),
-
-    panel.background = element_rect(fill = "white", color = NA),
-
-    strip.background = element_blank(),  # graue Balken entfernen
-    strip.text = element_blank()         # MT/MN/L entfernen
-  )
-```
-
-```{r}
-# Histogramm zur Häufigkeit der Wasserstände je Messpunkt und Standort 
-Wassertiefen$Standort <- as.factor(Wassertiefen$Standort)
-Wassertiefen$Messpunkt <- as.factor(Wassertiefen$Messpunkt)
-
-standort_L <- Wassertiefen %>% 
-  filter(Standort == "L")
-standort_L <- Wassertiefen %>%
-  filter(Standort == "L", Messpunkt != "4")#ohne Messpunkt 4 (verzerrt Daten)
-standort_MN <- Wassertiefen %>% 
-  filter(Standort == "MN")
-standort_MT <- Wassertiefen %>% 
-  filter(Standort == "MT")
-
-ggplot(standort_L, aes(x = Wassertiefe, fill = factor(Messpunkt))) +
-  geom_histogram(binwidth = 5, alpha = 0.7) +
-  facet_wrap(~Messpunkt) +
-  labs(
-    title = "",
-    x = "Wasserstand (cm)",
-    y = "Anzahl Messungen",
-    fill = "Messstelle"
-  ) +
-  scale_fill_manual(
-    values = c(
-      "1" = "#F8766D",
-      "2" = "#7CAE00",
-      "3" = "#00BFC4",
-      "4" = "#C77CFF"
-    )
-  ) +
-  theme(
-    axis.title.x = element_text(size = 16),
-    axis.title.y = element_text(size = 16),
-
-    axis.text.x = element_text(size = 14),
-    axis.text.y = element_text(size = 14),
-
-    legend.title = element_text(size = 15),
-    legend.text = element_text(size = 14),
-
-    panel.grid.major = element_line(color = "grey75"),
-    panel.grid.minor = element_line(color = "grey85"),
-
-    axis.ticks = element_blank(),
-
-    panel.background = element_rect(fill = "white", color = NA),
-
-    strip.background = element_blank(),
-    strip.text = element_blank()
-  )
-
-```
-
-```{r}
-ggsave(
-  "Histogramm_Häufigkeit der Wasserstände_Fläche 3 (ohne MS4).png",
-  width = 10,
-  height = 6,
-  dpi = 300
-)
-```
-
-```{r}
-Wassertiefen %>%
-  filter(!(Standort == "L" & Messpunkt == "4")) %>%
-  ggplot(aes(x = Wassertiefe, fill = Standort)) +
-  geom_histogram(binwidth = 5, alpha = 0.7) +
-  facet_grid(Standort ~ Messpunkt) +
-  theme_minimal() +
-  labs(
-    title = "Histogramm der Wasserstände nach Standort und Messpunkt",
-    x = "Wasserstand (cm)",
-    y = "Anzahl Messungen",
-    fill = "Fläche"
-  ) +
-  scale_fill_manual(
-    values = c(
-      "L" = "#1b9e77",
-      "MT" = "#d95f02",
-      "MN" = "#7570b3"
-    ),
-    labels = c(
-      "L" = "Lichtenau",
-      "MT" = "Meusebach trocken",
-      "MN" = "Meusebach nass"
-    )
-  )
-```
-
-# 6 Zusatz
-
-```{r}
-# Trocken- oder Hochwasserperioden zählen 
-# Interpolation (da der Wasserstand nicht kontinuirlich gemessen wurde/in regelmäßigen Abständen)
-library(zoo)
-
-# Daten nach Datum sortieren und interpolieren
-Wassertiefen <- Wassertiefen %>%
-  arrange(Standort, Messpunkt, Datum) %>%
-  group_by(Standort, Messpunkt) %>%
-  mutate(Wassertiefe_interp = na.approx(Wassertiefe, x = as.numeric(Datum))) %>%
-  ungroup()
-
-# Trocken, Normalwasser, Hochwasser definieren
-# Beispielwerte, noch keine konkreten festgelegt
-Wassertiefen <- Wassertiefen %>%
-  mutate(
-    Trocken = Wassertiefe_interp < 3,
-    Normalwasser = Wassertiefe_interp >= 3 & Wassertiefe_interp <= 25,
-    Hochwasser = Wassertiefe_interp > 25
-  )
-
-# Zusammenhängende Perioden identifizieren
-Wassertiefen <- Wassertiefen %>%
-  group_by(Standort, Messpunkt) %>%
-  mutate(
-    Trocken_grp = cumsum(Trocken != lag(Trocken, default=first(Trocken))),
-    Normalwasser_grp = cumsum(Normalwasser != lag(Normalwasser, default=first(Normalwasser))),
-    Hochwasser_grp = cumsum(Hochwasser != lag(Hochwasser, default=first(Hochwasser)))
-  ) %>%
-  ungroup()
-
-# Zusammenhängende Perioden zählen
-Perioden_Anzahl <- Wassertiefen %>%
-  group_by(Standort, Messpunkt) %>%
-  summarise(
-    TrockenPerioden = sum(Trocken & !duplicated(Trocken_grp)),
-    NormalwasserPerioden = sum(Normalwasser & !duplicated(Normalwasser_grp)),
-    HochwasserPerioden = sum(Hochwasser & !duplicated(Hochwasser_grp)),
-    .groups = "drop"
-  )
-
-Perioden_Anzahl
-
-```
-
-```{r}
-TrockenPerioden <- Wassertiefen %>%
-  filter(Trocken) %>%  # nur Trockenblöcke
-  group_by(Standort, Messpunkt, Trocken_grp) %>%  # nach zusammenhängenden Perioden
-  summarise(
-    Start = min(Datum),  # erster Tag der Periode
-    Ende = max(Datum),   # letzter Tag der Periode
-    Dauer_Tage = as.numeric(max(Datum) - min(Datum)) + 1,  # Dauer in Tagen
-    .groups = "drop"
-  )
-
-TrockenPerioden
-```
-
-```{r}
-HochwasserPerioden <- Wassertiefen %>%
-  filter(Hochwasser) %>%  # nur Hochwasserblöcke
-  group_by(Standort, Messpunkt, Hochwasser_grp) %>%
-  summarise(
-    Start = min(Datum),
-    Ende = max(Datum),
-    Dauer_Tage = as.numeric(max(Datum) - min(Datum)) + 1,
-    .groups = "drop"
-  )
-
-HochwasserPerioden
-```
-
-```{r}
-NormalwasserPerioden <- Wassertiefen %>%
-  filter(Normalwasser) %>%  # nur Normalwasserblöcke
-  group_by(Standort, Messpunkt, Normalwasser_grp) %>%  # bereits vorhanden!
-  summarise(
-    Start = min(Datum),
-    Ende = max(Datum),
-    Dauer_Tage = as.numeric(max(Datum) - min(Datum)) + 1,
-    .groups = "drop"
-  )
-
-NormalwasserPerioden
-```
-
-```{r}
-# Histogramm zur Häufigkeit der Wasserstände je Standort 
-ggplot(Wassertiefen, aes(x = Wassertiefe, fill = Standort)) +
-  geom_histogram(binwidth = 5, alpha = 0.7) +
-  facet_wrap(~Standort) +
-  theme_minimal() +
-  labs(title = "Verteilung der Wasserstände pro Standort",
-       x = "Wasserstand (cm)",
-       y = "Anzahl der Messungen")
-
-# Histogramm zur Häufigkeit der Wasserstände je Standort ohne Messpunkt 4 bei Lihtenau 
-ggplot(
-  Wassertiefen %>%
-    filter(!(Standort == "L" & Messpunkt == 4)),
-  aes(x = Wassertiefe, fill = Standort)
-) +
-  geom_histogram(binwidth = 5, alpha = 0.7) +
-  facet_wrap(~Standort) +
-  theme_minimal() +
-  labs(
-    title = "Verteilung der Wasserstände pro Standort",
-    x = "Wasserstand (cm)",
-    y = "Anzahl der Messungen"
-  )
 ```
