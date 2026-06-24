@@ -12,6 +12,7 @@ library(readxl)
 library(writexl)
 library(vegan)
 library(ggplot2)
+library(ggrepel)
 ```
 
 # 2 Daten einlesen und vorbereiten
@@ -470,14 +471,13 @@ ggplot(vegdata,
 comm_matrix <- veg_long %>%
   group_by(plot.ID, Art) %>%
   summarise(Deckung = sum(Deckung), .groups = "drop") %>%
-  tidyr::pivot_wider(
+  pivot_wider(
     names_from = Art,
     values_from = Deckung,
     values_fill = 0
   ) %>%
   tibble::column_to_rownames("plot.ID")
 str(comm_matrix)
-
 
 #berechnen von species richness, shannon Index, relativer Häufigkeit und Evenness
 species_richness <- specnumber(comm_matrix)
@@ -536,6 +536,20 @@ merged_data <- merged_data %>%
 
 # 7 DCA
 
+DCA wird durchgeführt für
+
+-   Fläche mit Pfeilen von Umwelt
+
+-   Transekt WO mit Arten
+
+-   Transekt NS mit Arten
+
+-   könnte auch noch gemacht werden für:
+
+    -   Fläche mit Moosarten
+
+    -   Fläche mit != Moosarten
+
 ## 7.1 Alle Flächen
 
 ```{r}
@@ -567,7 +581,6 @@ dca_df$site <- vegdata$site[match(dca_df$Name, vegdata$plot.ID)]
 
 ggplot(dca_df, aes(DCA1, DCA2, colour = site)) +
   geom_point(size = 2) +
-
   geom_segment(
     data = arrows,
     aes(
@@ -619,84 +632,28 @@ fit
 | weighted nitrogen    | 0.13362  | 0.99103  | 0.0352 | 0.010 \*\*   |
 | weighted alkalinity  | -0.49286 | 0.87011  | 0.0273 | 0.026 \*     |
 
-```{r}
-#entfernen von s. squarrosum in Lichtenau
-
-
-comm_moose_dca <- comm_moose[
-  rownames(comm_moose) != "225",
-  ,
-  drop = FALSE
-]
-
-# Sphagnum_squarrosum ist danach eine vollständige Nullspalte
-comm_moose_dca <- comm_moose_dca[
-  ,
-  colSums(comm_moose_dca) > 0,
-  drop = FALSE
-]
-
-dca_moose <- decorana(comm_moose_dca)
-
-summary(dca_moose)
-plot(dca_moose)
-
-
-# Scores der Aufnahmeflächen
-dca_sites <- as.data.frame(
-  scores(dca_moose, display = "sites", choices = 1:2)
-)
-
-dca_sites$plot.ID <- rownames(dca_sites)
-dca_sites$plot.ID <- as.integer(dca_sites$plot.ID)
-
-dca_sites <- dca_sites %>%
-  left_join(
-    vegdata %>%
-      select(plot.ID, site),
-    by = "plot.ID"
-  )
-
-# Scores der Arten
-dca_species <- as.data.frame(
-  scores(dca_moose, display = "species", choices = 1:2)
-)
-
-dca_species$Art <- rownames(dca_species)
-
-ggplot() +
-  geom_point(
-    data = dca_sites,
-    aes(x = DCA1, y = DCA2, color = site),
-    size = 2
-  ) +
-  geom_text(
-    data = dca_species,
-    aes(x = DCA1, y = DCA2, label = Art),
-    color = "black",
-    size = 3
-  ) +
-  labs(
-    x = "DCA1",
-    y = "DCA2",
-    color = "Gebiet"
-  ) +
-  theme_classic()
-
-```
-
 ## 7.2 Auf der Pfalz
 
 DCA mit environmental fit für die gesamte Fläche
 
 ```{r}
-data_MN <- merged_data$site == "Meu_nass" 
-comm_MN <- comm_matrix[data_MN, , drop = FALSE]
-
-
-comm_MN <- comm_MN[
-  rowSums(comm_MN) > 0,
-  colSums(comm_MN) > 0,
+comm_MN <- veg_long %>%
+  filter(site=="Meu_nass") %>%  
+  group_by(plot.ID, Art) %>%
+  summarise(
+    Deckung = sum(Deckung, na.rm = TRUE),
+    .groups = "drop"
+  ) %>%
+  pivot_wider(
+    names_from = Art,
+    values_from = Deckung,
+    values_fill = 0
+  )%>%
+  tibble::column_to_rownames("plot.ID")
+#entferne leere zeilen &spalten weil decorana damit nciht rechnen kann
+comm_L <- comm_L[
+  rowSums(comm_L) > 0,
+  colSums(comm_L) > 0,
   drop = FALSE
 ]
 
@@ -788,16 +745,19 @@ ggplot(dca_df, aes(DCA1, DCA2, colour = Distanz)) +
 DCA mit species scores jeweils für ein Transekt
 
 ```{r}
-#Transekt WO
-data_MN_WO <- merged_data$site == "Meu_nass" & merged_data$Transekt == "WO"
-comm_MN_WO <- comm_matrix[data_MN_WO, , drop = FALSE]
-
-
-comm_MN_WO <- comm_MN_WO[
-  rowSums(comm_MN_WO) > 0,
-  colSums(comm_MN_WO) > 0,
-  drop = FALSE
-]
+comm_MN_WO <- veg_long %>%
+  filter(site=="Meu_nass"&Transekt =="WO") %>%  
+  group_by(plot.ID, Art) %>%
+  summarise(
+    Deckung = sum(Deckung, na.rm = TRUE),
+    .groups = "drop"
+  ) %>%
+  pivot_wider(
+    names_from = Art,
+    values_from = Deckung,
+    values_fill = 0
+  )%>%
+  tibble::column_to_rownames("plot.ID")
 
 dca <- decorana(comm_MN_WO)
 summary(dca)
@@ -810,7 +770,7 @@ dca_df$Transektnummer <- vegdata$Transektnummer[match(dca_df$Name, vegdata$plot.
 
 species_df <- as.data.frame(scores(dca, display = "species", choices = c(1, 2)))
 species_df$Art <- rownames(species_df)
-species_totals <- colSums(comm_MN, na.rm = TRUE)
+species_totals <- colSums(comm_MN_WO, na.rm = TRUE)
 species_df <- species_df %>%
   filter(Art %in% names(species_totals[species_totals > 0]))
 
@@ -857,15 +817,20 @@ ggplot(dca_df, aes(DCA1, DCA2, colour = Transektnummer)) +
 
 
 #Transekt NS
-data_MN_NS <- merged_data$site == "Meu_nass" & merged_data$Transekt == "NS"
-comm_MN_NS <- comm_matrix[data_MN_NS, , drop = FALSE]
 
-
-comm_MN_NS <- comm_MN_NS[
-  rowSums(comm_MN_NS) > 0,
-  colSums(comm_MN_NS) > 0,
-  drop = FALSE
-]
+comm_MN_NS <- veg_long %>%
+  filter(site=="Meu_nass"&Transekt =="NS") %>%  
+  group_by(plot.ID, Art) %>%
+  summarise(
+    Deckung = sum(Deckung, na.rm = TRUE),
+    .groups = "drop"
+  ) %>%
+  pivot_wider(
+    names_from = Art,
+    values_from = Deckung,
+    values_fill = 0
+  )%>%
+  tibble::column_to_rownames("plot.ID")
 
 dca <- decorana(comm_MN_NS)
 summary(dca)
@@ -878,7 +843,7 @@ dca_df$Transektnummer <- vegdata$Transektnummer[match(dca_df$Name, vegdata$plot.
 
 species_df <- as.data.frame(scores(dca, display = "species", choices = c(1, 2)))
 species_df$Art <- rownames(species_df)
-species_totals <- colSums(comm_MN, na.rm = TRUE)
+species_totals <- colSums(comm_MN_NS, na.rm = TRUE)
 species_df <- species_df %>%
   filter(Art %in% names(species_totals[species_totals > 0]))
 
@@ -921,142 +886,6 @@ ggplot(dca_df, aes(DCA1, DCA2, colour = Transektnummer)) +
   theme(
     plot.title = element_text(hjust = 0.5)
   )
-
-```
-
-```{r}
-#|test mit darstellung mit kleinen strichen zu den artnamen
-
-
-comm_moose<- veg_long %>%
-  filter(site == "Lic")%>%
-  group_by(plot.ID, Art) %>%
-  summarise(Deckung = sum(Deckung), .groups = "drop") %>%
-  tidyr::pivot_wider(
-    names_from = Art,
-    values_from = Deckung,
-    values_fill = 0
-  ) %>%
-  tibble::column_to_rownames("plot.ID")
-str(comm_moose)
-comm_moose <- comm_moose[
-  rowSums(comm_moose) > 0,
-  colSums(comm_moose) > 0,
-  drop = FALSE
-]
-
-dca <- decorana(comm_moose)
-summary(dca)
-
-# Scores der Aufnahmeflächen
-dca_sites <- as.data.frame(
-  scores(dca, display = "sites", choices = 1:2)
-)
-
-dca_sites$plot.ID <- rownames(dca_sites)
-dca_sites$plot.ID <- as.integer(dca_sites$plot.ID)
-
-dca_sites <- dca_sites %>%
-  left_join(
-    vegdata %>%
-      select(plot.ID, site),
-    by = "plot.ID"
-  )
-
-# Scores der Arten
-dca_species <- as.data.frame(
-  scores(dca, display = "species", choices = 1:2)
-)
-
-dca_species$Art <- rownames(dca_species)
-
-ggplot() +
-  geom_point(
-    data = dca_sites,
-    aes(x = DCA1, y = DCA2, color = site),
-    size = 2
-  ) +
-  geom_text(
-    data = dca_species,
-    aes(x = DCA1, y = DCA2, label = Art),
-    color = "black",
-    size = 3
-  ) +
-  labs(
-    x = "DCA1",
-    y = "DCA2",
-    color = "Gebiet"
-  ) +
-  theme_classic()
-
-
-
-#test
-library(ggrepel)
-
-p<-ggplot() +
-  geom_point(
-    data = dca_sites,
-    aes(x = DCA1, y = DCA2, color = site),
-    size = 2
-  ) +
-
-  # Exakte Position der Artenwerte markieren
-  geom_point(
-    data = dca_species,
-    aes(x = DCA1, y = DCA2),
-    shape = 2,
-    size = 1.5,
-    color = "grey40"
-  ) +
-
-  geom_text_repel(
-    data = dca_species,
-    aes(x = DCA1, y = DCA2, label = Art),
-    color = "black",
-    size = 3,
-
-    # Keine Beschriftungen entfernen
-    max.overlaps = Inf,
-
-    # Abstand zwischen den Beschriftungen
-    box.padding = 0.35,
-    point.padding = 0.15,
-
-    # Beschriftungen nicht zu weit von ihrer Position entfernen
-    force = 1,
-    force_pull = 2,
-
-    # Verbindungslinien immer anzeigen
-    min.segment.length = 0,
-    segment.color = "grey50",
-    segment.linewidth = 0.3,
-
-    # Reproduzierbare Anordnung
-    seed = 123,
-
-    # Etwas gründlichere Berechnung
-    max.time = 2,
-    max.iter = 50000
-  ) +
-
-  labs(
-    x = "DCA1",
-    y = "DCA2",
-    color = "Gebiet"
-  ) +
-  theme_classic()
-
-#ggsave(
-#  filename = "test_DCA_Arten.png",
-#  plot = p,
-#  width = 10,
-#  height = 8,
-#  units = "in",
-#  dpi = 300
-#)
-getwd()
-p
 ```
 
 ## 7.3 Fuchshügel
@@ -1064,15 +893,19 @@ p
 DCA mit environmental fit für die gesamte Fläche
 
 ```{r}
-data_MT <- merged_data$site == "Meu_trock" 
-comm_MT <- comm_matrix[data_MT, , drop = FALSE]
-
-
-comm_MT <- comm_MT[
-  rowSums(comm_MT) > 0,
-  colSums(comm_MT) > 0,
-  drop = FALSE
-]
+comm_MT <- veg_long %>%
+  filter(site=="Meu_trock") %>%  
+  group_by(plot.ID, Art) %>%
+  summarise(
+    Deckung = sum(Deckung, na.rm = TRUE),
+    .groups = "drop"
+  ) %>%
+  pivot_wider(
+    names_from = Art,
+    values_from = Deckung,
+    values_fill = 0
+  )%>%
+  tibble::column_to_rownames("plot.ID")
 
 dca <- decorana(comm_MT)
 summary(dca)
@@ -1163,15 +996,19 @@ DCA mit species scores jeweils für ein Transekt
 
 ```{r}
 #Transekt WO
-data_MT_WO <- merged_data$site == "Meu_trock" & merged_data$Transekt == "WO"
-comm_MT_WO <- comm_matrix[data_MT_WO, , drop = FALSE]
-
-
-comm_MT_WO <- comm_MT_WO[
-  rowSums(comm_MT_WO) > 0,
-  colSums(comm_MT_WO) > 0,
-  drop = FALSE
-]
+comm_MT_WO <- veg_long %>%
+  filter(site=="Meu_trock"&Transekt =="WO") %>%  
+  group_by(plot.ID, Art) %>%
+  summarise(
+    Deckung = sum(Deckung, na.rm = TRUE),
+    .groups = "drop"
+  ) %>%
+  pivot_wider(
+    names_from = Art,
+    values_from = Deckung,
+    values_fill = 0
+  )%>%
+  tibble::column_to_rownames("plot.ID")
 
 dca <- decorana(comm_MT_WO)
 summary(dca)
@@ -1184,7 +1021,7 @@ dca_df$Transektnummer <- vegdata$Transektnummer[match(dca_df$Name, vegdata$plot.
 
 species_df <- as.data.frame(scores(dca, display = "species", choices = c(1, 2)))
 species_df$Art <- rownames(species_df)
-species_totals <- colSums(comm_MN, na.rm = TRUE)
+species_totals <- colSums(comm_MT_WO, na.rm = TRUE)
 species_df <- species_df %>%
   filter(Art %in% names(species_totals[species_totals > 0]))
 
@@ -1231,15 +1068,19 @@ ggplot(dca_df, aes(DCA1, DCA2, colour = Transektnummer)) +
 
 
 #Transekt NS
-data_MT_NS <- merged_data$site == "Meu_trock" & merged_data$Transekt == "NS"
-comm_MT_NS <- comm_matrix[data_MT_NS, , drop = FALSE]
-
-
-comm_MT_NS <- comm_MT_NS[
-  rowSums(comm_MT_NS) > 0,
-  colSums(comm_MT_NS) > 0,
-  drop = FALSE
-]
+comm_MT_NS <- veg_long %>%
+  filter(site=="Meu_trock"&Transekt =="NS") %>%  
+  group_by(plot.ID, Art) %>%
+  summarise(
+    Deckung = sum(Deckung, na.rm = TRUE),
+    .groups = "drop"
+  ) %>%
+  pivot_wider(
+    names_from = Art,
+    values_from = Deckung,
+    values_fill = 0
+  )%>%
+  tibble::column_to_rownames("plot.ID")
 
 dca <- decorana(comm_MT_NS)
 summary(dca)
@@ -1252,7 +1093,7 @@ dca_df$Transektnummer <- vegdata$Transektnummer[match(dca_df$Name, vegdata$plot.
 
 species_df <- as.data.frame(scores(dca, display = "species", choices = c(1, 2)))
 species_df$Art <- rownames(species_df)
-species_totals <- colSums(comm_MN, na.rm = TRUE)
+species_totals <- colSums(comm_MT_NS, na.rm = TRUE)
 species_df <- species_df %>%
   filter(Art %in% names(species_totals[species_totals > 0]))
 
@@ -1303,15 +1144,19 @@ ggplot(dca_df, aes(DCA1, DCA2, colour = Transektnummer)) +
 DCA mit environmental fit für die gesamte Fläche
 
 ```{r}
-data_L <- merged_data$site == "Lic" 
-comm_L <- comm_matrix[data_L, , drop = FALSE]
-
-
-comm_L <- comm_L[
-  rowSums(comm_L) > 0,
-  colSums(comm_L) > 0,
-  drop = FALSE
-]
+comm_L <- veg_long %>%
+  filter(site=="Lic") %>%  
+  group_by(plot.ID, Art) %>%
+  summarise(
+    Deckung = sum(Deckung, na.rm = TRUE),
+    .groups = "drop"
+  ) %>%
+  pivot_wider(
+    names_from = Art,
+    values_from = Deckung,
+    values_fill = 0
+  )%>%
+  tibble::column_to_rownames("plot.ID")
 
 dca <- decorana(comm_L)
 summary(dca)
@@ -1402,15 +1247,19 @@ DCA mit species scores jeweils für ein Transekt
 
 ```{r}
 #Transekt WO
-data_L_WO <- merged_data$site == "Lic" & merged_data$Transekt == "WO"
-comm_L_WO <- comm_matrix[data_L_WO, , drop = FALSE]
-
-
-comm_L_WO <- comm_L_WO[
-  rowSums(comm_L_WO) > 0,
-  colSums(comm_L_WO) > 0,
-  drop = FALSE
-]
+comm_L_WO <- veg_long %>%
+  filter(site=="Lic"&Transekt =="WO") %>%  
+  group_by(plot.ID, Art) %>%
+  summarise(
+    Deckung = sum(Deckung, na.rm = TRUE),
+    .groups = "drop"
+  ) %>%
+  pivot_wider(
+    names_from = Art,
+    values_from = Deckung,
+    values_fill = 0
+  )%>%
+  tibble::column_to_rownames("plot.ID")
 
 dca <- decorana(comm_L_WO)
 summary(dca)
@@ -1423,7 +1272,7 @@ dca_df$Transektnummer <- vegdata$Transektnummer[match(dca_df$Name, vegdata$plot.
 
 species_df <- as.data.frame(scores(dca, display = "species", choices = c(1, 2)))
 species_df$Art <- rownames(species_df)
-species_totals <- colSums(comm_MN, na.rm = TRUE)
+species_totals <- colSums(comm_L_WO, na.rm = TRUE)
 species_df <- species_df %>%
   filter(Art %in% names(species_totals[species_totals > 0]))
 
@@ -1470,15 +1319,19 @@ ggplot(dca_df, aes(DCA1, DCA2, colour = Transektnummer)) +
 
 
 #Transekt NS
-data_L_NS <- merged_data$site == "Lic" & merged_data$Transekt == "NS"
-comm_L_NS <- comm_matrix[data_L_NS, , drop = FALSE]
-
-
-comm_L_NS <- comm_L_NS[
-  rowSums(comm_L_NS) > 0,
-  colSums(comm_L_NS) > 0,
-  drop = FALSE
-]
+comm_L_NS <- veg_long %>%
+  filter(site=="Lic"&Transekt =="NS") %>%  
+  group_by(plot.ID, Art) %>%
+  summarise(
+    Deckung = sum(Deckung, na.rm = TRUE),
+    .groups = "drop"
+  ) %>%
+  pivot_wider(
+    names_from = Art,
+    values_from = Deckung,
+    values_fill = 0
+  )%>%
+  tibble::column_to_rownames("plot.ID")
 
 dca <- decorana(comm_L_NS)
 summary(dca)
@@ -1491,7 +1344,7 @@ dca_df$Transektnummer <- vegdata$Transektnummer[match(dca_df$Name, vegdata$plot.
 
 species_df <- as.data.frame(scores(dca, display = "species", choices = c(1, 2)))
 species_df$Art <- rownames(species_df)
-species_totals <- colSums(comm_MN, na.rm = TRUE)
+species_totals <- colSums(comm_L_NS, na.rm = TRUE)
 species_df <- species_df %>%
   filter(Art %in% names(species_totals[species_totals > 0]))
 
@@ -1693,26 +1546,22 @@ plot_data %>%
   breaks = c(1, 3, 5, 7, 9),
   labels = c(1, 3, 5, 7, 9)) +
   annotate("text",
-           x = max(plot_data$x),
-           y = 0,
+           x = max(plot_data$x),y = 0,
            label = "O",
            size = 5,
            hjust = 1.4) +
   annotate("text",
-           x = min(plot_data$x),
-           y = 0,
+           x = min(plot_data$x),y = 0,
            label = "W",
            size = 5,
            hjust = 1.4) +
   annotate("text",
-           x = 0,
-           y = max(plot_data$y),
+           x = 0,y = max(plot_data$y),
            label = "N",
            size = 5,
            vjust = -0.3) +
   annotate("text",
-           x = 0,
-           y = min(plot_data$y),
+           x = 0,y = min(plot_data$y),
            label = "S",
            size = 5,
            vjust = 1.3) +
@@ -1811,144 +1660,6 @@ library(performance)
 check_model(model1)
 ```
 
-DCAs nur für ein Transekt
-
-```{r}
-###Meusebch NAss Nord-> Süd
-
-idx_MN <- merged_data$site == "Meu_trock" & merged_data$Transekt == "WO"
-comm_MN <- comm_matrix[idx_MN, , drop = FALSE]
-
-
-comm_MN <- comm_MN[
-  rowSums(comm_MN) > 0,
-  colSums(comm_MN) > 0,
-  drop = FALSE
-]
-
-dca <- decorana(comm_MN)
-summary(dca)
-
-env_MN <- merged_data %>%
-  filter(site == "Meu_trock", Transekt=="WO")
-fit <- envfit(dca, env_MN[, c("Weighted_light",
-    "Weighted_temperature",
-    "Weighted_wetness",
-    "Weighted_nitrogen",
-    "Weighted_alkalinity",
-    "Hoehe",
-    "TL",
-    "ML",
-    "HL",
-    "SL")])
-fit
-
-plot(dca)
-arrows <-as.data.frame(scores(fit, display = "vectors"))
-arrows$Variable <- rownames(arrows)
-arrows$p_value <- fit$vectors$pvals
-arrows$r2 <- fit$vectors$r
-arrows$Variable <- c(
-  "Licht",
-  "Temperatur",
-  "Feuchte",
-  "Stickstoff",
-  "Basengehalt",
-  "Höhe",
-  "Baumschicht",
-  "Moosschicht",
-  "Krautschicht",
-  "Strauchschicht"
-)
-# nur Umweltvariablen mit signifikanten p-Werten anzeigen
-arrows_sig <- arrows %>%
-  filter(p_value <= 0.05)
-
-dca_scores <- scores(dca, display = "sites")
-dca_df <- as.data.frame(dca_scores)
-dca_df$Name <- rownames(dca_df)
-dca_df$site <- vegdata$site[match(dca_df$Name, vegdata$plot.ID)]
-dca_df$Transektnummer <- vegdata$Transektnummer[match(dca_df$Name, vegdata$plot.ID)]
-dca_df$Distanz <- dca_df$Transektnummer
-
-ggplot(dca_df, aes(DCA1, DCA2, colour = Distanz)) +
-  geom_point(size = 3) +
-  scale_colour_gradient2(
-  low = "#005A8D",
-  mid = "#FFD700",
-  high = "#7A0177",,
-  midpoint = 0,
-  name = "Position im Transekt")+
-  geom_segment(
-    data = arrows_sig,
-    aes(
-      x = 0, y = 0,
-      xend = DCA1 * 2,
-      yend = DCA2 * 2
-    ),
-    inherit.aes = FALSE,
-    arrow = arrow(length = unit(0.25, "cm")),
-    colour = "black") +
-  geom_text(
-  data = arrows,
-  aes(
-    x = DCA1 * 2.3,
-    y = DCA2 * 2.3,
-    label = Variable
-  ),
-  inherit.aes = FALSE
-  ) +
-
-  labs(
-    title = "DCA Vegetation Auf der Pfalz",
-    x = "DCA1",
-    y = "DCA2"
-  ) +
-
-  theme_minimal() +
-  theme(
-    plot.title = element_text(hjust = 0.5)
-  )
-
-
-###mit Arten aber ohne pfeile
-species_df <- as.data.frame(scores(dca, display = "species", choices = c(1, 2)))
-species_df$Art <- rownames(species_df)
-species_totals <- colSums(comm_MN, na.rm = TRUE)
-
-species_df <- species_df %>%
-  filter(Art %in% names(species_totals[species_totals > 0]))
-
-ggplot(dca_df, aes(DCA1, DCA2, colour = Distanz)) +
-  geom_point(size = 3) +
-
-  geom_text(
-  data = species_df,
-  aes(x = DCA1, y = DCA2, label = Art),
-  inherit.aes = FALSE,
-  size = 3,
-  colour = "grey30"
-) +
-
-  scale_colour_gradient2(
-    low = "#005A8D",
-    mid = "#FFD700",
-    high = "#7A0177",
-    midpoint = 0,
-    name = "Position im Transekt"
-  ) +
-  labs(
-    title = "DCA Vegetation Auf der Pfalz",
-    x = "DCA1",
-    y = "DCA2"
-  ) +
-
-  theme_minimal() +
-  theme(
-    plot.title = element_text(hjust = 0.5)
-  )
-```
-
 DCA hier mit einzelnem Transekt und von oben von den einzelnen Flöchen mit Moos und !=Moos zusammenbringen -\> Pflanzengesellschaften werden klar
 
 ```{r}
@@ -2009,3 +1720,706 @@ woody_plot_data %>%
 ```
 
 am besten feste farbverteilung festlegen, damit die arten in allen 3 flächen die gleichen farben bekommen. nur, falls du die plots am ende verwenden willst
+
+###### nur Moose
+
+```{r}
+#nur moose
+
+comm_moose_L <- veg_long %>%
+  filter(Schicht == "ML"& site=="Lic") %>%  
+  group_by(plot.ID, Art) %>%
+  summarise(
+    Deckung = sum(Deckung, na.rm = TRUE),
+    .groups = "drop"
+  ) %>%
+  pivot_wider(
+    names_from = Art,
+    values_from = Deckung,
+    values_fill = 0
+  )%>%
+  tibble::column_to_rownames("plot.ID")
+
+#entfernen leerer Zeilen und Spalten, weil decorana() damit ncht rechnen kann
+comm_moose_L <- comm_moose_L[rowSums(comm_moose_L) > 0, ]
+comm_moose_L <- comm_moose_L[, colSums(comm_moose_L) > 0]
+
+
+dca_moose <- decorana(comm_moose_L)
+
+summary(dca_moose_L)
+
+dca_moose_sites <- as.data.frame(
+  scores(dca_moose, display = "sites", choices = 1:2)
+)
+
+dca_moose_sites$plot.ID <- rownames(dca_moose_sites)
+
+dca_moose_sites <- dca_moose_sites %>%
+  left_join(
+    vegdata %>%
+      transmute(
+        plot.ID = as.character(plot.ID),
+        site
+      ),
+    by = "plot.ID"
+  )
+dca_moose_species <- as.data.frame(
+  scores(dca_moose, display = "species", choices = 1:2)
+)
+
+dca_moose_species$Art <- rownames(dca_moose_species)
+
+ggplot() +
+  geom_point(
+    data = dca_moose_sites,
+    aes(x = DCA1, y = DCA2, color = site),
+    size = 2
+  ) +
+  geom_text_repel(
+    data = dca_moose_species,
+    aes(x = DCA1, y = DCA2, label = Art),
+    color = "black",
+    size = 3,
+    max.overlaps = 30
+  ) +
+  labs(
+    x = "DCA1",
+    y = "DCA2",
+    color = "Gebiet"
+  ) +
+  theme_classic()
+
+
+#S. squarrosum scheint komplett woanders zu liegen und verzerrt die DCA. Die Art sollte entfernt werden. Sie kommt nur auf einem einzigen Quadrat vor
+comm_moose_L[
+  comm_moose_L[, "Sphagnum_squarrosum"] > 0,
+  "Sphagnum_squarrosum",
+  drop = FALSE
+]
+#die Art kommt nur auf einem Quadrat mit relativ wenig Deckung vor, deswegen wird sie erstmal entfernt
+
+#entfernen von s. squarrosum in Lichtenau
+comm_moose_dca <- comm_moose_L[
+  rownames(comm_moose_L) != "225",
+  ,
+  drop = FALSE
+]
+
+# Sphagnum_squarrosum ist danach eine vollständige Nullspalte
+comm_moose_dca <- comm_moose_dca[
+  ,
+  colSums(comm_moose_dca) > 0,
+  drop = FALSE
+]
+
+dca_moose <- decorana(comm_moose_dca)
+
+summary(dca_moose)
+plot(dca_moose)
+
+
+# Scores der Aufnahmeflächen
+dca_sites <- as.data.frame(
+  scores(dca_moose, display = "sites", choices = 1:2)
+)
+
+dca_sites$plot.ID <- rownames(dca_sites)
+dca_sites$plot.ID <- as.integer(dca_sites$plot.ID)
+
+dca_sites <- dca_sites %>%
+  left_join(
+    vegdata %>%
+      select(plot.ID, site),
+    by = "plot.ID"
+  )
+
+# Scores der Arten
+dca_species <- as.data.frame(
+  scores(dca_moose, display = "species", choices = 1:2)
+)
+
+dca_species$Art <- rownames(dca_species)
+
+ggplot() +
+  geom_point(
+    data = dca_sites,
+    aes(x = DCA1, y = DCA2, color = site),
+    size = 2
+  ) +
+  geom_text(
+    data = dca_species,
+    aes(x = DCA1, y = DCA2, label = Art),
+    color = "black",
+    size = 3
+  ) +
+  labs(
+    x = "DCA1",
+    y = "DCA2",
+    color = "Gebiet"
+  ) +
+  theme_classic()
+
+
+
+#PLot GPT
+ggplot() +
+  geom_point(
+    data = dca_sites,
+    aes(x = DCA1, y = DCA2, color = site),
+    size = 2
+  ) +
+  geom_text_repel(
+    data = dca_species,
+    aes(x = DCA1, y = DCA2, label = Art),
+    color = "black",
+    size = 3,
+    max.overlaps = 30
+  ) +
+  labs(
+    x = "DCA1",
+    y = "DCA2",
+    color = "Gebiet"
+  ) +
+  theme_classic()
+```
+
+##### nur NCHT moose
+
+```{r}
+# einzelne site mit arten
+comm_L <- veg_long %>%
+  filter(Schicht != "ML"&site=="Lic") %>%  
+  group_by(plot.ID, Art) %>%
+  summarise(
+    Deckung = sum(Deckung, na.rm = TRUE),
+    .groups = "drop"
+  ) %>%
+  pivot_wider(
+    names_from = Art,
+    values_from = Deckung,
+    values_fill = 0
+  )%>%
+  tibble::column_to_rownames("plot.ID")
+
+dca <- decorana(comm_L)
+summary(dca)
+
+
+plot(dca)
+
+dca_scores <- scores(dca, display = "sites")
+dca_df <- as.data.frame(dca_scores)
+dca_df$Name <- rownames(dca_df)
+dca_df$site <- vegdata$site[match(dca_df$Name, vegdata$plot.ID)]
+dca_df$Transektnummer <- vegdata$Transektnummer[match(dca_df$Name, vegdata$plot.ID)]
+dca_df$Distanz <- abs(dca_df$Transektnummer)
+
+
+
+species_df <- as.data.frame(scores(dca, display = "species", choices = c(1, 2)))
+species_df$Art <- rownames(species_df)
+species_totals <- colSums(comm_L, na.rm = TRUE)
+species_df <- species_df %>%
+  filter(Art %in% names(species_totals[species_totals > 0]))
+
+
+ggplot(dca_df, aes(DCA1, DCA2, colour = Distanz)) +
+  geom_point(size = 5) +
+  geom_point(
+    data = species_df,
+    aes(x = DCA1, y = DCA2),
+    inherit.aes = FALSE,
+    shape = 17,       
+    size = 3,
+    colour = "grey20"
+  ) +
+  geom_text_repel(
+    data = species_df,
+    aes(x = DCA1, y = DCA2, label = Art),
+    inherit.aes = FALSE,
+    size = 3,
+    colour = "grey20",
+    box.padding = 0.5,
+    point.padding = 0.3,
+    segment.colour = "grey60",
+    max.overlaps = Inf
+  ) +
+  scale_colour_gradient2(
+    low = "#005A8D",
+    mid = "#FFD700",
+    high = "#7A0177",
+    name = "Entfernung vom Mittelpunkt"
+  ) +
+  labs(
+    title = "DCA Vegetation Kleiner Sumpf, ohne Moose",
+    x = "DCA1",
+    y = "DCA2"
+  ) +
+  theme_minimal() +
+  theme(
+    plot.title = element_text(hjust = 0.5)
+  )
+
+
+```
+
+##### ganze site mit arten ohne pfeile
+
+```{r}
+# einzelne site mit arten
+comm_L <- veg_long %>%
+  filter(site=="Lic") %>%  
+  group_by(plot.ID, Art) %>%
+  summarise(
+    Deckung = sum(Deckung, na.rm = TRUE),
+    .groups = "drop"
+  ) %>%
+  pivot_wider(
+    names_from = Art,
+    values_from = Deckung,
+    values_fill = 0
+  )%>%
+  tibble::column_to_rownames("plot.ID")
+
+dca <- decorana(comm_L)
+summary(dca)
+
+
+plot(dca)
+
+dca_scores <- scores(dca, display = "sites")
+dca_df <- as.data.frame(dca_scores)
+dca_df$Name <- rownames(dca_df)
+dca_df$site <- vegdata$site[match(dca_df$Name, vegdata$plot.ID)]
+dca_df$Transektnummer <- vegdata$Transektnummer[match(dca_df$Name, vegdata$plot.ID)]
+dca_df$Distanz <- abs(dca_df$Transektnummer)
+
+
+
+species_df <- as.data.frame(scores(dca, display = "species", choices = c(1, 2)))
+species_df$Art <- rownames(species_df)
+species_totals <- colSums(comm_L, na.rm = TRUE)
+species_df <- species_df %>%
+  filter(Art %in% names(species_totals[species_totals > 0]))
+
+
+ggplot(dca_df, aes(DCA1, DCA2, colour = Distanz)) +
+  geom_point(size = 5) +
+  geom_point(
+    data = species_df,
+    aes(x = DCA1, y = DCA2),
+    inherit.aes = FALSE,
+    shape = 17,       
+    size = 3,
+    colour = "grey20"
+  ) +
+  geom_text_repel(
+    data = species_df,
+    aes(x = DCA1, y = DCA2, label = Art),
+    inherit.aes = FALSE,
+    size = 3,
+    colour = "grey20",
+    box.padding = 0.5,
+    point.padding = 0.3,
+    segment.colour = "grey60",
+    max.overlaps = Inf
+  ) +
+  scale_colour_gradient2(
+    low = "#005A8D",
+    mid = "#FFD700",
+    high = "#7A0177",
+    name = "Entfernung vom Mittelpunkt"
+  ) +
+  labs(
+    title = "DCA Vegetation Kleiner Sumpf, ohne Moose",
+    x = "DCA1",
+    y = "DCA2"
+  ) +
+  theme_minimal() +
+  theme(
+    plot.title = element_text(hjust = 0.5)
+  )
+
+
+```
+
+###### nur moose
+
+```{r}
+#nur moose
+# einzelne site mit arten
+comm_L <- veg_long %>%
+  filter(Schicht =="ML"&site=="Lic") %>%  
+  group_by(plot.ID, Art) %>%
+  summarise(
+    Deckung = sum(Deckung, na.rm = TRUE),
+    .groups = "drop"
+  ) %>%
+  pivot_wider(
+    names_from = Art,
+    values_from = Deckung,
+    values_fill = 0
+  )%>%
+  tibble::column_to_rownames("plot.ID")
+#enterne leere zeilen &spalten weil decorana m´damit nciht rechnen kann
+comm_L <- comm_L[
+  rowSums(comm_L) > 0,
+  colSums(comm_L) > 0,
+  drop = FALSE
+]
+
+
+dca <- decorana(comm_L)
+summary(dca)
+
+
+plot(dca)
+
+dca_scores <- scores(dca, display = "sites")
+dca_df <- as.data.frame(dca_scores)
+dca_df$Name <- rownames(dca_df)
+dca_df$site <- vegdata$site[match(dca_df$Name, vegdata$plot.ID)]
+dca_df$Transektnummer <- vegdata$Transektnummer[match(dca_df$Name, vegdata$plot.ID)]
+dca_df$Distanz <- abs(dca_df$Transektnummer)
+
+
+
+species_df <- as.data.frame(scores(dca, display = "species", choices = c(1, 2)))
+species_df$Art <- rownames(species_df)
+species_totals <- colSums(comm_L, na.rm = TRUE)
+species_df <- species_df %>%
+  filter(Art %in% names(species_totals[species_totals > 0]))
+
+
+ggplot(dca_df, aes(DCA1, DCA2, colour = Distanz)) +
+  geom_point(size = 5) +
+  geom_point(
+    data = species_df,
+    aes(x = DCA1, y = DCA2),
+    inherit.aes = FALSE,
+    shape = 17,       
+    size = 3,
+    colour = "grey20"
+  ) +
+  geom_text_repel(
+    data = species_df,
+    aes(x = DCA1, y = DCA2, label = Art),
+    inherit.aes = FALSE,
+    size = 3,
+    colour = "grey20",
+    box.padding = 0.5,
+    point.padding = 0.3,
+    segment.colour = "grey60",
+    max.overlaps = Inf
+  ) +
+  scale_colour_gradient2(
+    low = "#005A8D",
+    mid = "#FFD700",
+    high = "#7A0177",
+    name = "Entfernung vom Mittelpunkt"
+  ) +
+  labs(
+    title = "DCA Vegetation Kleiner Sumpf, ohne Moose",
+    x = "DCA1",
+    y = "DCA2"
+  ) +
+  theme_minimal() +
+  theme(
+    plot.title = element_text(hjust = 0.5)
+  )
+
+#S. squarrosum scheint komplett woanders zu liegen und verzerrt die DCA. Die Art sollte entfernt werden. Sie kommt nur auf einem einzigen Quadrat vor
+comm_L[
+  comm_L[, "Sphagnum_squarrosum"] > 0,
+  "Sphagnum_squarrosum",
+  drop = FALSE
+]
+#die Art kommt nur auf einem Quadrat mit relativ wenig Deckung vor, deswegen wird sie erstmal entfernt
+#entfernen von s. squarrosum in Lichtenau
+comm_L <- comm_L[
+  rownames(comm_L) != "225",
+  ,
+  drop = FALSE
+]
+# Sphagnum_squarrosum ist danach eine vollständige Nullspalte
+comm_L <- comm_L[
+  ,
+  colSums(comm_L) > 0,
+  drop = FALSE
+]
+
+dca <- decorana(comm_L)
+summary(dca)
+plot(dca)
+
+
+dca_scores <- scores(dca, display = "sites")
+dca_df <- as.data.frame(dca_scores)
+dca_df$Name <- rownames(dca_df)
+dca_df$site <- vegdata$site[match(dca_df$Name, vegdata$plot.ID)]
+dca_df$Transektnummer <- vegdata$Transektnummer[match(dca_df$Name, vegdata$plot.ID)]
+dca_df$Distanz <- abs(dca_df$Transektnummer)
+
+
+
+species_df <- as.data.frame(scores(dca, display = "species", choices = c(1, 2)))
+species_df$Art <- rownames(species_df)
+species_totals <- colSums(comm_L, na.rm = TRUE)
+species_df <- species_df %>%
+  filter(Art %in% names(species_totals[species_totals > 0]))
+
+
+ggplot(dca_df, aes(DCA1, DCA2, colour = Distanz)) +
+  geom_point(size = 5) +
+  geom_point(
+    data = species_df,
+    aes(x = DCA1, y = DCA2),
+    inherit.aes = FALSE,
+    shape = 17,       
+    size = 3,
+    colour = "grey20"
+  ) +
+  geom_text_repel(
+    data = species_df,
+    aes(x = DCA1, y = DCA2, label = Art),
+    inherit.aes = FALSE,
+    size = 3,
+    colour = "grey20",
+    box.padding = 0.5,
+    point.padding = 0.3,
+    segment.colour = "grey60",
+    max.overlaps = Inf
+  ) +
+  scale_colour_gradient2(
+    low = "#005A8D",
+    mid = "#FFD700",
+    high = "#7A0177",
+    name = "Entfernung vom Mittelpunkt"
+  ) +
+  labs(
+    title = "DCA Vegetation Kleiner Sumpf, ohne Moose",
+    x = "DCA1",
+    y = "DCA2"
+  ) +
+  theme_minimal() +
+  theme(
+    plot.title = element_text(hjust = 0.5)
+  )
+```
+
+###### einzelnes transekt
+
+```{r}
+# einzelne site mit arten
+comm_L <- veg_long %>%
+  filter(site=="Lic"&Transekt =="WO") %>%  
+  group_by(plot.ID, Art) %>%
+  summarise(
+    Deckung = sum(Deckung, na.rm = TRUE),
+    .groups = "drop"
+  ) %>%
+  pivot_wider(
+    names_from = Art,
+    values_from = Deckung,
+    values_fill = 0
+  )%>%
+  tibble::column_to_rownames("plot.ID")
+
+dca <- decorana(comm_L)
+summary(dca)
+
+
+plot(dca)
+
+dca_scores <- scores(dca, display = "sites")
+dca_df <- as.data.frame(dca_scores)
+dca_df$Name <- rownames(dca_df)
+dca_df$site <- vegdata$site[match(dca_df$Name, vegdata$plot.ID)]
+dca_df$Transektnummer <- vegdata$Transektnummer[match(dca_df$Name, vegdata$plot.ID)]
+
+
+
+species_df <- as.data.frame(scores(dca, display = "species", choices = c(1, 2)))
+species_df$Art <- rownames(species_df)
+species_totals <- colSums(comm_L, na.rm = TRUE)
+species_df <- species_df %>%
+  filter(Art %in% names(species_totals[species_totals > 0]))
+
+ggplot(dca_df, aes(DCA1, DCA2, colour = Transektnummer)) +
+  geom_point(size = 3) +
+  geom_point(
+    data = species_df,
+    aes(x = DCA1, y = DCA2),
+    inherit.aes = FALSE,
+    shape = 17,       
+    size = 3,
+    colour = "grey20"
+  ) +
+  geom_text_repel(
+    data = species_df,
+    aes(x = DCA1, y = DCA2, label = Art),
+    inherit.aes = FALSE,
+    size = 3,
+    colour = "grey20",
+    box.padding = 0.5,
+    point.padding = 0.3,
+    segment.colour = "grey60",
+    max.overlaps = Inf
+  ) +
+  scale_colour_gradient2(
+    low = "#005A8D",
+    mid = "#FFD700",
+    high = "#7A0177",
+    midpoint = 0,
+    breaks = range(dca_df$Transektnummer, na.rm = TRUE),
+    labels = c("Westen", "Osten"),
+    name = "Position im Transekt"
+  ) +
+  labs(
+    title = "DCA Vegetation Kleiner Sumpf, West-Ost Transekt",
+    x = "DCA1",
+    y = "DCA2"
+  ) +
+  theme_minimal() +
+  theme(
+    plot.title = element_text(hjust = 0.5)
+  )
+```
+
+###### test mit ggrepel
+
+```{r}
+#|test mit darstellung mit kleinen strichen zu den artnamen
+
+
+comm_moose<- veg_long %>%
+  filter(site == "Lic")%>%
+  group_by(plot.ID, Art) %>%
+  summarise(Deckung = sum(Deckung), .groups = "drop") %>%
+  tidyr::pivot_wider(
+    names_from = Art,
+    values_from = Deckung,
+    values_fill = 0
+  ) %>%
+  tibble::column_to_rownames("plot.ID")
+str(comm_moose)
+comm_moose <- comm_moose[
+  rowSums(comm_moose) > 0,
+  colSums(comm_moose) > 0,
+  drop = FALSE
+]
+
+dca <- decorana(comm_moose)
+summary(dca)
+
+# Scores der Aufnahmeflächen
+dca_sites <- as.data.frame(
+  scores(dca, display = "sites", choices = 1:2)
+)
+
+dca_sites$plot.ID <- rownames(dca_sites)
+dca_sites$plot.ID <- as.integer(dca_sites$plot.ID)
+
+dca_sites <- dca_sites %>%
+  left_join(
+    vegdata %>%
+      select(plot.ID, site),
+    by = "plot.ID"
+  )
+
+# Scores der Arten
+dca_species <- as.data.frame(
+  scores(dca, display = "species", choices = 1:2)
+)
+
+dca_species$Art <- rownames(dca_species)
+
+ggplot() +
+  geom_point(
+    data = dca_sites,
+    aes(x = DCA1, y = DCA2, color = site),
+    size = 2
+  ) +
+  geom_text(
+    data = dca_species,
+    aes(x = DCA1, y = DCA2, label = Art),
+    color = "black",
+    size = 3
+  ) +
+  labs(
+    x = "DCA1",
+    y = "DCA2",
+    color = "Gebiet"
+  ) +
+  theme_classic()
+
+
+
+#test
+library(ggrepel)
+
+p<-ggplot() +
+  geom_point(
+    data = dca_sites,
+    aes(x = DCA1, y = DCA2, color = site),
+    size = 2
+  ) +
+
+  # Exakte Position der Artenwerte markieren
+  geom_point(
+    data = dca_species,
+    aes(x = DCA1, y = DCA2),
+    shape = 2,
+    size = 1.5,
+    color = "grey40"
+  ) +
+
+  geom_text_repel(
+    data = dca_species,
+    aes(x = DCA1, y = DCA2, label = Art),
+    color = "black",
+    size = 3,
+
+    # Keine Beschriftungen entfernen
+    max.overlaps = Inf,
+
+    # Abstand zwischen den Beschriftungen
+    box.padding = 0.35,
+    point.padding = 0.15,
+
+    # Beschriftungen nicht zu weit von ihrer Position entfernen
+    force = 1,
+    force_pull = 2,
+
+    # Verbindungslinien immer anzeigen
+    min.segment.length = 0,
+    segment.color = "grey50",
+    segment.linewidth = 0.3,
+
+    # Reproduzierbare Anordnung
+    seed = 123,
+
+    # Etwas gründlichere Berechnung
+    max.time = 2,
+    max.iter = 50000
+  ) +
+
+  labs(
+    x = "DCA1",
+    y = "DCA2",
+    color = "Gebiet"
+  ) +
+  theme_classic()
+
+#ggsave(
+#  filename = "test_DCA_Arten.png",
+#  plot = p,
+#  width = 10,
+#  height = 8,
+#  units = "in",
+#  dpi = 300
+#)
+getwd()
+p
+```

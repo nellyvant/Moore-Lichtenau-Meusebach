@@ -1295,3 +1295,41 @@ ggplot(dca_df, aes(DCA1, DCA2, colour = Transektnummer)) +
   theme(
     plot.title = element_text(hjust = 0.5)
   )
+#####dca test run#####
+ggplot(dca_df, aes(DCA1, DCA2, colour = Distanz)) +
+  geom_point(size = 5) +
+  geom_point(
+    data = species_df,
+    aes(x = DCA1, y = DCA2),
+    inherit.aes = FALSE,
+    shape = 17,       
+    size = 3,
+    colour = "grey20"
+  ) +
+  geom_text_repel(
+    data = species_df,
+    aes(x = DCA1, y = DCA2, label = Art),
+    inherit.aes = FALSE,
+    size = 3,
+    colour = "grey20",
+    box.padding = 0.5,
+    point.padding = 0.3,
+    segment.colour = "grey60",
+    max.overlaps = Inf
+  ) +
+  scale_colour_gradient2(
+    low = "#005A8D",
+    mid = "#FFD700",
+    high = "#7A0177",
+    name = "Entfernung vom Mittelpunkt"
+  ) +
+  labs(
+    title = "DCA Vegetation Kleiner Sumpf, ohne Moose",
+    x = "DCA1",
+    y = "DCA2"
+  ) +
+  theme_minimal() +
+  theme(
+    plot.title = element_text(hjust = 0.5)
+  )
+
