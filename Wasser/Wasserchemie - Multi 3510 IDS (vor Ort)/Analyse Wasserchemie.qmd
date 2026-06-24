@@ -10,8 +10,6 @@ editor: visual
 library(readxl) 
 library(dplyr) 
 library(ggplot2) 
-#library(lubridate) 
-#library(tidyr)
 ```
 
 # 2 Daten einlesen
@@ -74,7 +72,7 @@ WS_stats_Flaeche <- WS %>%
 WS_stats_Flaeche
 ```
 
-## Ohne Messstelle 4 bei Lichtenau
+## 3.1 Ohne Messstelle 4 bei Lichtenau
 
 ```{r}
 # Statistiken je Messpunkt und Parameter
@@ -110,33 +108,4 @@ WS_stats_Flaeche_L <- WS %>%
   )
 
 WS_stats_Flaeche_L
-```
-
-## Diagramme 
-
-nur so zum ausprobieren, ich benötige keine zum Weiterarbeiten
-
-```{r}
-# Mittelwerte je Fläche und Datum 
-WS_mean_flaeche <- WS %>%
-  group_by(Datum, Fläche, Parameter) %>%
-  summarise(
-    Mean_Messwert = mean(Messwert, na.rm = TRUE),
-    .groups = "drop"
-  )
-```
-
-```{r}
-WS_mean_flaeche %>%
-  filter(Parameter == "Sauerstoffgehalt (mg/l)") %>%
-  ggplot(aes(x = Datum, y = Mean_Messwert, color = Fläche)) +
-  geom_line(linewidth = 1) +
-  geom_point(size = 2) +
-  labs(
-    title = "pH-Verlauf je Fläche (gemittelt über Messpunkte)",
-    x = "Datum",
-    y = "pH",
-    color = "Fläche"
-  ) +
-  theme_minimal()
 ```
