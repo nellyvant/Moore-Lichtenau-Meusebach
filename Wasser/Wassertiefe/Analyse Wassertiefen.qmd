@@ -31,16 +31,49 @@ class(Wassertiefen$Datum)
 
 # 3 Auswertung
 
+## 3.1 Statistische Kennzahlen 
+
+```{r}
+# Statistische Kennzahlen pro Messpunkt und Standort
+Kennzahlen_messpunkt <- Wassertiefen %>%
+  group_by(Standort, Messpunkt) %>%
+  summarise(
+    Mittelwert = mean(Wassertiefe, na.rm = TRUE),
+    Median = median(Wassertiefe, na.rm = TRUE),
+    Std = sd(Wassertiefe, na.rm = TRUE),
+    Min = min(Wassertiefe, na.rm = TRUE),
+    Max = max(Wassertiefe, na.rm = TRUE),
+    Range = max(Wassertiefe, na.rm = TRUE) - min(Wassertiefe, na.rm = TRUE),
+  )
+
+Kennzahlen_messpunkt
+```
+
+```{r}
+# Statistische Kennzahlen pro Standort
+Kennzahlen_standort <- Wassertiefen %>%
+  group_by(Standort) %>%
+  summarise(
+    Mittelwert = mean(Wassertiefe, na.rm = TRUE),
+    Median = median(Wassertiefe, na.rm = TRUE),
+    Std = sd(Wassertiefe, na.rm = TRUE),
+    Min = min(Wassertiefe, na.rm = TRUE),
+    Max = max(Wassertiefe, na.rm = TRUE),
+    Range = max(Wassertiefe, na.rm = TRUE) - min(Wassertiefe, na.rm = TRUE)
+  )
+
+Kennzahlen_standort
+```
+
+## 3.2 Jahresverlauf der Wassertiefe (MT vs MN vs L)
+
 ```{r}
 # Mittelwerte pro Tag/ pro Standort berechnen 
 WT_mittel <- Wassertiefen %>% 
   group_by(Datum, Standort) %>% 
   summarise(WT_mean = mean(Wassertiefe, na.rm = TRUE)) %>% 
   ungroup()
-
 ```
-
-## 3.1 Jahresverlauf der Wassertiefe (MT vs MN vs L)
 
 ```{r}
 # Liniendiagramm - Jahresverlauf
@@ -100,7 +133,7 @@ ggplot(WT_mittel, aes(x = Datum, y = WT_mean, color = Standort)) +
 #)
 ```
 
-## 3.2 Unterschiede zwischen den Standorten
+## 3.3 Unterschiede zwischen den Standorten
 
 ```{r}
 # Boxplot pro Standort, Mittelwert der verschiedenen Messpunkte
@@ -203,7 +236,7 @@ ggplot(Wassertiefen,
 #)
 ```
 
-## 3.3 Unterschiede innerhalb eines Standortes
+## 3.4 Unterschiede innerhalb eines Standortes
 
 ```{r}
 #### Jahresverlauf - Liniendiagramm
@@ -346,43 +379,7 @@ plot_box(Wassertiefen, st="L",
          x_name="Lichtenau")
 ```
 
-# 4 Statistische Kennzahlen
-
-```{r}
-# Statistische Kennzahlen pro Messpunkt und Standort
-Kennzahlen_messpunkt <- Wassertiefen %>%
-  group_by(Standort, Messpunkt) %>%
-  summarise(
-    Mittelwert = mean(Wassertiefe, na.rm = TRUE),
-    Median = median(Wassertiefe, na.rm = TRUE),
-    Std = sd(Wassertiefe, na.rm = TRUE),
-    Min = min(Wassertiefe, na.rm = TRUE),
-    Max = max(Wassertiefe, na.rm = TRUE),
-    Range = max(Wassertiefe, na.rm = TRUE) - min(Wassertiefe, na.rm = TRUE),
-  )
-
-Kennzahlen_messpunkt
-
-```
-
-```{r}
-# Statistische Kennzahlen pro Standort
-Kennzahlen_standort <- Wassertiefen %>%
-  group_by(Standort) %>%
-  summarise(
-    Mittelwert = mean(Wassertiefe, na.rm = TRUE),
-    Median = median(Wassertiefe, na.rm = TRUE),
-    Std = sd(Wassertiefe, na.rm = TRUE),
-    Min = min(Wassertiefe, na.rm = TRUE),
-    Max = max(Wassertiefe, na.rm = TRUE),
-    Range = max(Wassertiefe, na.rm = TRUE) - min(Wassertiefe, na.rm = TRUE)
-  )
-
-Kennzahlen_standort
-
-```
-
-# 5 Relevante Fragen
+# 4 Relevante Fragen
 
 (da die Diagramme ggf. ein falsches Bild vermitteln)
 
@@ -702,12 +699,4 @@ ggplot(
     x = "Wasserstand (cm)",
     y = "Anzahl der Messungen"
   )
-```
-
-```{r}
-
-```
-
-```{r}
-
 ```
