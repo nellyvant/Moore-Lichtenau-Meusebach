@@ -31,7 +31,7 @@ class(Wassertiefen$Datum)
 
 # 3 Auswertung
 
-## 3.1 Statistische Kennzahlen 
+## 3.1 Statistische Kennzahlen
 
 ```{r}
 # Statistische Kennzahlen pro Messpunkt und Standort
