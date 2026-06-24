@@ -2156,6 +2156,9 @@ summary(mod_MN)
 #Temperatur: nicht signifikant, p = 0,0688
 #Deckung_TL: nicht signifikant, p = 0.5888
 #Tage seit Regen: nicht signifikant, p = 0.0612
+r2(mod_MN)
+#Conditional R2: 0.518
+#Marginal R2: 0.043
 
 ###############################################################
 #Modell für Standort Meusebach trocken
@@ -2170,6 +2173,9 @@ summary(mod_MT)
 #Temperatur: nicht signifikant, p = 0,243
 #Deckung_TL: nicht signifikant, p = 0.54
 #Tage seit Regen: nicht signifikant, p = 0.144
+r2(mor_MT)
+#Conditional R2: 0.568
+#Marginal R2: 0.347
 
 ##############################################################
 #Modell für Standort Lichtenau
@@ -2184,6 +2190,9 @@ summary(mod_L)
 #Temperatur: signifikant, p = 0,0246, Estimate: 0.129
 #Deckung_TL: nicht signifikant, p = 0.0664
 #Tage seit Regen: nicht signifikant, p = 0.1594
+r2(mod_L)
+#Conditional R2: 0.704
+#Marginal R2: 0.442
 ```
 
 ```{r}
