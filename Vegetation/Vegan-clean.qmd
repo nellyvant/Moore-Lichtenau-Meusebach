@@ -549,12 +549,11 @@ results <- data.frame(
   Shannon = shannon_index,
   Evenness = species_evenness)
 
+
 str(results)
 
 #als Excel speichern
 #write_xlsx(results, "Ergebnisse_species_richness.xlsx")
-
-
 ```
 
 ```{r}
@@ -592,6 +591,30 @@ merged_data <- merged_data %>%
     by = c("Name", "site")
   )
   
+```
+
+## Summary Diversitätsmaße berechnen
+
+```{r}
+#summary pro Standort
+summary_area <- merged_data%>%
+  group_by(site)%>%
+  summarize(
+    richness_mean = mean(Richness),
+    richness_min = min(Richness),
+    richness_max = max(Richness),
+    richness_range = richness_max-richness_min,
+    shannon_mean = mean(Shannon),
+    shannon_min = min(Shannon),
+    shannon_max =max(Shannon),
+    shannon_range = shannon_max-shannon_min,
+    evenness_mean = mean (Evenness),
+    evenness_min = min(Evenness),
+    evenness_max = max(Evenness),
+    evenness_range = evenness_max-evenness_min,
+    .groups = "drop"
+  )
+summary_area
 ```
 
 # 7 DCA
@@ -1542,6 +1565,29 @@ merged_data %>%
   facet_wrap(~ Transekt)
 ```
 
+## Kreuztransekt Plots
+
+diesen Plot für alle drei Standorte (Lic, Meu_nass, Meu_trock) und alle Parameter wiederholen, am besten mit Ersetzung arbeiten
+
+**Parameter**\
+"Richness",\
+"Shannon",\
+"Evenness",\
+"Weighted_light",\
+"Weighted_temperature",\
+"Weighted_wetness",\
+"Weighted_nitrogen",\
+("Weighted_continental",)\
+"Weighted_alkalinity",\
+("Weighted_salinity" ,)\
+"TL",\
+"SL",\
+"HL",\
+"ML" ,\
+"Sukzessionszeiger",\
+"Moorart",\
+"woody"
+
 ```{r}
 plot_data <- merged_data %>%
   mutate(
@@ -1549,62 +1595,73 @@ plot_data <- merged_data %>%
     y = if_else(Transekt == "NS", Transektnummer, 0)
   )
 
-plot_data%>%
-  filter(site=="Lic")%>%
-  ggplot( aes(x = x, y = y, color = Weighted_wetness)) +
-  geom_point(size = 4) +
-  coord_equal() +
-  scale_color_viridis_c(name = "Feuchtezahl") +
-  labs(x = "West–Ost", y = "Süd–Nord") +
-  theme_minimal()
 
+#farbschema anpassen, evtl bessere kontraste (und evtl invertieren weil je feuchter desto blauer eig, aber bei den anderen parametern ist das ja egal)
+
+#Farbschema für Zeigerwerte angepasst
 plot_data %>%
-  filter(site == "Lic") %>%
-  ggplot(aes(x = x, y = y, color = Weighted_wetness)) +
+  filter(site == "Meu_trock") %>%
+  ggplot(aes(x = x, y = y, color = Moorart)) +
   geom_point(size = 4) +
   coord_equal() +
-  scale_color_viridis_c(name = "Feuchtezahl") +
+  scale_color_gradientn(
+ # name = "Richness",
+  colours = viridisLite::turbo(10), 
+#  values = scales::rescale(0:9),  #bei zeigerwerten
+#  limits = c(0, 9), #bei Zeigerwerten
+#  breaks = c(1, 3, 5, 7, 9), #bei Zeigerwerten
+#  labels = c(1, 3, 5, 7, 9) #bei Zeigerwerten
+  ) + 
   annotate("text",
-           x = max(plot_data$x),
-           y = 0,
+           x = max(plot_data$x),y = 0,
            label = "O",
            size = 5,
            hjust = 1.4) +
   annotate("text",
-           x = min(plot_data$x),
-           y = 0,
+           x = min(plot_data$x),y = 0,
            label = "W",
            size = 5,
            hjust = 1.4) +
   annotate("text",
-           x = 0,
-           y = max(plot_data$y),
+           x = 0,y = max(plot_data$y),
            label = "N",
            size = 5,
            vjust = -0.3) +
   annotate("text",
-           x = 0,
-           y = min(plot_data$y),
+           x = 0,y = min(plot_data$y),
            label = "S",
            size = 5,
            vjust = 1.3) +
   labs(x = NULL, y = NULL)
+```
+
+## Plots Einzelarten
+
+```{r}
+
+plot_data_species <- vegdata %>%
+  mutate(
+    x = if_else(Transekt == "WO", Transektnummer, 0),
+    y = if_else(Transekt == "NS", Transektnummer, 0)
+  )
+
 
 #farbschema anpassen, evtl bessere kontraste (und evtl invertieren weil je feuchter desto blauer eig, aber bei den anderen parametern ist das ja egal)
 
-
-plot_data %>%
-  filter(site == "Lic") %>%
-  ggplot(aes(x = x, y = y, color = Weighted_nitrogen)) +
+#Farbschema für Zeigerwerte angepasst
+plot_data_species %>%
+  filter(site == "Meu_trock") %>%
+  ggplot(aes(x = x, y = y, color = Pteridium_aquilinum_HL )) +
   geom_point(size = 4) +
   coord_equal() +
   scale_color_gradientn(
-  name = "Nährstoffzahl",
-  colours = viridisLite::turbo(10),
-  values = scales::rescale(0:9),
-  limits = c(0, 9),
-  breaks = c(1, 3, 5, 7, 9),
-  labels = c(1, 3, 5, 7, 9)) +
+ # name = "Richness",
+  colours = viridisLite::turbo(10), 
+#  values = scales::rescale(0:9),  #bei zeigerwerten
+#  limits = c(0, 9), #bei Zeigerwerten
+#  breaks = c(1, 3, 5, 7, 9), #bei Zeigerwerten
+#  labels = c(1, 3, 5, 7, 9) #bei Zeigerwerten
+  ) + 
   annotate("text",
            x = max(plot_data$x),y = 0,
            label = "O",
