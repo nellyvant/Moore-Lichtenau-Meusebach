@@ -290,6 +290,21 @@ layer_deckung%>%
     fill = "Schicht"
   ) +
   theme_minimal()
+
+
+
+#Export der Dtaen fpr die Tree layer für Analyse in Analysis-clean im Ordner Logger
+#muss nur einmalig durchgeführt werden
+#layer_per_plot <- layer_per_plot %>%
+#  left_join(
+#    vegdata %>%
+#      select(plot.ID, site, arbeitsname, Transekt, Transektnummer),
+#    by = c("plot.ID", "site", "arbeitsname")
+#  )
+layer_tree <- layer_per_plot %>%
+  select(-SL, -HL, -ML, -water, -bare.soil)
+write.csv(layer_tree, "treelayer.csv")
+
 ```
 
 # 4 Zeigerwerte einlesen und vorbereiten

@@ -1561,8 +1561,8 @@ precip%>%
 # Join mit AREA summary (Vergleich zwischen den 3 Standorten)
 plusprecipa <- left_join(summary_daily_area, precip, by = "Datum")
 str(plusprecipa)
-plusprecipa <- plusprecipa %>%
-  select(-Temp_area_sonne_mean:-Licht_summe)
+#plusprecipa <- plusprecipa %>%
+#  select(-Temp_area_sonne_mean:-Licht_summe)
 str(plusprecipa)
 plusprecipa <- plusprecipa %>%
   mutate(Monat = format(Datum, "%Y-%m"))
@@ -1647,8 +1647,8 @@ ggplot(trockena,
 
 plusprecipl <- left_join(summary_daily_logger, precip, by = "Datum")
 str(plusprecipl)
-plusprecipl <- plusprecipl %>%
-  select(-Temp_sonne_mean:-Licht_summe)
+#plusprecipl <- plusprecipl %>%
+#  select(-Temp_sonne_mean:-Licht_summe)
 str(plusprecipl)
 plusprecipl <- plusprecipl %>%
   mutate(Monat = format(Datum, "%Y-%m"))
@@ -1779,36 +1779,22 @@ ggplot(dat_rLF_L, aes(x = Logger_ID, y = delta_LF)) +
 #dieser Plot zeigt, in der Mitte nimmt die Luftfeuchte stärker ab als an den Rändern -> kann an Schatten liegen, Deckung der Bäume, Temperatur usw, dafür brauchen wir ein Model
 #Wenn kein model ausreichend Varianz erklärt, müssten andere Methoden verwendet werden, um die Frage zu beantworten
 
-#Für ein Modell, was die Austrockunungsrate deltaLF vorhersagt, benötigt man dieDeckung der Tree layer an den Loggerstandpunkten. Die Tabelle veg_long wurde in der Vegetationsanalyse im Ordner vegetation erzeugt und von dort exportiert
-#Deckung TL
-veg_long <- read_excel("veg_long.xlsx")
+#Für ein Modell, was die Austrockunungsrate deltaLF vorhersagt, benötigt man dieDeckung der Tree layer an den Loggerstandpunkten. Die Tabelle Deckung_schichten.csv stammt aus dem Ordner Vegetation und enthält die prozentuale Schätzung der Vegetationsschichten in allen Aufnhamequadratn. Füe die Loggerstandpunkte werden jeweils die Aufnhamequadrate an den Enden der Transekte und in der Mitte (Transektnummer = 0) verwendet.
 
-deckung_TL <- veg_long %>%
-  filter(
-    Schicht == "TL",
-    Transekt %in% c("NS", "WO")
-  ) %>%
+#Deckung TL
+treelayer<- read.csv("../Vegetation/treelayer.csv", header=T)
+treelayer_logger<- treelayer %>%
   group_by(site, Transekt) %>%
-  filter(
-    Transektnummer == min(Transektnummer, na.rm = TRUE) |
-      Transektnummer == max(Transektnummer, na.rm = TRUE) |
-      Transektnummer == 0
-  ) %>%
+  filter(Transektnummer %in% c(
+      min(Transektnummer, na.rm = TRUE),
+      max(Transektnummer, na.rm = TRUE))|
+      Transektnummer == 0 & Transekt == "NS"
+    ) %>%
   ungroup() %>%
-  group_by(
-    site,
-    Transekt,
-    Transektnummer,
-    Name,
-    plot.ID,
-    arbeitsname
-  ) %>%
-  summarise(
-    Deckung_TL = sum(Deckung, na.rm = TRUE),
-    .groups = "drop"
-  )
-deckung_TL
-deckung_TL <- deckung_TL %>%
+  arrange(site, Transekt, Transektnummer)
+treelayer_logger
+#Loggernamen einfügen
+deckung_TL <- treelayer_logger %>%
   group_by(site, Transekt) %>%
   mutate(
     logger = case_when(
@@ -1824,7 +1810,9 @@ deckung_TL <- deckung_TL %>%
       TRUE ~ NA_character_
     )) %>%
   ungroup()
-deckung_TL
+deckung_TL <- deckung_TL %>%
+  rename(Deckung_TL = TL)
+
 ```
 
 ```{r}
@@ -1843,7 +1831,7 @@ cor.test(deckung_TL$Transektnummer,
 
 kruskal.test(Deckung_TL ~ site, data = deckung_TL)
 kruskal.test(Deckung_TL ~ Transekt, data = deckung_TL)
-# Baumdeckung scheint weder stark standortabhängig noch transektabhängig zu sein
+# Baumdeckung scheint nicht stark standortabhängig, aber transektabhängig zu sein
 
 #################################################################
 #Daten für das Mdell vorbereiten, in model_data zusammenführen
@@ -1875,15 +1863,15 @@ str(model_data)
 
 #Modell über alle Standorte 
 mod <- lmer(
-  delta_LF ~ Deckung_TL + Tage_seit_Regen + Tp_mean + Standort +
+  delta_LF ~ Deckung_TL + Tage_seit_Regen + Temp_schatten_mean + Standort +
     (1 | Logger),
   data = model_data
 )
 summary(mod)
-#Temperatur: hoch signifikant, p = 2.33e-06, Estimate: 0.2149 = wenn die Temperatur steigt, steigt delta_LF
-#Deckung_TL: hoch signifikant, p = 0.000543, Estimate: 0.02067 = wenn Deckung steigt, steigt deltaLF leicht
-#Tage seit Regen: signifikant, p = 0.035003
-#Standort: nicht signifikant, p > 0.05 
+#Deckung TL: hoch signifikant p = 1.21e-05, Estimate = 2.721e-02 -> mit steigender Deckung TL, weniger Austrockung
+#Tage seit Regen: signifikant p=0.0283, Estimate = 1.295e-01 -> je länger der Regen heher ist, desto weniger Autrocknung (vmtl starke Austrockung an Tag 1, weniger austrocknung an tag 2 usw?)
+#Standort: MN unterscheidet sich signifikant zu L p = 0.0365, Estimate = -7.541e-01, Standort MN trocknet schneller aus als L
+
 
 #ermöglicht Vergleich der Variabeln, so dass man ermitteln kann welcher Effekt den größten Einfluss hat 
 model_data_scaled <- model_data %>%
@@ -1891,18 +1879,19 @@ model_data_scaled <- model_data %>%
     delta_LF_z = scale(delta_LF),
     Deckung_z = scale(Deckung_TL),
     Regen_z = scale(Tage_seit_Regen),
-    Temp_z = scale(Tp_mean)
+    Temp_z = scale(Temp_schatten_mean)
   )
 
-lmer(delta_LF_z ~ Deckung_z + Regen_z + Temp_z + (1 | Logger),
+mod_scaled <-lmer(delta_LF_z ~ Deckung_z + Regen_z + Temp_z + (1 | Logger),
      data = model_data_scaled)
-#Temperatur: 0.12671 - stärksten Effekt
-#Deckung_TL: 0.11481 - fast den selben Effekt wie Temp 
-#Tage seit Regen: 0.05659 - geringeren Effekt 
+summary(mod_scaled)
+#Dekcung TL: stärkster Effekt 0.15662  
+#Regen: 0.06269
+
      
 r2(mod)
-#Marginal R² = 0.042 -> Temperatur, Regen, Deckung, Standort erklären 4.2% der Variation in delta_LF
-#Conditional R² = 0.149 -> gesamtes Modell (inkl. Logger) erklärt   14.9% der Variation
+#Marginal R² = 0.043 -> Temperatur, Regen, Deckung, Standort erklären 4.3% der Variation in delta_LF
+#Conditional R² = 0.155 -> gesamtes Modell (inkl. Logger) erklärt   15.5% der Variation
 # = Modell erklärt nur einen kleinen Teil der Luftfeuchte-Dynamik!!
 
 ################################################################
@@ -1911,16 +1900,16 @@ data_MN <- model_data %>%
   filter(Standort == "MN")
 
 mod_MN <- lmer(
-  delta_LF ~ Deckung_TL + Tage_seit_Regen + Tp_mean + (1 | Logger),
+  delta_LF ~ Deckung_TL + Tage_seit_Regen + Temp_schatten_mean + (1 | Logger),
   data = data_MN
 )
 summary(mod_MN)
-#Temperatur: nicht signifikant, p = 0,0688
-#Deckung_TL: nicht signifikant, p = 0.5888
-#Tage seit Regen: nicht signifikant, p = 0.0612
+#Temperatur: nicht signifikant, p = 0.2588
+#Deckung_TL: nicht signifikant, p = 0.7045
+#Tage seit Regen: signifikant, p = 0.0418, estimate = 0.14404
 r2(mod_MN)
-#Conditional R2: 0.518
-#Marginal R2: 0.043
+#Conditional R2: 0.522
+#Marginal R2: 0.022
 
 ###############################################################
 #Modell für Standort Meusebach trocken
@@ -1928,16 +1917,16 @@ data_MT <- model_data %>%
   filter(Standort == "MT")
 
 mod_MT <- lmer(
-  delta_LF ~ Deckung_TL + Tage_seit_Regen + Tp_mean + (1 | Logger),
+  delta_LF ~ Deckung_TL + Tage_seit_Regen + Temp_schatten_mean + (1 | Logger),
   data = data_MT
 )
 summary(mod_MT)
-#Temperatur: nicht signifikant, p = 0,243
-#Deckung_TL: nicht signifikant, p = 0.54
-#Tage seit Regen: nicht signifikant, p = 0.144
+#Temperatur: nicht signifikant, p = 0.4694 
+#Deckung_TL: knapp nicht signifikant, p = 0.0515 
+#Tage seit Regen: nicht signifikant, p = 0.1182
 r2(mod_MT)
-#Conditional R2: 0.568
-#Marginal R2: 0.347
+#Conditional R2: 0.566
+#Marginal R2: 0.349
 
 ##############################################################
 #Modell für Standort Lichtenau
@@ -1945,16 +1934,16 @@ data_L <- model_data %>%
   filter(Standort == "L")
 
 mod_L <- lmer(
-  delta_LF ~ Deckung_TL + Tage_seit_Regen + Tp_mean + (1 | Logger),
+  delta_LF ~ Deckung_TL + Tage_seit_Regen + Temp_schatten_mean + (1 | Logger),
   data = data_L
 )
 summary(mod_L)
-#Temperatur: signifikant, p = 0,0246, Estimate: 0.129
-#Deckung_TL: nicht signifikant, p = 0.0664
-#Tage seit Regen: nicht signifikant, p = 0.1594
+#Temperatur: nicht signifikant, p = 0.5835 
+#Deckung_TL: nicht signifikant, p = 0.0672 
+#Tage seit Regen: nicht signifikant, p = 0.1565
 r2(mod_L)
-#Conditional R2: 0.704
-#Marginal R2: 0.442
+#Conditional R2: 0.702
+#Marginal R2: 0.434
 ```
 
 ```{r}
