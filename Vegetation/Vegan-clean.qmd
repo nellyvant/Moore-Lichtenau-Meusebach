@@ -54,12 +54,6 @@ veg_long <- vegdata %>%
 #sep trennt die Schicht sauber ab, da Arten als Gattung_Epitheton_Schicht vorliegen
 str(veg_long)
 
-#abspeichern in Logger für die Deckung der Treelayer in der Analyse der Luftfeuchte
-#write.csv2(
-#  veg_long,
-#  "../Logger/veg_long.csv",
-#  row.names = FALSE
-#)
 
 ```
 
