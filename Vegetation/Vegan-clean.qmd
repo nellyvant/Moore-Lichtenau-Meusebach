@@ -99,11 +99,14 @@ MT_subset <- subset(veg_long, site =="Meu_trock")
 
 ```
 
-# 3 Exploration
+# 3 Deckung der Layer und dominanter Arten
 
 Top 10 Arten nach Deckung
 
 ```{r}
+#alternativ nach Deckung ordnen: ggplot(aes(x = reorder(Art, mean_deckung), y = mean_deckung)) 
+
+
 #mittlere Deckungen
 p1 <- Lic_subset %>%
   group_by(Art) %>%
@@ -113,7 +116,7 @@ p1 <- Lic_subset %>%
   ) %>%
   arrange(desc(mean_deckung)) %>%
   slice_head(n = 10) %>%
-  ggplot(aes(x = reorder(Art, mean_deckung), y = mean_deckung)) +
+  ggplot(aes(x = reorder(Art, n), y = mean_deckung)) +
   geom_col(fill = "darkgreen") +
   geom_text(aes(label = paste0("n=", n)),
             hjust = -0.1, size = 3) +
@@ -125,6 +128,15 @@ p1 <- Lic_subset %>%
     title = "Kleiner Sumpf"
   ) +
   theme_minimal()
+#Anzahl von holzigen Arten in der Krautschicht
+#ersetze Pinus_sylvestris mit Betula oder Frangula_alnus
+Lic_subset %>%
+  filter(
+    Art == "Pinus_sylvestris",
+    Deckung > 0
+  ) %>%
+  count(Schicht, name = "Anzahl")
+
 
 p2 <- MN_subset %>%
   group_by(Art) %>%
@@ -134,7 +146,7 @@ p2 <- MN_subset %>%
   ) %>%
   arrange(desc(mean_deckung)) %>%
   slice_head(n = 10) %>%
-  ggplot(aes(x = reorder(Art, mean_deckung), y = mean_deckung)) +
+  ggplot(aes(x = reorder(Art, n), y = mean_deckung)) +
   geom_col(fill = "darkgreen") +
   geom_text(aes(label = paste0("n=", n)),
             hjust = -0.1, size = 3) +
@@ -146,6 +158,15 @@ p2 <- MN_subset %>%
     title = "Auf der Pfalz"
   ) +
   theme_minimal()
+#Anzahl von holzigen Arten in der Krautschicht
+#ersetze Pinus_sylvestris mit Betula oder Frangula_alnus
+MN_subset %>%
+  filter(
+    Art == "Pinus_sylvestris",
+    Deckung > 0
+  ) %>%
+  count(Schicht, name = "Anzahl")
+
 
 p3 <- MT_subset %>%
   group_by(Art) %>%
@@ -155,7 +176,7 @@ p3 <- MT_subset %>%
   ) %>%
   arrange(desc(mean_deckung)) %>%
   slice_head(n = 10) %>%
-  ggplot(aes(x = reorder(Art, mean_deckung), y = mean_deckung)) +
+  ggplot(aes(x = reorder(Art, n), y = mean_deckung)) +
   geom_col(fill = "darkgreen") +
   geom_text(aes(label = paste0("n=", n)),
             hjust = -0.1, size = 3) +
@@ -167,41 +188,6 @@ p3 <- MT_subset %>%
     title = "Fuchshügel"
   ) +
   theme_minimal()
-
-#p_all <- (p1/p2/p3)+plot_annotation(
-#    title = "Top 10 Arten nach mittlerer Deckung",
-#    theme = theme(plot.title = element_text(size = 18, face = "bold", hjust = 0.5)))
-#ggsave("top10_deckung.png", p_all,
-#       width = 14, height = 6, dpi = 300)
-```
-
-```{r}
-#plot redo
-#) p3$data → die plots muss ich neu berechnen und einzeln abspeichern, schauen wie mean-deckung berechnet wird (also ist das der mean innerhalb der plots, wo die art vorkommt oder der mean über alle plots zusammen??, zweiteres wäre mist, weil in manchen plots kommt es ja gar nicht vor, das würde ja alles verfälschen) → momentan ist nach deckung sortiert, will ich niht lieber die 10 häufisgten statt die 10 mit der höchsten mittleren deckung??
-
-p3 <- MT_subset %>%
-  group_by(Art) %>%
-  summarise(
-    mean_deckung = mean(Deckung,na.rm=T),
-    n = sum(Deckung > 0)
-  ) %>%
-  arrange(desc(n)) %>%
-  slice_head(n = 10) %>%
-  ggplot(aes(x = reorder(Art, n), y = mean_deckung)) +
-  geom_col(fill = "darkgreen") +
-  geom_text(aes(label = paste0("n=", n)),
-            hjust = -0.1, size = 3) +
-  coord_flip() +
-  scale_y_continuous(limits = c(0, 50))+
-  labs(
-    x = "Art",
-    y = "Mittlere Deckung %",
-    title = "Fuchshügel"
-  ) +
-  theme_minimal()
-
-p3
-
 #Anzahl von holzigen Arten in der Krautschicht
 #ersetze Pinus_sylvestris mit Betula oder Frangula_alnus
 MT_subset %>%
@@ -210,6 +196,15 @@ MT_subset %>%
     Deckung > 0
   ) %>%
   count(Schicht, name = "Anzahl")
+
+
+
+
+#p_all <- (p1/p2/p3)+plot_annotation(
+#    title = "Top 10 Arten nach mittlerer Deckung",
+#    theme = theme(plot.title = element_text(size = 18, face = "bold", hjust = 0.5)))
+#ggsave("top10_deckung.png", p_all,
+#       width = 14, height = 6, dpi = 300)
 ```
 
 Deckung nach Layer
@@ -248,6 +243,59 @@ ggplot(layer_deckung, aes(x = site, y = prop, fill = Schicht)) +
 
 #ggplot(layer_deckung, aes(fill=Schicht, y=Deckung, x=site)) + 
 #    geom_bar(position="fill", stat="identity")
+```
+
+```{r}
+#deckung der layer
+
+layer_per_plot<- read.csv("Deckung_Schichten.csv", header=T)
+
+layer_deckung <- layer_per_plot%>%
+  group_by(site) %>%
+  summarise(TL =mean(TL, na.rm=T),
+            SL = mean(SL, na.rm=T),
+            HL = mean(HL, na.rm=T),
+            ML= mean(ML, na.rm=T),
+            bare_soil = mean(bare.soil, na.rm=T),
+            .groups="drop")
+#%>%
+#  mutate(propTL = TL/sum(TL),
+#         propSL = SL/sum(SL),
+#         propHL = HL/sum(HL),
+#         propML = ML/sum(ML),
+#         propBS = bare_soil/sum(bare_soil))
+  
+# convert to long format
+layer_deckung<-layer_deckung %>%
+  pivot_longer(
+    cols = c(TL, SL, HL, ML, bare_soil),
+    names_to = "Schicht",
+    values_to = "Deckung"
+  )%>%
+  mutate(
+    Schicht = factor(Schicht, levels = c("bare_soil", "ML", "HL", "SL", "TL")))
+
+layer_deckung%>%
+  ggplot(aes(x = site, y = Deckung, fill = Schicht)) +
+  geom_col(position = position_stack(reverse = TRUE)) +
+  geom_text(
+    aes(label = round(Deckung, 1)),
+    position = position_stack(vjust = 0.5, reverse = TRUE),
+    size = 3
+  ) +
+  scale_x_discrete(
+    labels = c(
+      "Meu_nass" = "Auf der Pfalz",
+      "Meu_trock" = "Fuchshügel",
+      "Lic" = "Kleiner Sumpf"
+    )
+  ) +
+  labs(
+    y = "Mittlere Deckung [%]",
+    x = NULL,
+    fill = "Schicht"
+  ) +
+  theme_minimal()
 ```
 
 # 4 Zeigerwerte einlesen und vorbereiten
@@ -511,7 +559,10 @@ hoeheID <- vegdata %>%
 merged_data <- results %>%
   left_join(weighted_values, by = c("Plot" = "plot.ID")) %>%
   left_join(hoeheID, by = c("Plot" = "plot.ID")) %>%
-  left_join(layer_per_plot, by =c("Plot" = "plot.ID"))
+  left_join(layer_per_plot %>% select(-Name, -site, -arbeitsname),
+    by = c("Plot" = "plot.ID"))
+
+
 
 #Zusammenführen mit Attributen
 attribute_deckung <- veg_long %>%
@@ -651,9 +702,9 @@ comm_MN <- veg_long %>%
   )%>%
   tibble::column_to_rownames("plot.ID")
 #entferne leere zeilen &spalten weil decorana damit nciht rechnen kann
-comm_L <- comm_L[
-  rowSums(comm_L) > 0,
-  colSums(comm_L) > 0,
+comm_MN <- comm_MN[
+  rowSums(comm_MN) > 0,
+  colSums(comm_MN) > 0,
   drop = FALSE
 ]
 
@@ -2422,4 +2473,229 @@ p<-ggplot() +
 #)
 getwd()
 p
+```
+
+###### dca alle mit allen variablen aus merged_data
+
+```{r}
+dca <- decorana(comm_matrix)
+summary(dca)
+
+fit <- envfit(dca, merged_data[, c("Weighted_light",
+    "Weighted_temperature",
+    "Weighted_wetness",
+    "Weighted_nitrogen",
+    "Weighted_alkalinity",
+    "Richness",
+    "Shannon",
+    "Evenness",
+    "Hoehe",
+    "TL",
+    "SL",
+    "HL",
+    "ML",
+    "bare.soil",
+    "Sukzessionszeiger",
+    "Moorart",
+    "woody")],
+    na.rm=T)
+fit
+
+plot(dca)
+arrows <- as.data.frame(scores(fit, display = "vectors"))
+arrows$Variable <- rownames(arrows)
+arrows$p_value <- fit$vectors$pvals
+arrows$r2 <- fit$vectors$r
+arrows$Variable <- c(
+  "Licht",
+  "Temperatur",
+  "Feuchte",
+  "Stickstoff",
+  "Basengehalt",
+  "Richness",
+  "Shannon-Diversität",
+  "Evenness",
+  "Höhe",
+  "Baumschicht",
+  "Strauchschicht",
+  "Krautschicht",
+  "Moosschicht",
+  "bare soil",
+  "Sukzessionszeiger",
+  "Moorzeiger",
+  "Gehölze"
+)
+
+arrows_sig <- arrows %>%
+  filter(p_value <= 0.05)
+
+dca_scores <- scores(dca, display = "sites")
+dca_df <- as.data.frame(dca_scores)
+dca_df$Name <- rownames(dca_df)
+dca_df$site <- vegdata$site[match(dca_df$Name, vegdata$plot.ID)]
+
+ggplot(dca_df, aes(DCA1, DCA2, colour = site)) +
+  geom_point(size = 2) +
+  geom_segment(
+    data = arrows_sig,
+    aes(
+      x = 0, y = 0,
+      xend = DCA1 * 2,
+      yend = DCA2 * 2
+    ),
+    inherit.aes = FALSE,
+    arrow = arrow(length = unit(0.25, "cm")),
+    colour = "black"
+  ) +
+  geom_text(
+  data = arrows,
+  aes(
+    x = DCA1 * 2.3,
+    y = DCA2 * 2.3,
+    label = Variable
+  ),
+  inherit.aes = FALSE
+)+
+ scale_colour_discrete(
+    labels = c(
+      "Lic" = "Kleiner Sumpf",
+      "Meu_trock" = "Fuchshügel",
+      "Meu_nass" = "Auf der Pfalz"
+    )
+  ) +
+
+  labs(
+    title = "DCA der Vegetationsaufnahmen",
+    x = "DCA1",
+    y = "DCA2"
+  ) +
+
+  theme_minimal() +
+  theme(
+    legend.title = element_blank(),
+    plot.title = element_text(hjust = 0.5)
+  )
+```
+
+###### dca mit ALLEN variablen an EINEM standort
+
+```{r}
+comm_MN <- veg_long %>%
+  filter(site=="Meu_nass") %>%  
+  group_by(plot.ID, Art) %>%
+  summarise(
+    Deckung = sum(Deckung, na.rm = TRUE),
+    .groups = "drop"
+  ) %>%
+  pivot_wider(
+    names_from = Art,
+    values_from = Deckung,
+    values_fill = 0
+  )%>%
+  tibble::column_to_rownames("plot.ID")
+#entferne leere zeilen &spalten weil decorana damit nciht rechnen kann
+comm_MN <- comm_MN[
+  rowSums(comm_MN) > 0,
+  colSums(comm_MN) > 0,
+  drop = FALSE
+]
+
+dca <- decorana(comm_MN)
+summary(dca)
+
+env_MN <- merged_data %>%
+  filter(site == "Meu_nass")
+fit <- envfit(dca, env_MN[, c("Weighted_light",
+    "Weighted_temperature",
+    "Weighted_wetness",
+    "Weighted_nitrogen",
+    "Weighted_alkalinity",
+    "Richness",
+    "Shannon",
+    "Evenness",
+    "Hoehe",
+    "TL",
+    "SL",
+    "HL",
+    "ML",
+    "bare.soil",
+    "Sukzessionszeiger",
+    "Moorart",
+    "woody")],
+    na.rm=T)
+fit
+
+plot(dca)
+arrows <- as.data.frame(scores(fit, display = "vectors"))
+arrows$Variable <- rownames(arrows)
+arrows$p_value <- fit$vectors$pvals
+arrows$r2 <- fit$vectors$r
+arrows$Variable <- c(
+  "Licht",
+  "Temperatur",
+  "Feuchte",
+  "Stickstoff",
+  "Basengehalt",
+  "Richness",
+  "Shannon-Diversität",
+  "Evenness",
+  "Höhe",
+  "Baumschicht",
+  "Strauchschicht",
+  "Krautschicht",
+  "Moosschicht",
+  "bare soil",
+  "Sukzessionszeiger",
+  "Moorzeiger",
+  "Gehölze"
+)
+# nur Umweltvariablen mit signifikanten p-Werten anzeigen
+arrows_sig <- arrows %>%
+  filter(p_value <= 0.05)
+
+dca_scores <- scores(dca, display = "sites")
+dca_df <- as.data.frame(dca_scores)
+dca_df$Name <- rownames(dca_df)
+dca_df$site <- vegdata$site[match(dca_df$Name, vegdata$plot.ID)]
+dca_df$Transektnummer <- vegdata$Transektnummer[match(dca_df$Name, vegdata$plot.ID)]
+dca_df$Distanz <- abs(dca_df$Transektnummer)
+
+ggplot(dca_df, aes(DCA1, DCA2, colour = Distanz)) +
+  geom_point(size = 3) +
+  scale_colour_gradient2(
+    low = "#005A8D",
+    mid = "#FFD700",
+    high = "#7A0177",
+    midpoint = 0,
+    name = "Entfernung zum Mittelpunkt")+
+  geom_segment(
+    data = arrows_sig,
+    aes(
+      x = 0, y = 0,
+      xend = DCA1 * 2,
+      yend = DCA2 * 2
+    ),
+    inherit.aes = FALSE,
+    arrow = arrow(length = unit(0.25, "cm")),
+    colour = "black") +
+  geom_text(
+    data = arrows_sig,
+    aes(
+      x = DCA1 * 2.3,
+      y = DCA2 * 2.3,
+      label = Variable
+    ),
+    inherit.aes = FALSE
+  ) +
+  
+  labs(
+    title = "DCA Vegetation Auf der Pfalz",
+    x = "DCA1",
+    y = "DCA2"
+  ) +
+  
+  theme_minimal() +
+  theme(
+    plot.title = element_text(hjust = 0.5)
+  )
 ```
