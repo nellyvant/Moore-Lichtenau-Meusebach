@@ -22,7 +22,6 @@ library(readxl)
 library(ggpubr)
 library(rstatix)
 library(afex)
-library(lme4)
 library(emmeans)
 library(performance)
 ```
@@ -1783,7 +1782,6 @@ ggplot(dat_rLF_L, aes(x = Logger_ID, y = delta_LF)) +
 #Für ein Modell, was die Austrockunungsrate deltaLF vorhersagt, benötigt man dieDeckung der Tree layer an den Loggerstandpunkten. Die Tabelle veg_long wurde in der Vegetationsanalyse im Ordner vegetation erzeugt und von dort exportiert
 #Deckung TL
 veg_long <- read_excel("veg_long.xlsx")
-read.csv("veg_long.csv", header=T)# funktioniert bei mir irgendwie nicht!?
 
 deckung_TL <- veg_long %>%
   filter(
@@ -1937,7 +1935,7 @@ summary(mod_MT)
 #Temperatur: nicht signifikant, p = 0,243
 #Deckung_TL: nicht signifikant, p = 0.54
 #Tage seit Regen: nicht signifikant, p = 0.144
-r2(mor_MT)
+r2(mod_MT)
 #Conditional R2: 0.568
 #Marginal R2: 0.347
 
