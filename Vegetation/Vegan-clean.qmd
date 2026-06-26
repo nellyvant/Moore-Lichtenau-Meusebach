@@ -98,7 +98,7 @@ MT_subset <- subset(veg_long, site =="Meu_trock")
 Top 10 Arten nach Deckung
 
 ```{r}
-#alternativ nach Deckung ordnen: ggplot(aes(x = reorder(Art, mean_deckung), y = mean_deckung)) 
+#alternativ nach Deckung ordnen: ggplot(aes(x = reorder(Art, mean_deckung), y = mean_deckung)) & arrange(desc(n))
 
 
 #mittlere Deckungen
@@ -108,7 +108,7 @@ p1 <- Lic_subset %>%
     mean_deckung = mean(Deckung, na.rm = TRUE),
     n = sum(Deckung > 0)
   ) %>%
-  arrange(desc(mean_deckung)) %>%
+  arrange(desc(n)) %>%
   slice_head(n = 10) %>%
   ggplot(aes(x = reorder(Art, n), y = mean_deckung)) +
   geom_col(fill = "darkgreen") +
@@ -183,22 +183,14 @@ p3 <- MT_subset %>%
   ) +
   theme_minimal()
 #Anzahl von holzigen Arten in der Krautschicht
-#ersetze Pinus_sylvestris mit Betula oder Frangula_alnus
-MT_subset %>%
+#ersetze Artnamen mit Pinus_sylvestris, Betula oder Frangula_alnus
+MN_subset %>%
   filter(
-    Art == "Pinus_sylvestris",
+    Art == "Vaccinium_myrtillus",
     Deckung > 0
   ) %>%
   count(Schicht, name = "Anzahl")
 
-
-
-
-#p_all <- (p1/p2/p3)+plot_annotation(
-#    title = "Top 10 Arten nach mittlerer Deckung",
-#    theme = theme(plot.title = element_text(size = 18, face = "bold", hjust = 0.5)))
-#ggsave("top10_deckung.png", p_all,
-#       width = 14, height = 6, dpi = 300)
 ```
 
 Deckung nach Layer
@@ -608,9 +600,9 @@ summary_area <- merged_data%>%
     shannon_min = min(Shannon),
     shannon_max =max(Shannon),
     shannon_range = shannon_max-shannon_min,
-    evenness_mean = mean (Evenness),
-    evenness_min = min(Evenness),
-    evenness_max = max(Evenness),
+    evenness_mean = mean (Evenness, na.rm=T),
+    evenness_min = min(Evenness, na.rm=T),
+    evenness_max = max(Evenness, na.rm=T),
     evenness_range = evenness_max-evenness_min,
     .groups = "drop"
   )
@@ -629,9 +621,9 @@ DCA wird durchgeführt für
 
 -   könnte auch noch gemacht werden für:
 
-    -   Fläche mit Moosarten
+    -   Fläche mit Moosschicht
 
-    -   Fläche mit != Moosarten
+    -   Fläche ohne Moosschicht
 
 ## 7.1 Alle Flächen
 
@@ -1600,8 +1592,8 @@ plot_data <- merged_data %>%
 
 #Farbschema für Zeigerwerte angepasst
 plot_data %>%
-  filter(site == "Meu_trock") %>%
-  ggplot(aes(x = x, y = y, color = Moorart)) +
+  filter(site == "Meu_nass") %>%
+  ggplot(aes(x = x, y = y, color = woody)) +
   geom_point(size = 4) +
   coord_equal() +
   scale_color_gradientn(
@@ -1650,8 +1642,8 @@ plot_data_species <- vegdata %>%
 
 #Farbschema für Zeigerwerte angepasst
 plot_data_species %>%
-  filter(site == "Meu_trock") %>%
-  ggplot(aes(x = x, y = y, color = Pteridium_aquilinum_HL )) +
+  filter(site == "Meu_nass") %>%
+  ggplot(aes(x = x, y = y, color = Sphagnum_squarrosum_ML )) +
   geom_point(size = 4) +
   coord_equal() +
   scale_color_gradientn(
