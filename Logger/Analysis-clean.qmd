@@ -1812,7 +1812,7 @@ deckung_TL <- treelayer_logger %>%
   ungroup()
 deckung_TL <- deckung_TL %>%
   rename(Deckung_TL = TL)
-
+str(deckung_TL)
 ```
 
 ```{r}

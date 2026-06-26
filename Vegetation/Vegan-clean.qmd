@@ -301,9 +301,9 @@ layer_deckung%>%
 #      select(plot.ID, site, arbeitsname, Transekt, Transektnummer),
 #    by = c("plot.ID", "site", "arbeitsname")
 #  )
-layer_tree <- layer_per_plot %>%
-  select(-SL, -HL, -ML, -water, -bare.soil)
-write.csv(layer_tree, "treelayer.csv")
+#layer_tree <- layer_per_plot %>%
+#  select(-SL, -HL, -ML, -water, -bare.soil)
+#write.csv(layer_tree, "treelayer.csv")
 
 ```
 
