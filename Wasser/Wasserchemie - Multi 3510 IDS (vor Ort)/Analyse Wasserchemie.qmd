@@ -78,18 +78,28 @@ Wassertemperatur
 # Mittelwerte je Messpunkt 
 
 # Tagesmittelwerte 
-tagesmittel_temp_id <- WS %>%
+tagesstats_temp_id <- WS %>%
   group_by(Datum, ID) %>%
   summarise(
-    Tagesmittel_Temp = mean(Temperatur, na.rm = TRUE),
+    Mean   = mean(Temperatur, na.rm = TRUE),
+    Median = median(Temperatur, na.rm = TRUE),
+    SD     = sd(Temperatur, na.rm = TRUE),
+    Min    = min(Temperatur, na.rm = TRUE),
+    Max    = max(Temperatur, na.rm = TRUE),
+    Range  = max(Temperatur, na.rm = TRUE) - min(Temperatur, na.rm = TRUE),
     .groups = "drop"
   )
 
 # Mittelwert über den gesamten Untersuchungszeitraum 
-gesamtmittel_temp_id <- WS %>%
+gesamtstats_temp_id <- WS %>%
   group_by(ID) %>%
   summarise(
-    Mittelwert_Temp = mean(Temperatur, na.rm = TRUE),
+    Mean   = mean(Temperatur, na.rm = TRUE),
+    Median = median(Temperatur, na.rm = TRUE),
+    SD     = sd(Temperatur, na.rm = TRUE),
+    Min    = min(Temperatur, na.rm = TRUE),
+    Max    = max(Temperatur, na.rm = TRUE),
+    Range  = max(Temperatur, na.rm = TRUE) - min(Temperatur, na.rm = TRUE),
     .groups = "drop"
   )
 ```
@@ -98,18 +108,28 @@ gesamtmittel_temp_id <- WS %>%
 # Mittelwerte je Fläche
 
 # Tagesmittelwerte 
-tagesmittel_temp_flaeche <- WS %>%
+tagesstats_temp_flaeche <- WS %>%
   group_by(Datum, Fläche) %>%
   summarise(
-    Tagesmittel_Temp = mean(Temperatur, na.rm = TRUE),
+    Mean   = mean(Temperatur, na.rm = TRUE),
+    Median = median(Temperatur, na.rm = TRUE),
+    SD     = sd(Temperatur, na.rm = TRUE),
+    Min    = min(Temperatur, na.rm = TRUE),
+    Max    = max(Temperatur, na.rm = TRUE),
+    Range  = max(Temperatur, na.rm = TRUE) - min(Temperatur, na.rm = TRUE),
     .groups = "drop"
   )
 
 # Mittelwert über den gesamten Untersuchungszeitraum 
-gesamtmittel_temp_flaeche <- WS %>%
+gesamtstats_temp_flaeche <- WS %>%
   group_by(Fläche) %>%
   summarise(
-    Mittelwert_Temp = mean(Temperatur, na.rm = TRUE),
+    Mean   = mean(Temperatur, na.rm = TRUE),
+    Median = median(Temperatur, na.rm = TRUE),
+    SD     = sd(Temperatur, na.rm = TRUE),
+    Min    = min(Temperatur, na.rm = TRUE),
+    Max    = max(Temperatur, na.rm = TRUE),
+    Range  = max(Temperatur, na.rm = TRUE) - min(Temperatur, na.rm = TRUE),
     .groups = "drop"
   )
 ```
