@@ -72,25 +72,49 @@ WS_stats_Flaeche <- WS %>%
 WS_stats_Flaeche
 ```
 
-## 3.1 Ohne Messstelle 4 bei Lichtenau
+Wassertemperatur
 
 ```{r}
-# Statistiken je Messpunkt und Parameter
-WS_stats_Messpunkte_L <- WS %>%
-  filter(ID != "L4") %>%
-  group_by(ID, Parameter) %>%
+# Mittelwerte je Messpunkt 
+
+# Tagesmittelwerte 
+tagesmittel_temp_id <- WS %>%
+  group_by(Datum, ID) %>%
   summarise(
-    Mean = mean(Messwert, na.rm = TRUE),
-    Median = median(Messwert, na.rm = TRUE),
-    SD = sd(Messwert, na.rm = TRUE),
-    Min = min(Messwert, na.rm = TRUE),
-    Max = max(Messwert, na.rm = TRUE),
-    Range = Max - Min,
+    Tagesmittel_Temp = mean(Temperatur, na.rm = TRUE),
     .groups = "drop"
   )
 
-WS_stats_Messpunkte_L
+# Mittelwert über den gesamten Untersuchungszeitraum 
+gesamtmittel_temp_id <- WS %>%
+  group_by(ID) %>%
+  summarise(
+    Mittelwert_Temp = mean(Temperatur, na.rm = TRUE),
+    .groups = "drop"
+  )
 ```
+
+```{r}
+# Mittelwerte je Fläche
+
+# Tagesmittelwerte 
+tagesmittel_temp_flaeche <- WS %>%
+  group_by(Datum, Fläche) %>%
+  summarise(
+    Tagesmittel_Temp = mean(Temperatur, na.rm = TRUE),
+    .groups = "drop"
+  )
+
+# Mittelwert über den gesamten Untersuchungszeitraum 
+gesamtmittel_temp_flaeche <- WS %>%
+  group_by(Fläche) %>%
+  summarise(
+    Mittelwert_Temp = mean(Temperatur, na.rm = TRUE),
+    .groups = "drop"
+  )
+```
+
+## 3.1 Ohne Messstelle 4 bei Lichtenau
 
 ```{r}
 # Statistiken je Fläche und Parameter
