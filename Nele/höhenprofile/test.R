@@ -1333,3 +1333,271 @@ ggplot(dca_df, aes(DCA1, DCA2, colour = Distanz)) +
     plot.title = element_text(hjust = 0.5)
   )
 
+ggplot(dca_df, aes(DCA1, DCA2, colour = site)) +
+  geom_point(size = 5) +
+  geom_point(
+    data = species_df,
+    aes(x = DCA1, y = DCA2),
+    inherit.aes = FALSE,
+    shape = 17,       
+    size = 3,
+    colour = "grey20"
+  ) +
+  geom_text_repel(
+    data = species_df,
+    aes(x = DCA1, y = DCA2, label = Art),
+    inherit.aes = FALSE,
+    size = 3,
+    colour = "grey20",
+    box.padding = 0.5,
+    point.padding = 0.3,
+    segment.colour = "grey60",
+    max.overlaps = Inf
+  ) +
+  scale_colour_discrete(
+    labels = c(
+      "Lic" = "Kleiner Sumpf",
+      "Meu_trock" = "Fuchshügel",
+      "Meu_nass" = "Auf der Pfalz"
+    )) +
+  labs(
+    title = "DCA Vegetation",
+    x = "DCA1",
+    y = "DCA2"
+  ) +
+  theme_minimal() +
+  theme(
+    plot.title = element_text(hjust = 0.5)
+  )
+
+ggplot(dca_df, aes(DCA1, DCA2, colour = Distanz)) +
+  geom_point(size = 5) +
+  geom_point(
+    data = species_df,
+    aes(x = DCA1, y = DCA2),
+    inherit.aes = FALSE,
+    shape = 17,       
+    size = 3,
+    colour = "grey20"
+  ) +
+  geom_text_repel(
+    data = species_df,
+    aes(x = DCA1, y = DCA2, label = Art),
+    inherit.aes = FALSE,
+    size = 3,
+    colour = "grey20",
+    box.padding = 0.5,
+    point.padding = 0.3,
+    segment.colour = "grey60",
+    max.overlaps = Inf
+  ) +
+  scale_colour_gradient2(
+    low = "#005A8D",
+    mid = "#FFD700",
+    high = "#7A0177",
+    name = "Entfernung vom Mittelpunkt"
+  ) +
+  labs(
+    title = "DCA Vegetation MN",
+    x = "DCA1",
+    y = "DCA2"
+  ) +
+  theme_minimal() +
+  theme(
+    plot.title = element_text(hjust = 0.5)
+  )
+
+ggplot(dca_df, aes(DCA1, DCA2, colour = Transektnummer)) +
+  geom_point(size = 5) +
+  geom_point(
+    data = species_df,
+    aes(x = DCA1, y = DCA2),
+    inherit.aes = FALSE,
+    shape = 17,         
+    size = 3,
+    colour = "grey20"
+  ) +
+  geom_text_repel(
+    data = species_df,
+    aes(x = DCA1, y = DCA2, label = Art),
+    inherit.aes = FALSE,
+    size = 3,
+    colour = "grey20",
+    box.padding = 0.5,
+    point.padding = 0.3,
+    segment.colour = "grey60",
+    max.overlaps = Inf
+  ) +
+  scale_colour_gradient2(
+    low = "#005A8D",
+    mid = "#FFD700",
+    high = "#7A0177",
+    midpoint = 0,
+    breaks = range(dca_df$Transektnummer, na.rm = TRUE),
+    labels = c("Süden", "Norden"),
+    name = "Position im Transekt"
+  ) +
+  labs(
+    title = "DCA Vegetation Auf der Pfalz, Nord-Süd Transekt",
+    x = "DCA1",
+    y = "DCA2"
+  ) +
+  theme_minimal() +
+  theme(
+    plot.title = element_text(hjust = 0.5)
+  )
+
+
+ggplot(dca_df, aes(DCA1, DCA2, colour = Transektnummer)) +
+  geom_point(size = 3) +
+  geom_point(
+    data = species_df,
+    aes(x = DCA1, y = DCA2),
+    inherit.aes = FALSE,
+    shape = 17,       
+    size = 3,
+    colour = "grey20"
+  ) +
+  geom_text_repel(
+    data = species_df,
+    aes(x = DCA1, y = DCA2, label = Art),
+    inherit.aes = FALSE,
+    size = 3,
+    colour = "grey20",
+    box.padding = 0.5,
+    point.padding = 0.3,
+    segment.colour = "grey60",
+    max.overlaps = Inf
+  ) +
+  scale_colour_gradient2(
+    low = "#005A8D",
+    mid = "#FFD700",
+    high = "#7A0177",
+    midpoint = 0,
+    breaks = range(dca_df$Transektnummer, na.rm = TRUE),
+    labels = c("Westen", "Osten"),
+    name = "Position im Transekt"
+  ) +
+  labs(
+    title = "DCA Vegetation Auf der Pfalz, West-Ost Transekt",
+    x = "DCA1",
+    y = "DCA2"
+  ) +
+  theme_minimal() +
+  theme(
+    plot.title = element_text(hjust = 0.5)
+  )
+
+
+
+ggplot(dca_df, aes(DCA1, DCA2, colour = Transektnummer)) +
+  geom_point(size = 5) +
+  geom_point(
+    data = species_df,
+    aes(x = DCA1, y = DCA2),
+    inherit.aes = FALSE,
+    shape = 17,       
+    size = 3,
+    colour = "grey20"
+  ) +
+  geom_text_repel(
+    data = species_df,
+    aes(x = DCA1, y = DCA2, label = Art),
+    color = "black",
+    size = 3,
+    max.overlaps = 30
+  ) +
+  scale_colour_gradient2(
+    low = "#005A8D",
+    mid = "#FFD700",
+    high = "#7A0177",
+    midpoint = 0,
+    breaks = range(dca_df$Transektnummer, na.rm = TRUE),
+    labels = c("Westen", "Osten"),
+    name = "Position im Transekt"
+  ) +
+  labs(
+    title = "DCA Vegetation Auf der Pfalz, West-Ost Transekt",
+    x = "DCA1",
+    y = "DCA2"
+  ) +
+  theme_minimal() +
+  theme(
+    plot.title = element_text(hjust = 0.5)
+  )
+
+ggplot(dca_df, aes(DCA1, DCA2, colour = Transektnummer)) +
+  geom_point(size = 5) +
+  geom_point(
+    data = species_df,
+    aes(x = DCA1, y = DCA2),
+    inherit.aes = FALSE,
+    shape = 17,       
+    size = 3,
+    colour = "grey20"
+  ) +
+  geom_text_repel(
+    data = species_df,
+    aes(x = DCA1, y = DCA2, label = Art),
+    color = "black",
+    size = 3,
+    max.overlaps = 30
+  ) +
+  scale_colour_gradient2(
+    low = "#005A8D",
+    mid = "#FFD700",
+    high = "#7A0177",
+    midpoint = 0,
+    breaks = range(dca_df$Transektnummer, na.rm = TRUE),
+    labels = c("Westen", "Osten"),
+    name = "Position im Transekt"
+  ) +
+  labs(
+    title = "DCA Vegetation Auf der Pfalz, West-Ost Transekt",
+    x = "DCA1",
+    y = "DCA2"
+  ) +
+  theme_minimal() +
+  theme(
+    plot.title = element_text(hjust = 0.5)
+  )
+
+ggplot(dca_df, aes(DCA1, DCA2, fill = Transektnummer)) +
+  geom_point( shape = 21,
+              size = 5,
+              colour = "grey10",
+              stroke = 0.7) +
+  geom_point(
+    data = species_df,
+    aes(x = DCA1, y = DCA2),
+    inherit.aes = FALSE,
+    shape = 17,       
+    size = 3,
+    colour = "grey20"
+  ) +
+  geom_text_repel(
+    data = species_df,
+    aes(x = DCA1, y = DCA2, label = Art),
+    inherit.aes = F,
+    color = "black",
+    size = 3,
+    max.overlaps = 30
+  ) +
+  scale_fill_gradient2(
+    low = "#2166AC",
+    mid = "#F7F7F7",
+    high = "#B2182B",
+    midpoint = 0,
+    breaks = range(dca_df$Transektnummer, na.rm = TRUE),
+    labels = c("Süden", "Norden"),
+    name = "Position im Transekt"
+  ) +
+  labs(
+    title = "DCA Vegetation Auf der Pfalz, West-Ost Transekt",
+    x = "DCA1",
+    y = "DCA2"
+  ) +
+  theme_minimal() +
+  theme(
+    plot.title = element_text(hjust = 0.5)
+  )
