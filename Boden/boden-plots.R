@@ -64,14 +64,15 @@ hum_summary %>%
 
 
 plot_data <- hum %>%
-  filter(site == "l") %>%
+  filter(site == "mt" & !is.na(hum_num)) %>%
   mutate(
     Punkt = factor(Punkt),
     top = -von,
     bottom = -bis,
-    hum_factor = factor(hum_num, levels = 1:10)
+    hum_factor = factor(hum_num, names(hum_colors)
+    )
   )
-ggplot(plot_data) +
+Hum_MT <- ggplot(plot_data) +
   geom_rect(aes(
     xmin = as.numeric(Punkt) - 0.4,
     xmax = as.numeric(Punkt) + 0.4,
@@ -79,18 +80,25 @@ ggplot(plot_data) +
     ymax = top,
     fill = hum_factor
   ),
-  color = "black"
+  color = "black",
+  show.legend =T,
   ) +
   
   scale_fill_manual(
     values = hum_colors,
+    limits = names(hum_colors),
+    breaks = names(hum_colors),
     name = "Humifizierung",
-    labels = paste0("H", 1:10),
+    drop = FALSE,
+    labels = paste0("H", names(hum_colors)),
     na.translate = FALSE
   )+
   scale_x_continuous(
     breaks = seq_along(levels(plot_data$Punkt)),
-    labels = levels(plot_data$Punkt)
+    labels = stringr::str_wrap(
+      levels(plot_data$Punkt),
+      width = 12
+    )
   ) +
   labs(
     x = "Bohrpunkt",
@@ -99,7 +107,7 @@ ggplot(plot_data) +
   
   theme_bw()
 
-
+ggsave("hum_barplot_MT.png",Hum_MT,width = 30, height = 20, units = "cm")
 
 #hier wird BOR4 entfernt weil NA in humifizierungsgrad ist. das war die Bohrung an der Spundwand in Meu trock und dort gab es ja keinen Torf, sondern nur Sand aka das Verfüllungsmaterial für die Plombe -> im methodenteil erwähnen
 
@@ -116,4 +124,4 @@ hum_sf <- hum_summary %>%
   ) %>%
   st_as_sf()
 
-st_write(hum_sf, "hum.gpkg", delete_dsn = TRUE)
+#st_write(hum_sf, "hum.gpkg", delete_dsn = TRUE)
