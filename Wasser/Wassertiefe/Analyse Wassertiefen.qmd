@@ -52,6 +52,7 @@ Kennzahlen_messpunkt
 ```{r}
 # Statistische Kennzahlen pro Standort
 Kennzahlen_standort <- Wassertiefen %>%
+  #filter(ID != "L4") %>%
   group_by(Standort) %>%
   summarise(
     Mittelwert = mean(Wassertiefe, na.rm = TRUE),
@@ -185,7 +186,7 @@ standort_MN <- Wassertiefen %>%
 standort_MT <- Wassertiefen %>% 
   filter(Standort == "MT")
 
-ggplot(standort_L, aes(x = Wassertiefe, fill = factor(Messpunkt))) +
+ggplot(standort_MT, aes(x = Wassertiefe, fill = factor(Messpunkt))) +
   geom_histogram(binwidth = 5, alpha = 0.7) +
   facet_wrap(~Messpunkt) +
   labs(
