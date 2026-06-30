@@ -13,6 +13,11 @@ library(writexl)
 library(vegan)
 library(ggplot2)
 library(ggrepel)
+library(corrplot)
+library(lme4)
+library(performance)
+library(MASS)
+
 ```
 
 # 2 Daten einlesen und vorbereiten
@@ -1683,17 +1688,36 @@ plot_ly(
 
 TODO: für jeden plot deckung jeder layer in merged_data hinzufügen
 
-Korrelationen testen
+# Korrelationen testen
 
 ```{r}
-library(corrplot)
+
 #global
 #corrplot() erwartet numerische Matrix!
+#nur erklärende variablen
 corr_matrix <- merged_data %>%
   select(where(is.numeric)) %>%
-  select(-Plot, -Transektnummer) %>%
-  cor(use = "pairwise.complete.obs")
-corrplot(corr_matrix, method ="number")
+  select(-Plot, -Transektnummer, -Weighted_continental, -Weighted_salinity, -water,-bare.soil, -Richness,-Shannon,- Evenness,-Sukzessionszeiger,-woody,-grass,-Moorart) %>%
+  cor(method ="sp",use = "pairwise.complete.obs")
+#filter auf korr > |0,5|
+corr_matrix_filtered <- corr_matrix
+corr_matrix_filtered[abs(corr_matrix_filtered) <= 0.5] <- NA
+
+corrplot(
+  corr_matrix_filtered,
+  method = "number",
+  na.label = " "
+)
+#Achtung für Modelle:
+#Weighted_light und Weighted_wetness 0.81
+#Weighted_alkalinity und Weighted_temperature 0.74
+#Weighted_temperature un ML 0.6
+#Weighted_wetness und ML 0.53
+#Weighted_nitrogen und ML -0.63
+#Weighted_nitrogen und Weighted_temperature -0.5
+#HL und Weighted_nitrogen 0.64
+## light&wetness , sowie alkalinity&temperature sollten mit vorsivht in gemeisname modelle gepackt werden. Checke auf jeden Fall auf Kolinearität!!
+
 
 #lokal
 corr_matrix <- merged_data %>%
@@ -2797,7 +2821,7 @@ ggplot(dca_df, aes(DCA1, DCA2, colour = site)) +
 
 ```
 
-###### NMDS test
+###### NMDS test -\> verwerfen!
 
 ```{r}
 # test für wo-transekt in Meu nass mit Gefäßpflanzen
@@ -3296,7 +3320,7 @@ ggplot(dca_df, aes(DCA1, DCA2, colour = Distanz)) +
   )
 ```
 
-# Final unter vorbehalt, sollten evtl doch NMDS werden! Farbschema nach farbtests anpassen
+# Farbschema nach farbtests anpassen
 
 wichtig bei farbschema sind
 
@@ -3679,3 +3703,55 @@ ggplot(dca_df, aes(DCA1, DCA2, colour = Transektnummer)) +
     plot.title = element_text(hjust = 0.5)
   )
 ```
+
+# Models
+
+## alle Flöchen gemeinsam
+
+```{r}
+mod1<-glm(Richness ~ Weighted_light + Weighted_temperature + Weighted_wetness + Weighted_nitrogen + Weighted_alkalinity+ HL + ML + SL + TL + site,family = poisson, data = merged_data)
+summary(mod1)
+# keine overdipersion
+#vereinfachung
+#nicht singif. größen entfernen
+#-ML&TL
+mod2<-update(mod1, ~.-ML)
+anova(mod1, mod2, test= "Chisq")
+#p=0.7561
+summary(mod2)
+mod3<-update(mod2, ~.-TL)
+anova(mod2, mod3, test= "Chisq")
+#p=0.4379
+summary(mod3)
+mod4<-update(mod3, ~.-Weighted_temperature)
+anova(mod3, mod4, test= "Chisq")
+#p=0.3071
+summary(mod4)
+mod5<- update(mod4, ~.-site)
+anova(mod4, mod5, test="Chisq")
+#p=0.0002976 *** ich darf also site nicht entfernen. mein bestes Model ist mod4
+
+check_model(mod4)
+#modell sieht in orndung aus
+
+summary(mod4)
+#Richness unterscheidet sich in den 3 site, nur Lic&meu nass nicht signif. unterschiedlich
+#Layer: Richness steigt bei mehr shrubs und weniger herbs
+#Zeigerwerte: Richness steigt je dunkler, trockener, nähstoffreicher, saurer der Standort ist
+
+
+```
+
+modelle noch für
+
+Evenness
+
+Shannon
+
+Sukzessionszeiger
+
+Moorarten
+
+woody
+
+einzelarten zb sphag fallax oder sphag cuspi
