@@ -518,9 +518,9 @@ str(sd_summary_logger)
 ## 4.3 Summary pro Fläche (Mai - Oktober)
 
 ```{r}
-#| label: create summary_area_total
+#| label: create summary_area_year
 
-summary_area_total <- all_loggers %>%
+summary_area_year <- all_loggers %>%
   group_by(Standort) %>%
   summarise(
     Temp_area_sonne_mean = mean(Temp_sonne_C, na.rm = TRUE),
@@ -541,7 +541,7 @@ summary_area_total <- all_loggers %>%
     .groups = "drop"
   )
 
-str(summary_area_total)
+str(summary_area_year)
 ```
 
 # 5. Analyse & Plots Vergleich innerhalb der Flächen bzw. zwischen den Loggern
