@@ -515,6 +515,55 @@ sd_summary_logger <- summary_daily_logger %>%
 str(sd_summary_logger)
 ```
 
+## 4.3 Summary pro Fläche (Mai - Oktober)
+
+```{r}
+#| label: create summary_area_year
+
+summary_area_year <- all_loggers %>%
+  group_by(Standort) %>%
+  summarise(
+    Temp_area_sonne_mean = mean(Temp_sonne_C, na.rm = T),
+    Temp_area_sonne_max = max(Temp_sonne_C, na.rm = T),
+    Temp_area_sonne_min = min(Temp_sonne_C, na.rm = T),
+    Temp_area_sonne_sd = sd(Temp_sonne_C, na.rm = T),
+    Temp_area_sonne_range = Temp_area_sonne_max - Temp_area_sonne_min,
+    
+    Temp_area_schatten_mean = mean(Temp_schatten_C, na.rm = T),
+    Temp_area_schatten_max =  max(Temp_schatten_C, na.rm = T),
+    Temp_area_schatten_min = min(Temp_schatten_C, na.rm = T),
+    Temp_area_schatten_sd = sd(Temp_schatten_C, na.rm = T),
+    Temp_area_schatten_range = Temp_area_schatten_max - Temp_area_schatten_min,
+    
+    Licht_area_mean = mean(Licht_lux, na.rm = T),
+    Licht_area_max = max(Licht_lux, na.rm = T),
+    Licht_area_min = min(Licht_lux, na.rm = T),
+    Licht_area_sd = sd(Licht_lux, na.rm = T),
+    Licht_area_range = Licht_area_max - Licht_area_min,
+    Licht_area_mean_day = mean(Licht_lux[Licht_lux>1], na.rm =T),
+    #    Sonnenaufgang = min(DateTime[Licht_lux > 1], na.rm = T),
+    #    Sonnenuntergang  = max(DateTime[Licht_lux > 1], na.rm = T),
+    #    Tageslicht = as.numeric(difftime(Sonnenuntergang, Sonnenaufgang, units = "hours")),
+    Licht_summe = sum(Licht_lux*10, na.rm=T),
+    
+    rLF_area_mean = mean(relLF_percent, na.rm = T),
+    rLF_area_max = max(relLF_percent, na.rm = T),
+    rLF_area_min = min(relLF_percent, na.rm = T),
+    rLF_area_sd = sd(relLF_percent, na.rm = T),
+    rLF_area_range = rLF_area_max - rLF_area_min,
+    
+    Tp_area_mean = mean(Taupunkt_C, na.rm = T),
+    Tp_area_max = max(Taupunkt_C, na.rm = T),
+    Tp_area_min = min(Taupunkt_C, na.rm = T),
+    Tp_area_sd = sd(Taupunkt_C, na.rm = T),
+    Tp_area_range = Tp_area_max - Tp_area_min,
+    
+    .groups = "drop"
+  )
+
+str(summary_area_year)
+```
+
 # 5. Analyse & Plots Vergleich innerhalb der Flächen bzw. zwischen den Loggern
 
 ## 5.1 Licht
@@ -2235,6 +2284,13 @@ pairwise.wilcox.test(
 )
 
 #Alle drei Flächen unterscheiden sich signifikant in der Temperaturvariabilität (Schatten). 
+
+summary_daily_area %>%
+  group_by(Standort) %>%
+  summarise(
+    mean_daily_sd = mean(Temp_area_schatten_sd, na.rm = TRUE),
+    median_daily_sd = median(Temp_area_schatten_sd, na.rm = TRUE)
+  )
 ```
 
 ```{r}
@@ -2257,6 +2313,13 @@ pairwise.wilcox.test(
 )
 
 #Alle drei Flächen unterscheiden sich signifikant in der Temperaturvariabilität (Sonne). 
+
+summary_daily_area %>%
+  group_by(Standort) %>%
+  summarise(
+    mean_sd = mean(Temp_area_sonne_sd, na.rm = TRUE),
+    median_sd = median(Temp_area_sonne_sd, na.rm = TRUE)
+  )
 ```
 
 ```{r}
@@ -2494,7 +2557,16 @@ pairwise.wilcox.test(
   p.adjust.method = "BH"
 )
 
-#Es gibt einen signifikanten Unterschied in der Variabilität der relativen Luftfeuchte zwischen den Flächen 1 (MT) und 3 (L).
+#Es gibt einen signifikanten Unterschied in der Variabilität der relativen Luftfeuchte zwischen den Flächen 1 (MT) und 2 (MN).
+
+summary_daily_area %>%
+  group_by(Standort) %>%
+  summarise(
+    mean_daily_sd = mean(rLF_area_sd, na.rm = TRUE),
+    median_daily_sd = median(rLF_area_sd, na.rm = TRUE),
+    .groups = "drop"
+  ) %>%
+  arrange(desc(median_daily_sd))
 ```
 
 ### 6.3.3 Plots
