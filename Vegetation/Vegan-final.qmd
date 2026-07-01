@@ -1,0 +1,2289 @@
+---
+title: "Vegetation-Analysis-clean"
+format: html
+editor: visual
+---
+
+# 1 Packages
+
+```{r}
+library(tidyverse)
+library(readxl)
+library(writexl)
+library(vegan)
+library(ggplot2)
+library(ggrepel)
+library(corrplot)
+library(lme4)
+library(performance)
+library(MASS)
+library(ggnewscale)
+library(grid)
+library(conflicted)
+  conflict_prefer("select", "dplyr")
+  conflict_prefer("filter", "dplyr")
+library(mgcv)
+```
+
+# 2 Daten einlesen und vorbereiten
+
+```{r}
+#| label: read data
+#| output: true
+vegdata <- read.csv("vegdata_final.csv")
+str(vegdata)
+#spalten anders ordnen
+vegdata <- vegdata %>%
+  relocate(Transekt, Transektnummer, .after = Name)
+str(vegdata)
+#entfernen von Arten, die auf der Artenliste waren, aber in keinem der Plots vorkommen
+vegdata <- vegdata[, c(
+  names(vegdata)[1:6],
+  names(vegdata)[7:ncol(vegdata)][
+    colSums(vegdata[, 7:ncol(vegdata)], na.rm = TRUE) > 0
+  ]
+)]
+str(vegdata)
+```
+
+```{r}
+#| label: convert to long format
+#| output: false
+
+#Umwandeln zu Long format: 0-Werte bleiben erhalten
+
+rownames(vegdata) <- vegdata$Name 
+vegdata$Name <- NULL 
+ncol(vegdata) 
+str(vegdata)
+art_cols <- grep("_(TL|HL|ML|SL)$", names(vegdata), value = TRUE)
+veg_long <- vegdata %>%
+  rownames_to_column("Name") %>%
+  pivot_longer(cols = all_of(art_cols), names_to = "Art_full", values_to = "Deckung") %>% 
+  tidyr::separate(Art_full, into = c("Art", "Schicht"), sep = "_(?=[A-Z]{1,2}$)")
+#sep trennt die Schicht sauber ab, da Arten als Gattung_Epitheton_Schicht vorliegen
+str(veg_long)
+
+
+```
+
+```{r}
+#| label: Attribute hinzufügen
+arten_attribute <- veg_long %>%
+  distinct(Art) %>%
+  arrange(Art) %>%
+  mutate(
+    Wuchsform = NA_character_,
+    Sukzessionszeiger = NA,
+    Moorart = NA_character_
+  )
+write_csv(
+  arten_attribute,
+  "arten_attribute.csv",
+  na = ""
+)
+#anschließend Bearbeitung in Excel, Reimport
+attribute<- read.csv("arten_attribute_filled.csv", header=T)
+str(attribute)
+attribute$Wuchsform<- factor(attribute$Wuchsform)
+
+#join mit veg_long
+veg_long <- veg_long %>%
+  left_join(attribute, by = "Art", relationship = "many-to-one")
+str(veg_long)
+```
+
+```{r}
+#| label: create subsets
+
+#subsets für jede fläche machen
+Lic_subset <- subset(veg_long, site == "Lic")
+MN_subset <- subset(veg_long, site =="Meu_nass")
+MT_subset <- subset(veg_long, site =="Meu_trock")
+
+```
+
+# 3 Deckung der Layer und dominanter Arten
+
+Top 10 Arten nach Deckung
+
+```{r}
+#|label: Deckung & Häufikgeit der Top10 Arten
+#alternativ nach Deckung bzw Häufigkeit ordnen: arrange(desc(mean_deckung)) ODER arrange(desc(n))
+
+
+#mittlere Deckungen
+top10 <- Lic_subset %>%
+  group_by(Art) %>%
+  summarise(
+    mean_deckung = mean(Deckung, na.rm = TRUE),
+    n = sum(Deckung > 0)
+  ) %>%
+  arrange(desc(mean_deckung)) %>%
+  slice_head(n = 10) 
+top10
+
+#Anzahl von holzigen Arten in der Krautschicht
+#ersetze Pinus_sylvestris mit Betula oder Frangula_alnus, ersetze Lic_subset durch andere MT_subset oder MN_subset
+Lic_subset %>%
+  filter(
+    Art == "Pinus_sylvestris",
+    Deckung > 0
+  ) %>%
+  count(Schicht, name = "Anzahl")
+
+```
+
+Deckung nach Layer
+
+```{r}
+#|label: deckung der layer
+
+layer_per_plot<- read.csv("Deckung_Schichten.csv", header=T)
+
+layer_deckung <- layer_per_plot%>%
+  group_by(site) %>%
+  summarise(TL =mean(TL, na.rm=T),
+            SL = mean(SL, na.rm=T),
+            HL = mean(HL, na.rm=T),
+            ML= mean(ML, na.rm=T),
+            bare_soil = mean(bare.soil, na.rm=T),
+            .groups="drop")
+#%>%
+#  mutate(propTL = TL/sum(TL),
+#         propSL = SL/sum(SL),
+#         propHL = HL/sum(HL),
+#         propML = ML/sum(ML),
+#         propBS = bare_soil/sum(bare_soil))
+  
+# convert to long format
+layer_deckung<-layer_deckung %>%
+  pivot_longer(
+    cols = c(TL, SL, HL, ML, bare_soil),
+    names_to = "Schicht",
+    values_to = "Deckung"
+  )%>%
+  mutate(
+    Schicht = factor(Schicht, levels = c("bare_soil", "ML", "HL", "SL", "TL")))
+
+layer_deckung%>%
+  ggplot(aes(x = site, y = Deckung, fill = Schicht)) +
+  geom_col(position = position_stack(reverse = TRUE)) +
+  geom_text(
+    aes(label = round(Deckung, 1)),
+    position = position_stack(vjust = 0.5, reverse = TRUE),
+    size = 3
+  ) +
+  scale_x_discrete(
+    labels = c(
+      "Meu_nass" = "Auf der Pfalz",
+      "Meu_trock" = "Fuchshügel",
+      "Lic" = "Kleiner Sumpf"
+    )
+  ) +
+  labs(
+    y = "Mittlere Deckung [%]",
+    x = NULL,
+    fill = "Schicht"
+  ) +
+  theme_minimal()
+
+
+
+#Export der Daten für die Tree layer für Analyse in Analysis-clean im Ordner Logger
+#muss nur einmalig durchgeführt werden
+#layer_per_plot <- layer_per_plot %>%
+#  left_join(
+#    vegdata %>%
+#      select(plot.ID, site, arbeitsname, Transekt, Transektnummer),
+#    by = c("plot.ID", "site", "arbeitsname")
+#  )
+#layer_tree <- layer_per_plot %>%
+#  select(-SL, -HL, -ML, -water, -bare.soil)
+#write.csv(layer_tree, "treelayer.csv")
+
+```
+
+# 4 Zeigerwerte einlesen und vorbereiten
+
+```{r}
+#|label: import zeigerwerte
+# Zeigerwerte von GBIF
+zeigerwerte <- read.table("dwca-zeigerwerte-v1.2/ellenberg.txt",sep = "\t", header = TRUE)
+zeigerwerte <- zeigerwerte %>%
+  rename(gbif_name = id)
+# Liste meiner Arten, Artnamen für GBIF-Artnamen angepasst
+mapping <- read_xlsx("artenliste_mapping.xlsx")
+
+# Tabellen zusammenführen
+zeiger_mapped <- zeigerwerte %>%
+  inner_join(mapping, by = "gbif_name") %>%
+  select(gbif_name, my_name, light, temperature, continental, wetness, alkalinity, nitrogen, salinity)
+
+# Tabelle aufräumen
+zeiger_mapped <- zeiger_mapped %>%
+  mutate(across(
+    c(light, temperature, continental, wetness, alkalinity, nitrogen, salinity),
+    ~ str_remove_all(.x, "[~()xX=]") %>%
+      as.numeric()
+  ))
+zeiger_mapped <- zeiger_mapped %>%
+  rename(Art = my_name)
+zeiger_mapped <- zeiger_mapped %>%
+  select(-gbif_name)
+```
+
+```{r}
+#|label: gewichtete zeigerwerte berechnen
+combined_long <- left_join(veg_long, zeiger_mapped, by = "Art")
+str(combined_long)
+
+weighted_values <- combined_long %>%
+  group_by(plot.ID, Name, site, Transekt, Transektnummer) %>%
+  summarise(
+    Weighted_light = sum(Deckung * light, na.rm = TRUE) / sum(Deckung, na.rm = TRUE),
+    Weighted_temperature = sum(Deckung * temperature, na.rm = TRUE) / sum(Deckung, na.rm = TRUE),
+    Weighted_wetness = sum(Deckung * wetness, na.rm = TRUE) / sum(Deckung, na.rm = TRUE),
+    Weighted_nitrogen = sum(Deckung * nitrogen, na.rm = TRUE) / sum(Deckung, na.rm = TRUE),
+    Weighted_continental = sum(Deckung * continental, na.rm = TRUE) / sum(Deckung, na.rm = TRUE),
+    Weighted_alkalinity = sum(Deckung * alkalinity, na.rm = TRUE) / sum(Deckung, na.rm = TRUE),
+    Weighted_salinity = sum(Deckung * salinity, na.rm = TRUE) / sum(Deckung, na.rm = TRUE),
+    .groups = "drop"
+  )
+
+```
+
+# 5 Höhendaten einlesen und verarbeiten
+
+```{r}
+#|label: elevation data
+# Einlesen
+licMO <- read.csv("../Nele/höhenprofile/Lichtenau/lic_MO.csv", header=F)
+licWM <- read.csv("../Nele/höhenprofile/Lichtenau/lic_WM_min.csv", header=F)
+licMS <- read.csv("../Nele/höhenprofile/Lichtenau/lic_MS.csv", header=F)
+licNM <- read.csv("../Nele/höhenprofile/Lichtenau/lic_NM.csv", header=F)
+licMS$V1 <- licMS$V1 + max(licNM$V1)
+licNS <- bind_rows(licNM, licMS )
+licMO$V1 <- licMO$V1 + max(licWM$V1)
+licWO <- bind_rows(licWM, licMO )
+
+MeunassWM <- read.csv("../Nele/höhenprofile/Meu-nass/mn_WM.csv", header=F)
+MeunassMO <- read.csv("../Nele/höhenprofile/Meu-nass/mn_MO.csv", header=F)
+MeunassMS <- read.csv("../Nele/höhenprofile/Meu-nass/mn_MS.csv", header=F)
+MeunassNM <- read.csv("../Nele/höhenprofile/Meu-nass/mn_NM.csv", header=F)
+MeunassMS$V1 <- MeunassMS$V1 + max(MeunassNM$V1)
+MeunassNS <- bind_rows(MeunassNM, MeunassMS )
+MeunassMO$V1 <- MeunassMO$V1 + max(MeunassWM$V1)
+MeunassWO <- bind_rows(MeunassWM, MeunassMO )
+
+MeutrockWM <- read.csv("../Nele/höhenprofile/Meu-trock/mt_WM.csv", header=F)
+MeutrockMO <- read.csv("../Nele/höhenprofile/Meu-trock/mt_MO.csv", header=F)
+MeutrockMS <- read.csv("../Nele/höhenprofile/Meu-trock/mt_MS.csv", header=F)
+MeutrockNM <- read.csv("../Nele/höhenprofile/Meu-trock/mt_NM.csv", header=F)
+MeutrockMS$V1 <- MeutrockMS$V1 + max(MeutrockNM$V1)
+MeutrockNS <- bind_rows(MeutrockNM, MeutrockMS )
+MeutrockMO$V1 <- MeutrockMO$V1 + max(MeutrockWM$V1)
+MeutrockWO <- bind_rows(MeutrockWM, MeutrockMO )
+
+#Duplikate entfernen
+licNS <- licNS %>%
+  distinct(V1, V2, .keep_all = T)
+licWO <- licWO%>%
+  distinct(V1, V2, keep.all=T)
+MeunassNS <- MeunassNS %>%
+  distinct(V1, V2, .keep_all = T)
+MeunassWO <- MeunassWO %>%
+  distinct(V1, V2, .keep_all = T)
+MeutrockNS <- MeutrockNS %>%
+  distinct(V1, V2, .keep_all = T)
+MeutrockWO <- MeutrockWO %>%
+  distinct(V1, V2, .keep_all = T)
+
+#Generelles Problem: Plotzahl und gemessener Abstand der GPS-Punkte stimmen nicht überein. Höhendaten werden deshalb auf die Plotzahl gestaucht/gestreckt und interpoliert, sodass für jeden Plot ein Höhenwert vorliegt
+#Interpolation (Funktion von ChatGPT GPT 5.5)
+n_plots <- vegdata %>%
+  group_by("site", "Transekt")%>%
+  count(site, Transekt, name = "n_plots")
+n_plots
+
+interpolate_height <- function(df, site_name, transekt_name, values_col = V2) {
+  
+  n <- n_plots |>
+    dplyr::ungroup() |>
+    dplyr::filter(site == site_name, Transekt == transekt_name) |>
+    dplyr::pull(n_plots)
+  
+  werte <- df |> dplyr::pull({{ values_col }})
+  
+  approx(
+    x = seq(0, 1, length.out = length(werte)),
+    y = werte,
+    xout = seq(0, 1, length.out = n)
+  )$y
+}
+
+licNS_hoehe <- interpolate_height(licNS, "Lic", "NS")
+licWO_hoehe<- interpolate_height(licWO, "Lic", "WO")
+MeunassNS_hoehe <- interpolate_height(MeunassNS, "Meu_nass", "NS")
+MeunassWO_hoehe<- interpolate_height(MeunassWO, "Meu_nass", "WO")
+MeutrockNS_hoehe<- interpolate_height(MeutrockNS, "Meu_trock", "NS")
+MeutrockWO_hoehe<- interpolate_height(MeutrockWO, "Meu_trock", "WO")
+#Überprüfen mit Plot
+par(mfrow = c(2, 3))
+plot(licNS_hoehe, type ="line")
+plot(licWO_hoehe, type ="line")
+plot(MeunassNS_hoehe, type ="line")
+plot(MeunassWO_hoehe, type ="line")
+plot(MeutrockNS_hoehe, type ="line")
+plot(MeutrockWO_hoehe, type ="line")
+
+#arbeitsnamen anfügen, da nicht alle vegetationsaufnahmen in der gleichen Richtung erfolgt sind!
+#MT_WO ist WM1-26, MO1-27
+MT_WO_arbeitsname <- c(paste0("WM", 1:26),paste0("MO", 1:27))
+length(MT_WO_arbeitsname);length(MeutrockWO_hoehe)
+MeutrockWO_hoehe_df <- data.frame(
+  arbeitsname = MT_WO_arbeitsname,
+  Hoehe = MeutrockWO_hoehe,
+  site = "Meu_trock")
+#MT_NS ist NM1-29, SM1-30
+MT_NS_arbeitsname <- c(paste0("NM", 1:29),paste0("SM", 30:1))
+length(MT_NS_arbeitsname);length(MeutrockNS_hoehe)
+MeutrockNS_hoehe_df <- data.frame(
+  arbeitsname = MT_NS_arbeitsname,
+  Hoehe = MeutrockNS_hoehe,
+   site = "Meu_trock")
+#MN_WO ist OM 1-32, WM 1-32
+MN_WO_arbeitsname <- c(paste0("WM", 1:32),paste0("OM", 32:1))
+length(MN_WO_arbeitsname);length(MeunassWO_hoehe)
+MeunassWO_hoehe_df <- data.frame(
+  arbeitsname = MN_WO_arbeitsname,
+  Hoehe = MeunassWO_hoehe,
+   site = "Meu_nass")
+#MN_NS ist SM1-23, NM 1-22
+MN_NS_arbeitsname <- c(paste0("NM",1:22 ),paste0("SM",23:1 ))
+length(MN_NS_arbeitsname);length(MeunassNS_hoehe)
+MeunassNS_hoehe_df <- data.frame(
+  arbeitsname = MN_NS_arbeitsname,
+  Hoehe = MeunassNS_hoehe,
+   site = "Meu_nass")
+#LicWO ist OW 1-67
+L_WO_arbeitsname <- c(paste0("OW",67:1 ))
+length(L_WO_arbeitsname);length(licWO_hoehe)
+licWO_hoehe_df <- data.frame(
+  arbeitsname = L_WO_arbeitsname,
+  Hoehe = licWO_hoehe,
+   site = "Lic")
+#LicNS ist SN 1-62
+L_NS_arbeitsname <- c(paste0("SN",62:1 ))
+length(L_NS_arbeitsname);length(licNS_hoehe)
+licNS_hoehe_df <- data.frame(
+  arbeitsname = L_NS_arbeitsname,
+  Hoehe = licNS_hoehe,
+   site = "Lic")
+
+#Zusammenfügen wie in vegdata -> erstmal Reihenfolge nachgucken
+vegdata %>%
+  mutate(zeile = row_number()) %>%
+  group_by(site, Transekt) %>%
+  summarise(
+    erste_Zeile = min(zeile),
+    letzte_Zeile = max(zeile),
+    n = n(),
+    .groups = "drop"
+  ) %>%
+  arrange(erste_Zeile)
+
+hoehe <- bind_rows(MeutrockWO_hoehe_df, MeutrockNS_hoehe_df,MeunassWO_hoehe_df,MeunassNS_hoehe_df,licWO_hoehe_df,licNS_hoehe_df)
+str(hoehe)
+
+vegdata <- vegdata %>%
+  left_join(
+    hoehe,
+    by = c("site", "arbeitsname")) 
+#überprüfen mit Plot
+vegdata <- vegdata %>%
+  relocate(Hoehe, .after = Transektnummer)
+
+ggplot(vegdata,
+       aes(x = Transektnummer,
+           y = Hoehe,
+           group = 1)) +
+  geom_line() +
+  geom_point() +
+  facet_wrap(~ site + Transekt,
+             scales = "free") +
+  theme_bw()
+
+```
+
+# 6 Diversitätsmaße berechnen
+
+```{r}
+#|label: species richness, Shannon Index, relative Häufigkeit und species evenness bestimmen
+#anlegen einer Vegetationsmatrix
+comm_matrix <- veg_long %>%
+  group_by(plot.ID, Art) %>%
+  summarise(Deckung = sum(Deckung), .groups = "drop") %>%
+  pivot_wider(
+    names_from = Art,
+    values_from = Deckung,
+    values_fill = 0
+  ) %>%
+  tibble::column_to_rownames("plot.ID")
+str(comm_matrix)
+
+#berechnen von species richness, shannon Index, relativer Häufigkeit und Evenness
+species_richness <- specnumber(comm_matrix)
+shannon_index <- diversity(comm_matrix, index = "shannon")
+relative_freq <- decostand(comm_matrix, method = "total")
+species_evenness <- shannon_index / log(specnumber(comm_matrix))
+
+# Ergebnisse in ein Dataframe packen
+results <- data.frame(
+  Plot = rownames(comm_matrix),
+  Richness = species_richness,
+  Shannon = shannon_index,
+  Evenness = species_evenness)
+
+
+str(results)
+
+```
+
+```{r}
+#|label: Zusammenführen mit gewichteten Zeigerwerten
+results$Plot <- as.integer(results$Plot)
+
+#Höhendaten vorbereiten
+hoeheID <- vegdata %>%
+  select(plot.ID, Hoehe)
+
+merged_data <- results %>%
+  left_join(weighted_values, by = c("Plot" = "plot.ID")) %>%
+  left_join(hoeheID, by = c("Plot" = "plot.ID")) %>%
+  left_join(layer_per_plot %>% select(-Name, -site, -arbeitsname),
+    by = c("Plot" = "plot.ID"))
+
+
+
+#Zusammenführen mit Attributen
+attribute_deckung <- veg_long %>%
+  group_by(Name, site) %>%
+  summarise(
+    Sukzessionszeiger = sum(
+      Deckung[Sukzessionszeiger %in% TRUE],
+      na.rm = T),
+    Moorart = sum(Deckung[Moorart %in% T],na.rm=T),
+    woody = sum(Deckung[Wuchsform %in% "woody"],na.rm=T),
+    grass = sum(Deckung[Wuchsform %in% "grass"], na.rm =T),
+    .groups = "drop"
+  )
+
+merged_data <- merged_data %>%
+  left_join(
+    attribute_deckung,
+    by = c("Name", "site")
+  )
+  
+```
+
+## Summary Diversitätsmaße berechnen
+
+```{r}
+#|label: summary pro Standort
+summary_area <- merged_data%>%
+  group_by(site)%>%
+  summarize(
+    richness_mean = mean(Richness),
+    richness_min = min(Richness),
+    richness_max = max(Richness),
+    richness_range = richness_max-richness_min,
+    shannon_mean = mean(Shannon),
+    shannon_min = min(Shannon),
+    shannon_max =max(Shannon),
+    shannon_range = shannon_max-shannon_min,
+    evenness_mean = mean (Evenness, na.rm=T),
+    evenness_min = min(Evenness, na.rm=T),
+    evenness_max = max(Evenness, na.rm=T),
+    evenness_range = evenness_max-evenness_min,
+    .groups = "drop"
+  )
+summary_area
+```
+
+# 7 DCA
+
+DCA wird durchgeführt für
+
+-   alle Flächen,
+
+-   Einzelflächen und Einzelfächen mit:
+
+    -   nur Moose
+
+    -   nur Gefäßpflanzen
+
+!Achtung! Wegen der gleichen Objektbenennung (dca, env) muss jeweils das gesamte Codechunk ausgeführt werden, um die korrekte DCA auszugeben und darzustellen
+
+## 7.1 Alle Flächen
+
+```{r}
+#|label: dca all areas
+dca <- decorana(comm_matrix)
+summary(dca)
+
+fit <- envfit(dca, merged_data[, c("Weighted_light",
+    "Weighted_temperature",
+    "Weighted_wetness",
+    "Weighted_nitrogen",
+    "Weighted_alkalinity",
+    "Hoehe",
+    "TL",
+    "SL",
+    "HL",
+    "ML"
+    )],
+    na.rm=T)
+fit
+
+plot(dca)
+arrows <- as.data.frame(scores(fit, display = "vectors"))
+arrows$Variable <- rownames(arrows)
+arrows$p_value <- fit$vectors$pvals
+arrows$r2 <- fit$vectors$r
+arrows$Variable <- c(
+  "Licht",
+  "Temperatur",
+  "Feuchte",
+  "Stickstoff",
+  "Basengehalt",
+  "Höhe",
+  "Baumschicht",
+  "Strauchschicht",
+  "Krautschicht",
+  "Moosschicht"
+)
+
+arrows_sig <- arrows %>%
+  filter(p_value <= 0.05)
+
+dca_scores <- scores(dca, display = "sites")
+dca_df <- as.data.frame(dca_scores)
+dca_df$Name <- rownames(dca_df)
+dca_df$site <- vegdata$site[match(dca_df$Name, vegdata$plot.ID)]
+
+ggplot(dca_df, aes(DCA1, DCA2, colour = site)) +
+  geom_point(size = 2) +
+  geom_segment(
+    data = arrows_sig,
+    aes(
+      x = 0, y = 0,
+      xend = DCA1 * 2,
+      yend = DCA2 * 2
+    ),
+    inherit.aes = FALSE,
+    arrow = arrow(length = unit(0.25, "cm")),
+    colour = "black"
+  ) +
+  geom_text(
+  data = arrows,
+  aes(
+    x = DCA1 * 2.3,
+    y = DCA2 * 2.3,
+    label = Variable
+  ),
+  inherit.aes = FALSE
+)+
+ scale_colour_manual(
+    breaks = c("Meu_trock", "Meu_nass", "Lic"),
+    values = c(
+      "Meu_trock" = "#D55E00",
+      "Meu_nass"  = "#6495ED",
+      "Lic"       = "#006400"
+    ),
+    labels = c(
+      "Lic" = "Kleiner Sumpf",
+      "Meu_trock" = "Fuchshügel",
+      "Meu_nass" = "Auf der Pfalz"
+    )
+  ) +
+
+  labs(
+    title = "DCA der Vegetationsaufnahmen",
+    x = "DCA1",
+    y = "DCA2"
+  ) +
+
+  theme_minimal() +
+  theme(
+    legend.title = element_blank(),
+    plot.title = element_text(hjust = 0.5)
+  )
+```
+
+## 7.2 Einzelne Flächen
+
+Ersetze jeweils "Meu_nass" durch "Meu_trock" oder "Lic" und die Beschriftung der Abbildung um für alle Flächen zu berechnen. Die Ersetzungen müssen in allen folgenden Codechunks ausgeführt werden (außer Moose Lichtenau). Die betreffenden Stellen sind jeweils
+
+comm \<- veg_long %\>%\
+filter(site=="Meu_nass")
+
+und
+
+env \<- merged_data %\>%\
+filter(site == "Meu_nass")
+
+und in der Beschriftung in ggplot() entspricht \
+Auf der Pfalz = Meu_nass\
+Fuchshügel = Meu_trock\
+Kleiner Sumpf = Lic
+
+labs(
+
+title = "DCA der Vegetation -- Auf der Pfalz"
+
+### 7.2.1 Alle Arten
+
+```{r}
+#|label: dca all species
+comm <- veg_long %>%
+  filter(site=="Meu_nass") %>%  
+  group_by(plot.ID, Art) %>%
+  summarise(
+    Deckung = sum(Deckung, na.rm = TRUE),
+    .groups = "drop"
+  ) %>%
+  pivot_wider(
+    names_from = Art,
+    values_from = Deckung,
+    values_fill = 0
+  )%>%
+  tibble::column_to_rownames("plot.ID")
+#entferne leere zeilen &spalten weil decorana damit nciht rechnen kann
+comm <- comm[
+  rowSums(comm) > 0,
+  colSums(comm) > 0,
+  drop = FALSE
+]
+
+dca <- decorana(comm)
+summary(dca)
+
+env <- merged_data %>%
+  filter(site == "Meu_nass")
+fit <- envfit(dca, env[, c("Weighted_light",
+                              "Weighted_temperature",
+                              "Weighted_wetness",
+                              "Weighted_nitrogen",
+                              "Weighted_alkalinity",
+                              "Hoehe",
+                              "TL",
+                              "ML",
+                              "HL",
+                              "SL")])
+fit
+
+plot(dca)
+arrows <-as.data.frame(scores(fit, display = "vectors"))
+arrows$Variable <- rownames(arrows)
+arrows$p_value <- fit$vectors$pvals
+arrows$r2 <- fit$vectors$r
+arrows$Variable <- c(
+  "Licht",
+  "Temperatur",
+  "Feuchte",
+  "Stickstoff",
+  "Basengehalt",
+  "Höhe",
+  "Baumschicht",
+  "Moosschicht",
+  "Krautschicht",
+  "Strauchschicht"
+)
+# nur Umweltvariablen mit signifikanten p-Werten anzeigen
+arrows_sig <- arrows %>%
+  filter(p_value <= 0.05)
+
+#DCA scores
+dca_scores <- scores(dca, display = "sites")
+dca_df <- as.data.frame(dca_scores)
+dca_df$Name <- rownames(dca_df)
+dca_df$site <- vegdata$site[match(dca_df$Name, vegdata$plot.ID)]
+dca_df$Transektnummer <- vegdata$Transektnummer[match(dca_df$Name, vegdata$plot.ID)]
+dca_df$Distanz <- abs(dca_df$Transektnummer)
+dca_df$Transekt <- vegdata$Transekt[
+  match(dca_df$Name, vegdata$plot.ID)
+]
+
+#species scores
+species_df <- as.data.frame(scores(dca, display = "species", choices = c(1, 2)))
+species_df$Art <- rownames(species_df)
+species_totals <- colSums(comm, na.rm = TRUE)
+species_df <- species_df %>%
+  filter(Art %in% names(species_totals[species_totals > 0]))
+
+
+
+################################################################################
+#PLOT
+
+ggplot() +
+  # --------------------------------------------------
+# NS-Transekt: Süden blau, Mitte weiß, Norden rot
+# --------------------------------------------------
+geom_point(
+  data = dca_df %>%
+    filter(Transekt == "NS"),
+  aes(
+    x = DCA1,
+    y = DCA2,
+    fill = Transektnummer,
+    shape = Transekt
+  ),
+  size = 4,
+  stroke = 0.7,
+  colour = "black"
+) +
+  
+  scale_fill_gradient2(
+    low = "#2166AC",
+    mid = "white",
+    high = "#B2182B",
+    midpoint = 0,
+    breaks = c(
+      min(dca_df$Transektnummer[dca_df$Transekt == "NS"],
+          na.rm = TRUE),
+      0,
+      max(dca_df$Transektnummer[dca_df$Transekt == "NS"],
+          na.rm = TRUE)
+    ),
+    labels = c("Süden", "Mitte", "Norden"),
+    name = "NS-Transekt"
+  ) +
+  
+  # Neue unabhängige Füllfarbenskala
+  ggnewscale::new_scale_fill() +
+  
+  # --------------------------------------------------
+# WO-Transekt: Westen grün, Mitte weiß, Osten gelb
+# --------------------------------------------------
+geom_point(
+  data = dca_df %>%
+    filter(Transekt == "WO"),
+  aes(
+    x = DCA1,
+    y = DCA2,
+    fill = Transektnummer,
+    shape = Transekt
+  ),
+  size = 4,
+  stroke = 0.7,
+  colour = "black"
+) +
+  
+  scale_fill_gradient2(
+    low = "#1B7837",
+    mid = "white",
+    high = "#FFD92F",
+    midpoint = 0,
+    breaks = c(
+      min(dca_df$Transektnummer[dca_df$Transekt == "WO"],
+          na.rm = TRUE),
+      0,
+      max(dca_df$Transektnummer[dca_df$Transekt == "WO"],
+          na.rm = TRUE)
+    ),
+    labels = c("Westen", "Mitte", "Osten"),
+    name = "WO-Transekt"
+  ) +
+  scale_shape_manual(
+    name = "Transekt",
+    values = c(NS = 21, WO = 22),
+    labels = c(NS = "Nord–Süd", WO = "West–Ost")
+    )+
+  
+  # --------------------------------------------------
+# Signifikante envfit-Pfeile
+# --------------------------------------------------
+geom_segment(
+  data = arrows_sig,
+  aes(
+    x = 0,
+    y = 0,
+    xend = DCA1*2 ,
+    yend = DCA2 *2
+  ),
+  inherit.aes = FALSE,
+  arrow = arrow(
+    length = unit(0.25, "cm"),
+    type = "closed"
+  ),
+  linewidth = 0.7,
+  colour = "black"
+) +
+  
+  geom_text_repel(
+    data = arrows_sig,
+    aes(
+      x = DCA1 *2,
+      y = DCA2 *2,
+      label = Variable
+    ),
+    inherit.aes = FALSE,
+    size = 3.5,
+    fontface = "bold",
+    colour = "black",
+    box.padding = 0.5,
+    point.padding = 0.2,
+    segment.colour = "grey50",
+    max.overlaps = Inf,
+    seed = 321
+  ) +
+  # --------------------------------------------------
+# Arten
+# --------------------------------------------------
+geom_point(
+  data = species_df,
+  aes(x = DCA1, y = DCA2),
+  shape = 17,
+  size = 2.5,
+  colour = "grey30"
+) +
+  
+  geom_text_repel(
+    data = species_df,
+    aes(
+      x = DCA1,
+      y = DCA2,
+      label = Art
+    ),
+    size = 3.5,
+    colour = "grey30",
+    box.padding = 0.5,
+    point.padding = 0.3,
+    segment.colour = "grey70",
+    max.overlaps = Inf,
+    seed = 123
+  ) +
+  # --------------------------------------------------
+# Beschriftungen von Achsen, Titel usw
+# -------------------------------------------------- 
+  
+  labs(
+    title = "DCA der Vegetation – Auf der Pfalz",
+    subtitle = "Aufnahmeflächen, Arten und signifikante Umweltvektoren",
+    x = "DCA1",
+    y = "DCA2"
+  ) +
+  coord_equal() +
+  theme_minimal() +
+  theme(
+    plot.title = element_text(
+      hjust = 0.5,
+      face = "bold"
+    ),
+    plot.subtitle = element_text(hjust = 0.5),
+    panel.grid.minor = element_blank(),
+    legend.position = "right"
+  )
+```
+
+### 7.2.2 Moose
+
+#### a) Meusebach nass und meusebach trocken
+
+!Achtung! Bei Fläche "Lic" ist für die Moose ein anderes Codechunk auszuführen
+
+```{r}
+#|label: dca moss
+# nur für Meu_nass und Meu_trock
+comm <- veg_long %>%
+  filter(site=="Meu_nass"&Schicht =="ML") %>%  
+  group_by(plot.ID, Art) %>%
+  summarise(
+    Deckung = sum(Deckung, na.rm = TRUE),
+    .groups = "drop"
+  ) %>%
+  pivot_wider(
+    names_from = Art,
+    values_from = Deckung,
+    values_fill = 0
+  )%>%
+  tibble::column_to_rownames("plot.ID")
+#entferne leere zeilen &spalten weil decorana damit nciht rechnen kann
+comm <- comm[
+  rowSums(comm) > 0,
+  colSums(comm) > 0,
+  drop = FALSE
+]
+
+dca <- decorana(comm)
+summary(dca)
+
+env_vars <- c(
+  "Weighted_light",
+  "Weighted_temperature",
+  "Weighted_wetness",
+  "Weighted_nitrogen",
+  "Weighted_alkalinity",
+  "Hoehe",
+  "TL",
+  "ML",
+  "HL",
+  "SL"
+)
+
+env <- merged_data %>%
+  filter(
+    site == "Meu_nass",
+    as.character(Plot) %in% rownames(comm)
+  ) %>%
+  select(
+    plot.ID = Plot,
+    dplyr::all_of(env_vars)
+  ) %>%
+  mutate(plot.ID = as.character(plot.ID)) %>%
+  distinct()
+
+fit <- envfit(dca, env[, c("Weighted_light",
+                              "Weighted_temperature",
+                              "Weighted_wetness",
+                              "Weighted_nitrogen",
+                              "Weighted_alkalinity",
+                              "Hoehe",
+                              "TL",
+                              "ML",
+                              "HL",
+                              "SL")])
+
+fit
+
+plot(dca)
+arrows <-as.data.frame(scores(fit, display = "vectors"))
+arrows$Variable <- rownames(arrows)
+arrows$p_value <- fit$vectors$pvals
+arrows$r2 <- fit$vectors$r
+arrows$Variable <- c(
+  "Licht",
+  "Temperatur",
+  "Feuchte",
+  "Stickstoff",
+  "Basengehalt",
+  "Höhe",
+  "Baumschicht",
+  "Moosschicht",
+  "Krautschicht",
+  "Strauchschicht"
+)
+# nur Umweltvariablen mit signifikanten p-Werten anzeigen
+arrows_sig <- arrows %>%
+  filter(p_value <= 0.05)
+
+#DCA scores
+dca_scores <- scores(dca, display = "sites")
+dca_df <- as.data.frame(dca_scores)
+dca_df$Name <- rownames(dca_df)
+dca_df$site <- vegdata$site[match(dca_df$Name, vegdata$plot.ID)]
+dca_df$Transektnummer <- vegdata$Transektnummer[match(dca_df$Name, vegdata$plot.ID)]
+dca_df$Distanz <- abs(dca_df$Transektnummer)
+dca_df$Transekt <- vegdata$Transekt[
+  match(dca_df$Name, vegdata$plot.ID)
+]
+
+#species scores
+species_df <- as.data.frame(scores(dca, display = "species", choices = c(1, 2)))
+species_df$Art <- rownames(species_df)
+species_totals <- colSums(comm, na.rm = TRUE)
+species_df <- species_df %>%
+  filter(Art %in% names(species_totals[species_totals > 0]))
+
+
+
+################################################################################
+#PLOT
+
+ggplot() +
+  # --------------------------------------------------
+# NS-Transekt: Süden blau, Mitte weiß, Norden rot
+# --------------------------------------------------
+geom_point(
+  data = dca_df %>%
+    filter(Transekt == "NS"),
+  aes(
+    x = DCA1,
+    y = DCA2,
+    fill = Transektnummer,
+    shape = Transekt
+  ),
+  size = 4,
+  stroke = 0.7,
+  colour = "black"
+) +
+  
+  scale_fill_gradient2(
+    low = "#2166AC",
+    mid = "white",
+    high = "#B2182B",
+    midpoint = 0,
+    breaks = c(
+      min(dca_df$Transektnummer[dca_df$Transekt == "NS"],
+          na.rm = TRUE),
+      0,
+      max(dca_df$Transektnummer[dca_df$Transekt == "NS"],
+          na.rm = TRUE)
+    ),
+    labels = c("Süden", "Mitte", "Norden"),
+    name = "NS-Transekt"
+  ) +
+  
+  # Neue unabhängige Füllfarbenskala
+  ggnewscale::new_scale_fill() +
+  
+  # --------------------------------------------------
+# WO-Transekt: Westen grün, Mitte weiß, Osten gelb
+# --------------------------------------------------
+geom_point(
+  data = dca_df %>%
+    filter(Transekt == "WO"),
+  aes(
+    x = DCA1,
+    y = DCA2,
+    fill = Transektnummer,
+    shape = Transekt
+  ),
+  size = 4,
+  stroke = 0.7,
+  colour = "black"
+) +
+  
+  scale_fill_gradient2(
+    low = "#1B7837",
+    mid = "white",
+    high = "#FFD92F",
+    midpoint = 0,
+    breaks = c(
+      min(dca_df$Transektnummer[dca_df$Transekt == "WO"],
+          na.rm = TRUE),
+      0,
+      max(dca_df$Transektnummer[dca_df$Transekt == "WO"],
+          na.rm = TRUE)
+    ),
+    labels = c("Westen", "Mitte", "Osten"),
+    name = "WO-Transekt"
+  ) +
+  scale_shape_manual(
+    name = "Transekt",
+    values = c(NS = 21, WO = 22),
+    labels = c(NS = "Nord–Süd", WO = "West–Ost")
+    )+
+  
+  # --------------------------------------------------
+# Signifikante envfit-Pfeile
+# --------------------------------------------------
+geom_segment(
+  data = arrows_sig,
+  aes(
+    x = 0,
+    y = 0,
+    xend = DCA1*2 ,
+    yend = DCA2 *2
+  ),
+  inherit.aes = FALSE,
+  arrow = arrow(
+    length = unit(0.25, "cm"),
+    type = "closed"
+  ),
+  linewidth = 0.7,
+  colour = "black"
+) +
+  
+  geom_text_repel(
+    data = arrows_sig,
+    aes(
+      x = DCA1 *2,
+      y = DCA2 *2,
+      label = Variable
+    ),
+    inherit.aes = FALSE,
+    size = 3.5,
+    fontface = "bold",
+    colour = "black",
+    box.padding = 0.5,
+    point.padding = 0.2,
+    segment.colour = "grey50",
+    max.overlaps = Inf,
+    seed = 321
+  ) +
+  # --------------------------------------------------
+# Arten
+# --------------------------------------------------
+geom_point(
+  data = species_df,
+  aes(x = DCA1, y = DCA2),
+  shape = 17,
+  size = 2.5,
+  colour = "grey30"
+) +
+  
+  geom_text_repel(
+    data = species_df,
+    aes(
+      x = DCA1,
+      y = DCA2,
+      label = Art
+    ),
+    size = 3.5,
+    colour = "grey30",
+    box.padding = 0.5,
+    point.padding = 0.3,
+    segment.colour = "grey70",
+    max.overlaps = Inf,
+    seed = 123
+  ) +
+  # --------------------------------------------------
+# Beschriftungen von Achsen, Titel usw
+# -------------------------------------------------- 
+  
+  labs(
+    title = "DCA der Vegetation – Auf der Pfalz",
+    subtitle = "Aufnahmeflächen, Arten und signifikante Umweltvektoren",
+    x = "DCA1",
+    y = "DCA2"
+  ) +
+  coord_equal() +
+  theme_minimal() +
+  theme(
+    plot.title = element_text(
+      hjust = 0.5,
+      face = "bold"
+    ),
+    plot.subtitle = element_text(hjust = 0.5),
+    panel.grid.minor = element_blank(),
+    legend.position = "right"
+  )
+```
+
+#### b) Lichtenau
+
+Sphagnum squarrosum kommt hier auf nur einem Relevee vor mit einer geringen Deckung, hat aber starken Einfluss auf die DCA und verzerrt die Ergebnisse. Daher wird die Art hier aus der Matrix entfernt bevor die DCA durchgeführt wird
+
+```{r}
+#|label: dca moss
+comm <- veg_long %>%
+  filter(site=="Lic"&Schicht =="ML") %>%  
+  group_by(plot.ID, Art) %>%
+  summarise(
+    Deckung = sum(Deckung, na.rm = TRUE),
+    .groups = "drop"
+  ) %>%
+  pivot_wider(
+    names_from = Art,
+    values_from = Deckung,
+    values_fill = 0
+  )%>%
+  tibble::column_to_rownames("plot.ID")
+#entferne leere zeilen &spalten weil decorana damit nciht rechnen kann
+comm <- comm[
+  rowSums(comm) > 0,
+  colSums(comm) > 0,
+  drop = FALSE
+]
+###################################################################################
+#S. squarrosum verzerrt die DCA. Die Art sollte entfernt werden. Sie kommt nur auf einem einzigen relevee vor
+comm[
+  comm[, "Sphagnum_squarrosum"] > 0,
+  "Sphagnum_squarrosum",
+  drop = FALSE
+]
+#die Art kommt nur auf einem Quadrat mit relativ wenig Deckung vor, deswegen wird sie erstmal entfernt
+
+#entfernen von s. squarrosum in Lichtenau
+comm <- comm[
+  rownames(comm) != "225",
+  ,
+  drop = FALSE
+]
+
+# Sphagnum_squarrosum ist danach eine vollständige Nullspalte
+comm <- comm[
+  ,
+  colSums(comm) > 0,
+  drop = FALSE
+]
+###################################################################################
+
+
+dca <- decorana(comm)
+summary(dca)
+
+env_vars <- c(
+  "Weighted_light",
+  "Weighted_temperature",
+  "Weighted_wetness",
+  "Weighted_nitrogen",
+  "Weighted_alkalinity",
+  "Hoehe",
+  "TL",
+  "ML",
+  "HL",
+  "SL"
+)
+
+env <- merged_data %>%
+  filter(
+    site == "Lic",
+    as.character(Plot) %in% rownames(comm)
+  ) %>%
+  select(
+    plot.ID = Plot,
+    dplyr::all_of(env_vars)
+  ) %>%
+  mutate(plot.ID = as.character(plot.ID)) %>%
+  distinct()
+
+fit <- envfit(dca, env[, c("Weighted_light",
+                              "Weighted_temperature",
+                              "Weighted_wetness",
+                              "Weighted_nitrogen",
+                              "Weighted_alkalinity",
+                              "Hoehe",
+                              "TL",
+                              "ML",
+                              "HL",
+                              "SL")])
+
+fit
+
+plot(dca)
+arrows <-as.data.frame(scores(fit, display = "vectors"))
+arrows$Variable <- rownames(arrows)
+arrows$p_value <- fit$vectors$pvals
+arrows$r2 <- fit$vectors$r
+arrows$Variable <- c(
+  "Licht",
+  "Temperatur",
+  "Feuchte",
+  "Stickstoff",
+  "Basengehalt",
+  "Höhe",
+  "Baumschicht",
+  "Moosschicht",
+  "Krautschicht",
+  "Strauchschicht"
+)
+# nur Umweltvariablen mit signifikanten p-Werten anzeigen
+arrows_sig <- arrows %>%
+  filter(p_value <= 0.05)
+
+#DCA scores
+dca_scores <- scores(dca, display = "sites")
+dca_df <- as.data.frame(dca_scores)
+dca_df$Name <- rownames(dca_df)
+dca_df$site <- vegdata$site[match(dca_df$Name, vegdata$plot.ID)]
+dca_df$Transektnummer <- vegdata$Transektnummer[match(dca_df$Name, vegdata$plot.ID)]
+dca_df$Distanz <- abs(dca_df$Transektnummer)
+dca_df$Transekt <- vegdata$Transekt[
+  match(dca_df$Name, vegdata$plot.ID)
+]
+
+#species scores
+species_df <- as.data.frame(scores(dca, display = "species", choices = c(1, 2)))
+species_df$Art <- rownames(species_df)
+species_totals <- colSums(comm, na.rm = TRUE)
+species_df <- species_df %>%
+  filter(Art %in% names(species_totals[species_totals > 0]))
+
+
+
+################################################################################
+#PLOT
+
+ggplot() +
+  # --------------------------------------------------
+# NS-Transekt: Süden blau, Mitte weiß, Norden rot
+# --------------------------------------------------
+geom_point(
+  data = dca_df %>%
+    filter(Transekt == "NS"),
+  aes(
+    x = DCA1,
+    y = DCA2,
+    fill = Transektnummer,
+    shape = Transekt
+  ),
+  size = 4,
+  stroke = 0.7,
+  colour = "black"
+) +
+  
+  scale_fill_gradient2(
+    low = "#2166AC",
+    mid = "white",
+    high = "#B2182B",
+    midpoint = 0,
+    breaks = c(
+      min(dca_df$Transektnummer[dca_df$Transekt == "NS"],
+          na.rm = TRUE),
+      0,
+      max(dca_df$Transektnummer[dca_df$Transekt == "NS"],
+          na.rm = TRUE)
+    ),
+    labels = c("Süden", "Mitte", "Norden"),
+    name = "NS-Transekt"
+  ) +
+  
+  # Neue unabhängige Füllfarbenskala
+  ggnewscale::new_scale_fill() +
+  
+  # --------------------------------------------------
+# WO-Transekt: Westen grün, Mitte weiß, Osten gelb
+# --------------------------------------------------
+geom_point(
+  data = dca_df %>%
+    filter(Transekt == "WO"),
+  aes(
+    x = DCA1,
+    y = DCA2,
+    fill = Transektnummer,
+    shape = Transekt
+  ),
+  size = 4,
+  stroke = 0.7,
+  colour = "black"
+) +
+  
+  scale_fill_gradient2(
+    low = "#1B7837",
+    mid = "white",
+    high = "#FFD92F",
+    midpoint = 0,
+    breaks = c(
+      min(dca_df$Transektnummer[dca_df$Transekt == "WO"],
+          na.rm = TRUE),
+      0,
+      max(dca_df$Transektnummer[dca_df$Transekt == "WO"],
+          na.rm = TRUE)
+    ),
+    labels = c("Westen", "Mitte", "Osten"),
+    name = "WO-Transekt"
+  ) +
+  scale_shape_manual(
+    name = "Transekt",
+    values = c(NS = 21, WO = 22),
+    labels = c(NS = "Nord–Süd", WO = "West–Ost")
+    )+
+  
+  # --------------------------------------------------
+# Signifikante envfit-Pfeile
+# --------------------------------------------------
+geom_segment(
+  data = arrows_sig,
+  aes(
+    x = 0,
+    y = 0,
+    xend = DCA1*2 ,
+    yend = DCA2 *2
+  ),
+  inherit.aes = FALSE,
+  arrow = arrow(
+    length = unit(0.25, "cm"),
+    type = "closed"
+  ),
+  linewidth = 0.7,
+  colour = "black"
+) +
+  
+  geom_text_repel(
+    data = arrows_sig,
+    aes(
+      x = DCA1 *2,
+      y = DCA2 *2,
+      label = Variable
+    ),
+    inherit.aes = FALSE,
+    size = 3.5,
+    fontface = "bold",
+    colour = "black",
+    box.padding = 0.5,
+    point.padding = 0.2,
+    segment.colour = "grey50",
+    max.overlaps = Inf,
+    seed = 321
+  ) +
+  # --------------------------------------------------
+# Arten
+# --------------------------------------------------
+geom_point(
+  data = species_df,
+  aes(x = DCA1, y = DCA2),
+  shape = 17,
+  size = 2.5,
+  colour = "grey30"
+) +
+  
+  geom_text_repel(
+    data = species_df,
+    aes(
+      x = DCA1,
+      y = DCA2,
+      label = Art
+    ),
+    size = 3.5,
+    colour = "grey30",
+    box.padding = 0.5,
+    point.padding = 0.3,
+    segment.colour = "grey70",
+    max.overlaps = Inf,
+    seed = 123
+  ) +
+  # --------------------------------------------------
+# Beschriftungen von Achsen, Titel usw
+# -------------------------------------------------- 
+  
+  labs(
+    title = "DCA der Vegetation – Auf der Pfalz",
+    subtitle = "Aufnahmeflächen, Arten und signifikante Umweltvektoren",
+    x = "DCA1",
+    y = "DCA2"
+  ) +
+  coord_equal() +
+  theme_minimal() +
+  theme(
+    plot.title = element_text(
+      hjust = 0.5,
+      face = "bold"
+    ),
+    plot.subtitle = element_text(hjust = 0.5),
+    panel.grid.minor = element_blank(),
+    legend.position = "right"
+  )
+```
+
+### 7.2.3 Gefäßpflanzen
+
+```{r}
+#|label: dca vascular plants
+comm <- veg_long %>%
+  filter(site=="Meu_nass"& Schicht !="ML") %>%  
+  group_by(plot.ID, Art) %>%
+  summarise(
+    Deckung = sum(Deckung, na.rm = TRUE),
+    .groups = "drop"
+  ) %>%
+  pivot_wider(
+    names_from = Art,
+    values_from = Deckung,
+    values_fill = 0
+  )%>%
+  tibble::column_to_rownames("plot.ID")
+#entferne leere zeilen &spalten weil decorana damit nciht rechnen kann
+comm <- comm[
+  rowSums(comm) > 0,
+  colSums(comm) > 0,
+  drop = FALSE
+]
+
+dca <- decorana(comm)
+summary(dca)
+
+env_vars <- c(
+  "Weighted_light",
+  "Weighted_temperature",
+  "Weighted_wetness",
+  "Weighted_nitrogen",
+  "Weighted_alkalinity",
+  "Hoehe",
+  "TL",
+  "ML",
+  "HL",
+  "SL"
+)
+
+env <- merged_data %>%
+  filter(
+    site == "Meu_nass",
+    as.character(Plot) %in% rownames(comm)
+  ) %>%
+  select(
+    plot.ID = Plot,
+    dplyr::all_of(env_vars)
+  ) %>%
+  mutate(plot.ID = as.character(plot.ID)) %>%
+  distinct()
+
+fit <- envfit(dca, env[, c("Weighted_light",
+                              "Weighted_temperature",
+                              "Weighted_wetness",
+                              "Weighted_nitrogen",
+                              "Weighted_alkalinity",
+                              "Hoehe",
+                              "TL",
+                              "ML",
+                              "HL",
+                              "SL")])
+
+fit
+
+plot(dca)
+arrows <-as.data.frame(scores(fit, display = "vectors"))
+arrows$Variable <- rownames(arrows)
+arrows$p_value <- fit$vectors$pvals
+arrows$r2 <- fit$vectors$r
+arrows$Variable <- c(
+  "Licht",
+  "Temperatur",
+  "Feuchte",
+  "Stickstoff",
+  "Basengehalt",
+  "Höhe",
+  "Baumschicht",
+  "Moosschicht",
+  "Krautschicht",
+  "Strauchschicht"
+)
+# nur Umweltvariablen mit signifikanten p-Werten anzeigen
+arrows_sig <- arrows %>%
+  filter(p_value <= 0.05)
+
+#DCA scores
+dca_scores <- scores(dca, display = "sites")
+dca_df <- as.data.frame(dca_scores)
+dca_df$Name <- rownames(dca_df)
+dca_df$site <- vegdata$site[match(dca_df$Name, vegdata$plot.ID)]
+dca_df$Transektnummer <- vegdata$Transektnummer[match(dca_df$Name, vegdata$plot.ID)]
+dca_df$Distanz <- abs(dca_df$Transektnummer)
+dca_df$Transekt <- vegdata$Transekt[
+  match(dca_df$Name, vegdata$plot.ID)
+]
+
+#species scores
+species_df <- as.data.frame(scores(dca, display = "species", choices = c(1, 2)))
+species_df$Art <- rownames(species_df)
+species_totals <- colSums(comm, na.rm = TRUE)
+species_df <- species_df %>%
+  filter(Art %in% names(species_totals[species_totals > 0]))
+
+
+
+################################################################################
+#PLOT
+
+ggplot() +
+  # --------------------------------------------------
+# NS-Transekt: Süden blau, Mitte weiß, Norden rot
+# --------------------------------------------------
+geom_point(
+  data = dca_df %>%
+    filter(Transekt == "NS"),
+  aes(
+    x = DCA1,
+    y = DCA2,
+    fill = Transektnummer,
+    shape = Transekt
+  ),
+  size = 4,
+  stroke = 0.7,
+  colour = "black"
+) +
+  
+  scale_fill_gradient2(
+    low = "#2166AC",
+    mid = "white",
+    high = "#B2182B",
+    midpoint = 0,
+    breaks = c(
+      min(dca_df$Transektnummer[dca_df$Transekt == "NS"],
+          na.rm = TRUE),
+      0,
+      max(dca_df$Transektnummer[dca_df$Transekt == "NS"],
+          na.rm = TRUE)
+    ),
+    labels = c("Süden", "Mitte", "Norden"),
+    name = "NS-Transekt"
+  ) +
+  
+  # Neue unabhängige Füllfarbenskala
+  ggnewscale::new_scale_fill() +
+  
+  # --------------------------------------------------
+# WO-Transekt: Westen grün, Mitte weiß, Osten gelb
+# --------------------------------------------------
+geom_point(
+  data = dca_df %>%
+    filter(Transekt == "WO"),
+  aes(
+    x = DCA1,
+    y = DCA2,
+    fill = Transektnummer,
+    shape = Transekt
+  ),
+  size = 4,
+  stroke = 0.7,
+  colour = "black"
+) +
+  
+  scale_fill_gradient2(
+    low = "#1B7837",
+    mid = "white",
+    high = "#FFD92F",
+    midpoint = 0,
+    breaks = c(
+      min(dca_df$Transektnummer[dca_df$Transekt == "WO"],
+          na.rm = TRUE),
+      0,
+      max(dca_df$Transektnummer[dca_df$Transekt == "WO"],
+          na.rm = TRUE)
+    ),
+    labels = c("Westen", "Mitte", "Osten"),
+    name = "WO-Transekt"
+  ) +
+  scale_shape_manual(
+    name = "Transekt",
+    values = c(NS = 21, WO = 22),
+    labels = c(NS = "Nord–Süd", WO = "West–Ost")
+    )+
+  
+  # --------------------------------------------------
+# Signifikante envfit-Pfeile
+# --------------------------------------------------
+geom_segment(
+  data = arrows_sig,
+  aes(
+    x = 0,
+    y = 0,
+    xend = DCA1*2 ,
+    yend = DCA2 *2
+  ),
+  inherit.aes = FALSE,
+  arrow = arrow(
+    length = unit(0.25, "cm"),
+    type = "closed"
+  ),
+  linewidth = 0.7,
+  colour = "black"
+) +
+  
+  geom_text_repel(
+    data = arrows_sig,
+    aes(
+      x = DCA1 *2,
+      y = DCA2 *2,
+      label = Variable
+    ),
+    inherit.aes = FALSE,
+    size = 3.5,
+    fontface = "bold",
+    colour = "black",
+    box.padding = 0.5,
+    point.padding = 0.2,
+    segment.colour = "grey50",
+    max.overlaps = Inf,
+    seed = 321
+  ) +
+  # --------------------------------------------------
+# Arten
+# --------------------------------------------------
+geom_point(
+  data = species_df,
+  aes(x = DCA1, y = DCA2),
+  shape = 17,
+  size = 2.5,
+  colour = "grey30"
+) +
+  
+  geom_text_repel(
+    data = species_df,
+    aes(
+      x = DCA1,
+      y = DCA2,
+      label = Art
+    ),
+    size = 3.5,
+    colour = "grey30",
+    box.padding = 0.5,
+    point.padding = 0.3,
+    segment.colour = "grey70",
+    max.overlaps = Inf,
+    seed = 123
+  ) +
+  # --------------------------------------------------
+# Beschriftungen von Achsen, Titel usw
+# -------------------------------------------------- 
+  
+  labs(
+    title = "DCA der Vegetation – Auf der Pfalz",
+    subtitle = "Aufnahmeflächen, Arten und signifikante Umweltvektoren",
+    x = "DCA1",
+    y = "DCA2"
+  ) +
+  coord_equal() +
+  theme_minimal() +
+  theme(
+    plot.title = element_text(
+      hjust = 0.5,
+      face = "bold"
+    ),
+    plot.subtitle = element_text(hjust = 0.5),
+    panel.grid.minor = element_blank(),
+    legend.position = "right"
+  )
+```
+
+# 8 Transekte plotten
+
+Der Flächenname ist ersetzbar mit Lic, Meu_nass, Meu_trock
+
+```{r}
+#|label: Übersicht Variablen
+#plot entlang der Transekte
+merged_data %>%
+  filter(site == "Lic") %>%
+  ggplot( aes(Transektnummer, Weighted_wetness)) +
+#  geom_point() +
+#  geom_smooth() +
+  geom_line()+
+  facet_wrap(~ Transekt)
+
+merged_data %>%
+  filter(site == "Meu_nass") %>%
+  ggplot( aes(Transektnummer, Weighted_wetness)) +
+  geom_point() +
+ # geom_smooth() +
+  facet_wrap(~ Transekt)
+
+merged_data %>%
+  filter(site == "Meu_trock") %>%
+  ggplot( aes(Transektnummer, Weighted_wetness)) +
+  geom_point() +
+ # geom_smooth() +
+  facet_wrap(~ Transekt)
+
+merged_data %>%
+  filter(site == "Lic") %>%
+  ggplot( aes(Transektnummer, Weighted_temperature)) +
+  geom_point() +
+  geom_smooth() +
+  facet_wrap(~ Transekt)
+
+merged_data %>%
+  filter(site == "Lic") %>%
+  ggplot( aes(Transektnummer, Weighted_light)) +
+  geom_point() +
+  geom_smooth() +
+  facet_wrap(~ Transekt)
+
+merged_data %>%
+  filter(site == "Lic") %>%
+  ggplot( aes(Transektnummer, Weighted_nitrogen)) +
+  geom_point() +
+  geom_smooth() +
+  facet_wrap(~ Transekt)
+
+merged_data %>%
+  filter(site == "Lic") %>%
+  ggplot( aes(Transektnummer, Weighted_alkalinity)) +
+  geom_point() +
+  geom_smooth() +
+  facet_wrap(~ Transekt)
+
+merged_data %>%
+  filter(site == "Lic") %>%
+  ggplot( aes(Transektnummer, Weighted_temperature)) +
+  geom_point() +
+  geom_smooth() +
+  facet_wrap(~ Transekt)
+
+merged_data %>%
+  filter(site == "Lic") %>%
+  ggplot( aes(Transektnummer, Richness)) +
+  geom_point() +
+  geom_smooth() +
+  facet_wrap(~ Transekt)
+
+merged_data %>%
+  filter(site == "Lic") %>%
+  ggplot( aes(Transektnummer, Shannon)) +
+  geom_point() +
+  geom_smooth() +
+  facet_wrap(~ Transekt)
+
+merged_data %>%
+  filter(site == "Lic") %>%
+  ggplot( aes(Transektnummer, Evenness)) +
+  geom_point() +
+  geom_smooth() +
+  facet_wrap(~ Transekt)
+
+merged_data %>%
+  filter(site == "Lic") %>%
+  ggplot( aes(Transektnummer, Hoehe)) +
+  geom_point() +
+  geom_line()+
+  facet_wrap(~ Transekt)
+```
+
+## Kreuztransekte
+
+diesen Plot für alle drei Standorte (Lic, Meu_nass, Meu_trock) und alle Parameter wiederholen, am besten mit Ersetzung arbeiten
+
+**Parameter**\
+"Richness",\
+"Shannon",\
+"Evenness",\
+"Weighted_light",\
+"Weighted_temperature",\
+"Weighted_wetness",\
+"Weighted_nitrogen",\
+"Weighted_alkalinity",\
+"TL",\
+"SL",\
+"HL",\
+"ML" ,\
+"Sukzessionszeiger",\
+"Moorart",\
+"woody"
+
+```{r}
+#|label: Kruezplots für Variablen
+plot_data <- merged_data %>%
+  mutate(
+    x = if_else(Transekt == "WO", Transektnummer, 0),
+    y = if_else(Transekt == "NS", Transektnummer, 0)
+  )
+
+#Farbschema für Zeigerwerte angepasst, die markierten Zeilen sollten bei Zeigerwerten (Weighted_...) ausgfeführt werden, für alle anderen Größen nicht
+plot_data %>%
+  filter(site == "Lic") %>%
+  ggplot(aes(x = x, y = y, color = woody)) +
+  geom_point(size = 4) +
+  coord_equal() +
+  scale_color_gradientn(
+  colours = viridisLite::turbo(10), 
+#  values = scales::rescale(0:9),  # nur bei zeigerwerten ausführen
+#  limits = c(0, 9), # nur bei zeigerwerten ausführen
+#  breaks = c(1, 3, 5, 7, 9), # nur bei zeigerwerten ausführen
+#  labels = c(1, 3, 5, 7, 9) # nur bei zeigerwerten ausführen
+  ) + 
+  annotate("text",
+           x = max(plot_data$x),y = 0,
+           label = "O",
+           size = 5,
+           hjust = 1.4) +
+  annotate("text",
+           x = min(plot_data$x),y = 0,
+           label = "W",
+           size = 5,
+           hjust = 1.4) +
+  annotate("text",
+           x = 0,y = max(plot_data$y),
+           label = "N",
+           size = 5,
+           vjust = -0.3) +
+  annotate("text",
+           x = 0,y = min(plot_data$y),
+           label = "S",
+           size = 5,
+           vjust = 1.3) +
+  labs(x = NULL, y = NULL)
+```
+
+## Plots Einzelarten
+
+Ersetze Flächennamen und Artnamen nach Belieben. Artname muss immer Gattung_epitheton_Schicht lauten. Schichten sind TL, SL, HL, ML. Flächennamen sind Meu_nass, Meu_trock, Lic.
+
+```{r}
+#| label: Kreuzplot für einzelne Arten
+plot_data_species <- vegdata %>%
+  mutate(
+    x = if_else(Transekt == "WO", Transektnummer, 0),
+    y = if_else(Transekt == "NS", Transektnummer, 0)
+  )
+
+plot_data_species %>%
+  filter(site == "Lic") %>%
+  ggplot(aes(x = x, y = y, color = Sphagnum_russowii_ML )) +
+  geom_point(size = 4) +
+  coord_equal() +
+  scale_color_gradientn(
+  colours = viridisLite::turbo(10), 
+  ) + 
+  annotate("text",
+           x = max(plot_data_species$x),y = 0,
+           label = "O",
+           size = 5,
+           hjust = 1.4) +
+  annotate("text",
+           x = min(plot_data_species$x),y = 0,
+           label = "W",
+           size = 5,
+           hjust = 1.4) +
+  annotate("text",
+           x = 0,y = max(plot_data_species$y),
+           label = "N",
+           size = 5,
+           vjust = -0.3) +
+  annotate("text",
+           x = 0,y = min(plot_data_species$y),
+           label = "S",
+           size = 5,
+           vjust = 1.3) +
+  labs(x = NULL, y = NULL)
+```
+
+## Plots Artengruppen
+
+hier kann in \
+woody_plot_data \<- veg_long %\>%\
+filter(\
+Moorart == TRUE &\
+Deckung \> 0) %\>%\
+ersetzt werden Moorart==TRUE gegen\
+Wuchsform == grass\
+Wuchsform == woody\
+Sukzessionszeiger ==TRUE\
+grepl("\^Sphag", Art)
+
+oder beliebige andere Filter\
+Je nach Filter sollte in\
+dark2_erweitert \<- colorRampPalette(\
+RColorBrewer::brewer.pal(8, "Dark2"))(**8**)\
+die fettgedruckte Zahl ersetzt werden durch einen Wert \>=8\
+Wenn Anzahl der Farben nicht ausreicht erscheint folgender Error:
+
+```         
+Insufficient values in manual scale. 8 needed but only 4 provided.
+```
+
+Im Error kann die genaue Zahl an bneötigten Farben abgelesen werden und in den Befehl colorRampPalette() eingefügt werden.
+
+Die Fläche kann ersetzt werden mit Meu_nass, Meu_trock oder Lic
+
+```{r}
+#|label: Kreuzplot für Artengruppen
+woody_plot_data <- veg_long %>%
+  filter(
+    grepl("^Sphag", Art) &
+    Deckung > 0) %>%
+  mutate(
+    x = if_else(Transekt == "WO", Transektnummer, 0),
+    y = if_else(Transekt == "NS", Transektnummer, 0)
+  )
+
+woody_plot_data <- woody_plot_data %>%
+  filter(site == "Meu_nass") %>%
+  arrange(desc(Deckung)) 
+
+
+#Farbpalette erweitern auf 30 farben
+dark2_erweitert <- colorRampPalette(
+  RColorBrewer::brewer.pal(8, "Dark2")
+)(8)
+
+
+#Plot
+woody_plot_data%>%
+  ggplot(
+    aes(
+      x = x,
+      y = y,
+      color = Art,
+      size = Deckung
+    )
+  ) +
+  geom_point(
+    position = position_jitter(
+      width = 0.12,
+      height = 0.12,
+      seed = 123
+    ),
+    alpha = 0.8
+  ) +
+  coord_equal() +
+  scale_color_manual(
+    name = "Holzige Art",
+    values = dark2_erweitert,
+    guide = guide_legend(
+    override.aes = list(
+      size = 5,
+      alpha = 1))) +
+  scale_size_continuous(name = "Deckung",range = c(4, 10)) +
+  labs(
+    x = "West–Ost",
+    y = "Süd–Nord"
+  ) +
+  theme_minimal()
+```
+
+# 9 Korrelationen testen
+
+```{r}
+#|label: corrplot 
+#global
+#corrplot() erwartet numerische Matrix!
+#nur erklärende variablen
+corr_matrix <- merged_data %>%
+  select(where(is.numeric)) %>%
+  select(-Plot, -Transektnummer, -Weighted_continental, -Weighted_salinity, -water,-bare.soil, -Richness,-Shannon,- Evenness,-Sukzessionszeiger,-woody,-grass,-Moorart) %>%
+  cor(method ="sp",use = "pairwise.complete.obs")
+#filter auf korr > |0,5|
+corr_matrix_filtered <- corr_matrix
+corr_matrix_filtered[abs(corr_matrix_filtered) <= 0.5] <- NA
+
+corrplot(
+  corr_matrix_filtered,
+  method = "number",
+  na.label = " "
+)
+#Achtung für Modelle:
+#Weighted_light und Weighted_wetness 0.81
+#Weighted_alkalinity und Weighted_temperature 0.74
+#Weighted_temperature un ML 0.6
+#Weighted_wetness und ML 0.53
+#Weighted_nitrogen und ML -0.63
+#Weighted_nitrogen und Weighted_temperature -0.5
+#HL und Weighted_nitrogen 0.64
+## light&wetness , sowie alkalinity&temperature sollten mit vorsivht in gemeisname modelle gepackt werden. Checke auf jeden Fall auf Kolinearität!!
+```
+
+```{r}
+#|label: corrplot Meu trock
+corr_matrix <- merged_data %>%
+  filter(site == "Meu_trock") %>%
+  select(where(is.numeric)) %>%
+  select(-Plot, -Transektnummer, -Weighted_continental, -Weighted_salinity, -water,-bare.soil, -Richness,-Shannon,- Evenness,-Sukzessionszeiger,-woody,-grass,-Moorart) %>%
+  cor(use = "pairwise.complete.obs")
+corrplot(corr_matrix, method ="number")
+```
+
+```{r}
+#|label: corrplot Meu nass
+corr_matrix <- merged_data %>%
+  filter(site == "Meu_nass") %>%
+  select(where(is.numeric)) %>%
+  select(-Plot, -Transektnummer, -Weighted_continental, -Weighted_salinity, -water,-bare.soil, -Richness,-Shannon,- Evenness,-Sukzessionszeiger,-woody,-grass,-Moorart) %>%
+  cor(use = "pairwise.complete.obs")
+corrplot(corr_matrix, method ="number")
+```
+
+```{r}
+#|label: corrplot Lic
+corr_matrix <- merged_data %>%
+  filter(site == "Lic") %>%
+  select(where(is.numeric)) %>%
+  select(-Plot, -Transektnummer, -Weighted_continental, -Weighted_salinity, -water,-bare.soil, -Richness,-Shannon,- Evenness,-Sukzessionszeiger,-woody,-grass,-Moorart) %>%
+  cor(use = "pairwise.complete.obs")
+corrplot(corr_matrix, method ="number")
+```
+
+# 10 Models
+
+## 10.1 Richness
+
+```{r}
+#|label: model richness
+# Richness ist eine Zählvariable -> glm mit family=poisson
+mod1<-glm(Richness ~ Weighted_light + Weighted_temperature + Weighted_wetness + Weighted_nitrogen + Weighted_alkalinity+ Hoehe+ HL + ML + SL + TL,family = poisson, data = merged_data)
+summary(mod1)
+# keine overdipersion
+#vereinfachung
+#nicht singif. größen entfernen
+#-ML&TL
+mod2<-update(mod1, ~.-TL)
+anova(mod1, mod2, test= "Chisq")
+#p=0.7657
+summary(mod2)
+mod3<- update(mod2,~.-ML)
+anova(mod2, mod3, test ="Chisq")
+#p=0.2483
+summary(mod3)
+mod4<-update(mod3,~.-Weighted_alkalinity)
+anova(mod3, mod4, test ="Chisq")
+#p=0.3619
+summary(mod4)
+
+
+check_model(mod4)
+#modell sieht in orndung aus
+
+summary(mod4)
+
+#Layer: Richness steigt bei mehr shrubs und weniger herbs
+#Zeigerwerte: Richness steigt je dunkler, wärmer, trockener, nährstoffreicher der Standort ist
+#Höhe bbeinflusst Richness in positive Richtung -> höher=artenreicher
+#Nitrogen hat stärksten estimta =0.175368 , gefolgt von licht estimate = -0.168134
+```
+
+## 10.2 Shannon-Index
+
+```{r}
+#|label: model shannon
+mod5<-lm(Shannon ~ Weighted_light + Weighted_temperature + Weighted_wetness + Weighted_nitrogen + Weighted_alkalinity+Hoehe+ HL + ML + SL + TL , data = merged_data)
+summary(mod5)
+mod6<-update(mod5,~.-TL)
+anova(mod6,mod5)
+#p=0.5639
+summary(mod6)
+mod7<- update(mod6, ~.-Weighted_temperature)
+anova(mod7,mod6)
+#p=0.4736
+summary(mod7)
+mod8<-update(mod7,~.-ML)
+anova(mod7, mod8)
+#p=0.2079
+summary(mod8)
+mod9<- update(mod8,~.-Weighted_light)
+anova(mod8,mod9)
+#p= 0.3398
+summary(mod9)
+mod10<-update(mod9,~.-HL)
+anova(mod9,mod10)
+#p=0.08798
+summary(mod10)
+mod11<-update(mod10,~.- SL)
+anova(mod10, mod11)
+#p=0.05377
+summary(mod11)
+
+check_model(mod11)
+plot(mod11)
+#plots sehen okay aus
+
+summary(mod11)
+
+#Shannon wird größer bei Trockenheit, Nährstoffarmut, höherer pH, höher im Gelände
+#stärkster Faktor ph Estinate=0.191090
+```
+
+## 10.3 Evenness
+
+```{r}
+#|label: model evenness
+mod12<-lm(Evenness ~ Weighted_light + Weighted_temperature + Weighted_wetness + Weighted_nitrogen + Weighted_alkalinity+ HL + ML + SL + TL + Hoehe, data = merged_data)
+summary(mod12)
+mod13<-update(mod12,~.-ML)
+anova(mod12,mod13)
+#p=0.9305
+summary(mod13)
+mod14<- update(mod13,~.-TL)
+anova(mod13, mod14)
+#p=0.5464
+summary(mod14)
+mod15<-update(mod14,~.-SL)
+anova(mod14, mod15)
+#p=0.2056
+summary(mod15)
+mod16<-update(mod15,~.-HL)
+anova(mod15, mod16)
+#p=0.1266
+summary(mod16)
+mod17<-update(mod16,~.-Weighted_temperature)
+anova(mod16, mod17)
+#p=0.06573
+summary(mod17)
+check_model(mod17)
+#sieht in ordnung aus
+
+summary(mod17)
+#Evenness steigt bei mehr Licht, Trockenheit, Nährstoffarmut, höherer pH, niedrige Geländehöhe
+#pH stärkster Faktor Estimate =0.098082
+```
+
+## 10.4 Sukzessionszeiger
+
+```{r}
+#|label: model sukzessionszeiger
+mod18<-lm(Sukzessionszeiger ~ Weighted_light + Weighted_temperature + Weighted_wetness + Weighted_nitrogen + Weighted_alkalinity+ HL + ML + SL + TL + Hoehe, data = merged_data)
+summary(mod18)
+mod19<-update(mod18,~.-Weighted_nitrogen)
+anova(mod18, mod19)
+#p=0.894
+summary(mod19)
+mod20<-update(mod19,~.-TL)
+anova(mod19, mod20)
+#p=0.3559
+summary(mod20)
+check_model(mod20)
+#sieht nicht so gut aus, ich teste mal log-transformation (log1p macht immer +1 um 0 zu vermeiden)
+mod21<-lm(log1p(Sukzessionszeiger) ~ Weighted_light + Weighted_temperature + Weighted_wetness + Weighted_alkalinity + HL + ML + SL + Hoehe,data = merged_data)
+summary(mod21)
+mod22<-update(mod21,~.-Weighted_alkalinity)
+anova(mod21,  mod22)
+#p=0.2134
+summary(mod22)
+check_model(mod22)
+plot(mod22)
+
+# das hat auch nix verbessert, ich lasse das modell nochmal von vorne laufen als gam mit family=tweedie, da abhängige Variable stark rechtsschief
+mod23<-gam(Sukzessionszeiger ~ Weighted_light + Weighted_temperature + Weighted_wetness + Weighted_nitrogen + Weighted_alkalinity+ HL + ML + SL + TL + Hoehe,family=tw, data = merged_data)
+summary(mod23)
+mod24<-update(mod23,~.-HL)
+
+summary(mod24)
+mod25<-update(mod24,~.-TL)
+
+summary(mod25)
+mod26<-update(mod25,~.-Hoehe)
+
+summary(mod26)
+mod27<-update(mod26,~.-Weighted_nitrogen)
+
+summary(mod27)
+
+gam.check(mod27)
+#bis auf response vs fitted sieht alles in ordnung aus, modell wird erstmal angenommen
+
+summary(mod27)
+#Sukzessionszeiger treten vermehrt auf bei Schatten, höheren Temperaturen, Trockenheit, niedriger pH, wenig Moose, viel Shrubs
+#moose und shrubs logisch, da meiste sukzessionszeiger shrubs sind...
+#stärkster einfluss licht Estimate = -1.094643
+#schatten könnte zirkelschluss sein, da sukzessionszeiger meist shrubs, die beschatten umgebung -> kommen da vor, wo arten in ihrem schatten vorkommen
+#zweitsträrkster einfluss Temperatur Estzimate=0.885005. Je wärmer desto mehr Sukzesinszeiger
+```
+
+## 10.5 Moorart
+
+```{r}
+#|label: model moorarten
+mod28<- lm(Moorart ~Weighted_light + Weighted_temperature + Weighted_wetness + Weighted_nitrogen + Weighted_alkalinity+ HL + ML + SL + TL + Hoehe, data=merged_data)
+summary(mod28)
+mod29<-update(mod28,~.-Weighted_alkalinity)
+anova(mod28, mod29)
+#p=0.9165
+summary(mod29)
+mod30<-update(mod29,~.-TL)
+anova(mod29, mod30)
+#p=0.4797
+summary(mod30)
+mod31<- update(mod30,~.-Hoehe)
+anova(mod30, mod31)
+#p=0.09228
+summary(mod31)
+mod32<- update(mod31,~.-Weighted_light)
+anova(mod31, mod32)
+#p=0.1053
+summary(mod32)
+check_model(mod32)
+#Moorarten treten vermehrt auf bei Kälte, Feuchte, Nährstoffarmut, mehr Moose, etwas mehr herbs und shrubs
+#makes sense :)
+```
+
+## 10.6 Gehölze
+
+```{r}
+#|label: model woody
+hist(merged_data$woody)
+#ich sollte wieder ein gam mit family=tweedie nutzen
+mod33<-gam(woody ~Weighted_light + Weighted_temperature + Weighted_wetness + Weighted_nitrogen + Weighted_alkalinity+ HL + ML + SL + TL + Hoehe,family=tw, data=merged_data)
+summary(mod33)
+mod34<-update(mod33,~.-Weighted_temperature)
+summary(mod34)
+mod35<-update(mod34,~.-HL)
+summary(mod35)
+mod36<-update(mod35,~.-Weighted_nitrogen)
+summary(mod36)
+gam.check(mod36)
+#response vs fitted sieht wieder komisch aus, der rest passt ganz gu
+summary(mod36)
+#Gehölze treten vermehrt auf bei Schatten, Trockenheit, höherem pH, weniger Moos, mehr shrubs, herbs und trees, höhere geländehöhe
+# Schichten skönnten wieder zirkelschluss sein -> gehölze kommen in allen schichten außer moos vor
+```

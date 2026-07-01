@@ -1762,3 +1762,60 @@ geom_point(
     panel.grid.minor = element_blank(),
     legend.position = "right"
   )
+
+###### Kruezplots für Arten #####
+#Kreuzplot für holzige Arten
+woody_plot_data <- veg_long %>%
+  filter(
+    Moorart == TRUE &
+      Deckung > 0) %>%
+  mutate(
+    x = if_else(Transekt == "WO", Transektnummer, 0),
+    y = if_else(Transekt == "NS", Transektnummer, 0)
+  )
+
+woody_plot_data<- woody_plot_data %>%
+  filter(site == "Lic") %>%
+  arrange(desc(Deckung)) 
+
+
+#Farbpalette erweitern auf 30 farben
+dark2_erweitert <- colorRampPalette(
+  RColorBrewer::brewer.pal(8, "Dark2")
+)(17)
+
+
+#Plot
+woody_plot_data%>%
+  ggplot(
+    aes(
+      x = x,
+      y = y,
+      color = Art,
+      size = Deckung
+    )
+  ) +
+  geom_point(
+    position = position_jitter(
+      width = 0.12,
+      height = 0.12,
+      seed = 123
+    ),
+    alpha = 0.8
+  ) +
+  coord_equal() +
+  scale_color_manual(
+    name = "Holzige Art",
+    values = dark2_erweitert,
+    guide = guide_legend(
+      override.aes = list(
+        size = 5,
+        alpha = 1))) +
+  scale_size_continuous(name = "Deckung",range = c(4, 12)) +
+  labs(
+    x = "West–Ost",
+    y = "Süd–Nord"
+  ) +
+  theme_minimal()
+
+
