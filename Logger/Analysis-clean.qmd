@@ -404,7 +404,7 @@ summary_daily_area <- all_loggers %>%
 str(summary_daily_area)
 ```
 
-## 4.2 Summary pro Logger
+## 4.2 Summary pro Logger Mai - Oktober
 
 ### 4.2.1 Summary über alle Daten
 
@@ -1223,6 +1223,8 @@ ggplot(
 ```
 
 Standorte einzeln
+
+#hier fehlt plot standard deviation?
 
 ```{r}
 #| label: boxplot of mean temperature, max temperature & standard deviation in each area
