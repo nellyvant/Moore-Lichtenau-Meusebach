@@ -515,6 +515,35 @@ sd_summary_logger <- summary_daily_logger %>%
 str(sd_summary_logger)
 ```
 
+## 4.3 Summary pro Fläche (Mai - Oktober)
+
+```{r}
+#| label: create summary_area_total
+
+summary_area_total <- all_loggers %>%
+  group_by(Standort) %>%
+  summarise(
+    Temp_area_sonne_mean = mean(Temp_sonne_C, na.rm = TRUE),
+    Temp_area_sonne_sd = sd(Temp_sonne_C, na.rm = TRUE),
+    
+    Temp_area_schatten_mean = mean(Temp_schatten_C, na.rm = TRUE),
+    Temp_area_schatten_sd = sd(Temp_schatten_C, na.rm = TRUE),
+    
+    Licht_area_mean = mean(Licht_lux, na.rm = TRUE),
+    Licht_area_sd = sd(Licht_lux, na.rm = TRUE),
+    
+    rLF_area_mean = mean(relLF_percent, na.rm = TRUE),
+    rLF_area_sd = sd(relLF_percent, na.rm = TRUE),
+    
+    Tp_area_mean = mean(Taupunkt_C, na.rm = TRUE),
+    Tp_area_sd = sd(Taupunkt_C, na.rm = TRUE),
+    
+    .groups = "drop"
+  )
+
+str(summary_area_total)
+```
+
 # 5. Analyse & Plots Vergleich innerhalb der Flächen bzw. zwischen den Loggern
 
 ## 5.1 Licht
