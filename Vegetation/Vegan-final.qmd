@@ -1,12 +1,20 @@
 ---
-title: "Vegetation-Analysis-clean"
-format: html
+title: "Vegetationsanalyse"
+format: 
+  html:
+    toc: true
+    toc-location: left
+    toc-depth: 3
+    toc-title: "Inhaltsverzeichnis"
+    number-sections: false
 editor: visual
 ---
 
 # 1 Packages
 
 ```{r}
+#| label: load packages
+#| output: false
 library(tidyverse)
 library(readxl)
 library(writexl)
@@ -29,7 +37,7 @@ library(mgcv)
 
 ```{r}
 #| label: read data
-#| output: true
+#| output: false
 vegdata <- read.csv("vegdata_final.csv")
 str(vegdata)
 #spalten anders ordnen
@@ -43,6 +51,10 @@ vegdata <- vegdata[, c(
     colSums(vegdata[, 7:ncol(vegdata)], na.rm = TRUE) > 0
   ]
 )]
+
+```
+
+```{r}
 str(vegdata)
 ```
 
@@ -57,10 +69,11 @@ vegdata$Name <- NULL
 ncol(vegdata) 
 str(vegdata)
 art_cols <- grep("_(TL|HL|ML|SL)$", names(vegdata), value = TRUE)
+#adaptiert nach ChatGPT 5.5
 veg_long <- vegdata %>%
   rownames_to_column("Name") %>%
   pivot_longer(cols = all_of(art_cols), names_to = "Art_full", values_to = "Deckung") %>% 
-  tidyr::separate(Art_full, into = c("Art", "Schicht"), sep = "_(?=[A-Z]{1,2}$)")
+  separate(Art_full, into = c("Art", "Schicht"), sep = "_(?=[A-Z]{1,2}$)")
 #sep trennt die Schicht sauber ab, da Arten als Gattung_Epitheton_Schicht vorliegen
 str(veg_long)
 
@@ -69,6 +82,7 @@ str(veg_long)
 
 ```{r}
 #| label: Attribute hinzufügen
+# Attribute hinzufügen
 arten_attribute <- veg_long %>%
   distinct(Art) %>%
   arrange(Art) %>%
@@ -84,7 +98,6 @@ write_csv(
 )
 #anschließend Bearbeitung in Excel, Reimport
 attribute<- read.csv("arten_attribute_filled.csv", header=T)
-str(attribute)
 attribute$Wuchsform<- factor(attribute$Wuchsform)
 
 #join mit veg_long
@@ -107,9 +120,11 @@ MT_subset <- subset(veg_long, site =="Meu_trock")
 
 Top 10 Arten nach Deckung
 
+Das subset sollte ersetzt werden durch Lic_subset, MN_subset, MT_subset
+
 ```{r}
-#|label: Deckung & Häufikgeit der Top10 Arten
-#alternativ nach Deckung bzw Häufigkeit ordnen: arrange(desc(mean_deckung)) ODER arrange(desc(n))
+#| label: Deckung und Häufikgeit der Top10 Arten
+# alternativ nach Deckung bzw Häufigkeit ordnen: arrange(desc(mean_deckung)) ODER arrange(desc(n))
 
 
 #mittlere Deckungen
@@ -149,14 +164,7 @@ layer_deckung <- layer_per_plot%>%
             ML= mean(ML, na.rm=T),
             bare_soil = mean(bare.soil, na.rm=T),
             .groups="drop")
-#%>%
-#  mutate(propTL = TL/sum(TL),
-#         propSL = SL/sum(SL),
-#         propHL = HL/sum(HL),
-#         propML = ML/sum(ML),
-#         propBS = bare_soil/sum(bare_soil))
-  
-# convert to long format
+
 layer_deckung<-layer_deckung %>%
   pivot_longer(
     cols = c(TL, SL, HL, ML, bare_soil),
@@ -166,6 +174,7 @@ layer_deckung<-layer_deckung %>%
   mutate(
     Schicht = factor(Schicht, levels = c("bare_soil", "ML", "HL", "SL", "TL")))
 
+#adaptiert nach ChatGPT 5.5
 layer_deckung%>%
   ggplot(aes(x = site, y = Deckung, fill = Schicht)) +
   geom_col(position = position_stack(reverse = TRUE)) +
@@ -235,6 +244,7 @@ zeiger_mapped <- zeiger_mapped %>%
 
 ```{r}
 #|label: gewichtete zeigerwerte berechnen
+#|output: false
 combined_long <- left_join(veg_long, zeiger_mapped, by = "Art")
 str(combined_long)
 
@@ -257,6 +267,8 @@ weighted_values <- combined_long %>%
 
 ```{r}
 #|label: elevation data
+#|output: false
+#|warning: false
 # Einlesen
 licMO <- read.csv("../Nele/höhenprofile/Lichtenau/lic_MO.csv", header=F)
 licWM <- read.csv("../Nele/höhenprofile/Lichtenau/lic_WM_min.csv", header=F)
@@ -306,6 +318,7 @@ n_plots <- vegdata %>%
   count(site, Transekt, name = "n_plots")
 n_plots
 
+#übernommen von ChatGPT 5.5
 interpolate_height <- function(df, site_name, transekt_name, values_col = V2) {
   
   n <- n_plots |>
@@ -337,6 +350,11 @@ plot(MeunassWO_hoehe, type ="line")
 plot(MeutrockNS_hoehe, type ="line")
 plot(MeutrockWO_hoehe, type ="line")
 
+```
+
+```{r}
+#|label: arbeitsnamen einfügen und überprüfen
+#adaptiert nach ChatGPT 5.5
 #arbeitsnamen anfügen, da nicht alle vegetationsaufnahmen in der gleichen Richtung erfolgt sind!
 #MT_WO ist WM1-26, MO1-27
 MT_WO_arbeitsname <- c(paste0("WM", 1:26),paste0("MO", 1:27))
@@ -420,6 +438,7 @@ ggplot(vegdata,
 
 ```{r}
 #|label: species richness, Shannon Index, relative Häufigkeit und species evenness bestimmen
+#|output: false
 #anlegen einer Vegetationsmatrix
 comm_matrix <- veg_long %>%
   group_by(plot.ID, Art) %>%
@@ -485,6 +504,7 @@ merged_data <- merged_data %>%
     by = c("Name", "site")
   )
   
+str(merged_data)
 ```
 
 ## Summary Diversitätsmaße berechnen
@@ -524,6 +544,8 @@ DCA wird durchgeführt für
     -   nur Gefäßpflanzen
 
 !Achtung! Wegen der gleichen Objektbenennung (dca, env) muss jeweils das gesamte Codechunk ausgeführt werden, um die korrekte DCA auszugeben und darzustellen
+
+Alle DCA-Codechunks wurden adaptiert nach ChatGPT 5.5
 
 ## 7.1 Alle Flächen
 
@@ -572,7 +594,7 @@ dca_df <- as.data.frame(dca_scores)
 dca_df$Name <- rownames(dca_df)
 dca_df$site <- vegdata$site[match(dca_df$Name, vegdata$plot.ID)]
 
-ggplot(dca_df, aes(DCA1, DCA2, colour = site)) +
+p1<-ggplot(dca_df, aes(DCA1, DCA2, colour = site)) +
   geom_point(size = 2) +
   geom_segment(
     data = arrows_sig,
@@ -619,6 +641,8 @@ ggplot(dca_df, aes(DCA1, DCA2, colour = site)) +
     legend.title = element_blank(),
     plot.title = element_text(hjust = 0.5)
   )
+p1
+ggsave("DCA-all-areas.png",p1, path ="plots")
 ```
 
 ## 7.2 Einzelne Flächen
@@ -633,7 +657,7 @@ und
 env \<- merged_data %\>%\
 filter(site == "Meu_nass")
 
-und in der Beschriftung in ggplot() entspricht \
+und in der Beschriftung in ggplot() entspricht\
 Auf der Pfalz = Meu_nass\
 Fuchshügel = Meu_trock\
 Kleiner Sumpf = Lic
@@ -727,7 +751,7 @@ species_df <- species_df %>%
 ################################################################################
 #PLOT
 
-ggplot() +
+p2<-ggplot() +
   # --------------------------------------------------
 # NS-Transekt: Süden blau, Mitte weiß, Norden rot
 # --------------------------------------------------
@@ -886,11 +910,13 @@ geom_point(
     panel.grid.minor = element_blank(),
     legend.position = "right"
   )
+p2
+ggsave( "DCA-Meu-nass.png",p2, path="plots",width = 12, height = 10, dpi = 300)
 ```
 
 ### 7.2.2 Moose
 
-#### a) Meusebach nass und meusebach trocken
+#### a) Meusebach nass und Meusebach trocken
 
 !Achtung! Bei Fläche "Lic" ist für die Moose ein anderes Codechunk auszuführen
 
@@ -898,7 +924,7 @@ geom_point(
 #|label: dca moss
 # nur für Meu_nass und Meu_trock
 comm <- veg_long %>%
-  filter(site=="Meu_nass"&Schicht =="ML") %>%  
+  filter(site=="Meu_trock"&Schicht =="ML") %>%  
   group_by(plot.ID, Art) %>%
   summarise(
     Deckung = sum(Deckung, na.rm = TRUE),
@@ -935,7 +961,7 @@ env_vars <- c(
 
 env <- merged_data %>%
   filter(
-    site == "Meu_nass",
+    site == "Meu_trock",
     as.character(Plot) %in% rownames(comm)
   ) %>%
   select(
@@ -1002,7 +1028,7 @@ species_df <- species_df %>%
 ################################################################################
 #PLOT
 
-ggplot() +
+p3<-ggplot() +
   # --------------------------------------------------
 # NS-Transekt: Süden blau, Mitte weiß, Norden rot
 # --------------------------------------------------
@@ -1145,7 +1171,7 @@ geom_point(
 # -------------------------------------------------- 
   
   labs(
-    title = "DCA der Vegetation – Auf der Pfalz",
+    title = "DCA der Moosvegetation – Fuchshügel",
     subtitle = "Aufnahmeflächen, Arten und signifikante Umweltvektoren",
     x = "DCA1",
     y = "DCA2"
@@ -1161,6 +1187,8 @@ geom_point(
     panel.grid.minor = element_blank(),
     legend.position = "right"
   )
+p3
+ggsave("DCA-Meu-trock-moss.png",p3, path="plots",width = 12, height = 10, dpi = 300)
 ```
 
 #### b) Lichtenau
@@ -1298,7 +1326,7 @@ species_df <- species_df %>%
 ################################################################################
 #PLOT
 
-ggplot() +
+p4<-ggplot() +
   # --------------------------------------------------
 # NS-Transekt: Süden blau, Mitte weiß, Norden rot
 # --------------------------------------------------
@@ -1441,7 +1469,7 @@ geom_point(
 # -------------------------------------------------- 
   
   labs(
-    title = "DCA der Vegetation – Auf der Pfalz",
+    title = "DCA der Moosvegetation – Kleiner Sumpf",
     subtitle = "Aufnahmeflächen, Arten und signifikante Umweltvektoren",
     x = "DCA1",
     y = "DCA2"
@@ -1457,6 +1485,8 @@ geom_point(
     panel.grid.minor = element_blank(),
     legend.position = "right"
   )
+p4
+ggsave( "DCA-Lic-moss.png",p4, path="plots",width = 12, height = 10, dpi = 300)
 ```
 
 ### 7.2.3 Gefäßpflanzen
@@ -1464,7 +1494,7 @@ geom_point(
 ```{r}
 #|label: dca vascular plants
 comm <- veg_long %>%
-  filter(site=="Meu_nass"& Schicht !="ML") %>%  
+  filter(site=="Lic"& Schicht !="ML") %>%  
   group_by(plot.ID, Art) %>%
   summarise(
     Deckung = sum(Deckung, na.rm = TRUE),
@@ -1501,7 +1531,7 @@ env_vars <- c(
 
 env <- merged_data %>%
   filter(
-    site == "Meu_nass",
+    site == "Lic",
     as.character(Plot) %in% rownames(comm)
   ) %>%
   select(
@@ -1568,7 +1598,7 @@ species_df <- species_df %>%
 ################################################################################
 #PLOT
 
-ggplot() +
+p5<-ggplot() +
   # --------------------------------------------------
 # NS-Transekt: Süden blau, Mitte weiß, Norden rot
 # --------------------------------------------------
@@ -1711,7 +1741,7 @@ geom_point(
 # -------------------------------------------------- 
   
   labs(
-    title = "DCA der Vegetation – Auf der Pfalz",
+    title = "DCA der Vegetation der Gefäßpflanzen – Kleiner Sumpf",
     subtitle = "Aufnahmeflächen, Arten und signifikante Umweltvektoren",
     x = "DCA1",
     y = "DCA2"
@@ -1727,6 +1757,8 @@ geom_point(
     panel.grid.minor = element_blank(),
     legend.position = "right"
   )
+p5
+ggsave( "DCA-Lic-vasc.png",p5, path="plots",width = 12, height = 10, dpi = 300)
 ```
 
 # 8 Transekte plotten
@@ -1748,14 +1780,14 @@ merged_data %>%
   filter(site == "Meu_nass") %>%
   ggplot( aes(Transektnummer, Weighted_wetness)) +
   geom_point() +
- # geom_smooth() +
+  geom_smooth() +
   facet_wrap(~ Transekt)
 
 merged_data %>%
   filter(site == "Meu_trock") %>%
   ggplot( aes(Transektnummer, Weighted_wetness)) +
   geom_point() +
- # geom_smooth() +
+  geom_smooth() +
   facet_wrap(~ Transekt)
 
 merged_data %>%
@@ -1824,7 +1856,9 @@ merged_data %>%
 
 ## Kreuztransekte
 
-diesen Plot für alle drei Standorte (Lic, Meu_nass, Meu_trock) und alle Parameter wiederholen, am besten mit Ersetzung arbeiten
+diesen Plot für alle drei Standorte (Lic, Meu_nass, Meu_trock) und alle Parameter wiederholen, am besten mit Ersetzung arbeiten in
+
+ggplot(aes(x = x, y = y, color = woody)) +
 
 **Parameter**\
 "Richness",\
@@ -1844,13 +1878,15 @@ diesen Plot für alle drei Standorte (Lic, Meu_nass, Meu_trock) und alle Paramet
 "woody"
 
 ```{r}
-#|label: Kruezplots für Variablen
+#|label: Kreuzplots für Variablen
+#übernommen von ChatGPT 5.5
 plot_data <- merged_data %>%
   mutate(
     x = if_else(Transekt == "WO", Transektnummer, 0),
     y = if_else(Transekt == "NS", Transektnummer, 0)
   )
 
+#adaptiert nach ChatGPT 5.5
 #Farbschema für Zeigerwerte angepasst, die markierten Zeilen sollten bei Zeigerwerten (Weighted_...) ausgfeführt werden, für alle anderen Größen nicht
 plot_data %>%
   filter(site == "Lic") %>%
@@ -1893,12 +1929,14 @@ Ersetze Flächennamen und Artnamen nach Belieben. Artname muss immer Gattung_epi
 
 ```{r}
 #| label: Kreuzplot für einzelne Arten
+#übernommen von ChatGPT 5.5
 plot_data_species <- vegdata %>%
   mutate(
     x = if_else(Transekt == "WO", Transektnummer, 0),
     y = if_else(Transekt == "NS", Transektnummer, 0)
   )
 
+#adaptiert nach ChatGPT 5.5
 plot_data_species %>%
   filter(site == "Lic") %>%
   ggplot(aes(x = x, y = y, color = Sphagnum_russowii_ML )) +
@@ -1932,7 +1970,7 @@ plot_data_species %>%
 
 ## Plots Artengruppen
 
-hier kann in \
+hier kann in\
 woody_plot_data \<- veg_long %\>%\
 filter(\
 Moorart == TRUE &\
@@ -1960,6 +1998,7 @@ Die Fläche kann ersetzt werden mit Meu_nass, Meu_trock oder Lic
 
 ```{r}
 #|label: Kreuzplot für Artengruppen
+#adaptiert nach ChatGPT 5.5
 woody_plot_data <- veg_long %>%
   filter(
     grepl("^Sphag", Art) &
@@ -1979,7 +2018,7 @@ dark2_erweitert <- colorRampPalette(
   RColorBrewer::brewer.pal(8, "Dark2")
 )(8)
 
-
+#adaptiert nach ChatGPT 5.5
 #Plot
 woody_plot_data%>%
   ggplot(
@@ -2018,7 +2057,7 @@ woody_plot_data%>%
 
 ```{r}
 #|label: corrplot 
-#global
+
 #corrplot() erwartet numerische Matrix!
 #nur erklärende variablen
 corr_matrix <- merged_data %>%
@@ -2081,6 +2120,7 @@ corrplot(corr_matrix, method ="number")
 
 ```{r}
 #|label: model richness
+#|output: false
 # Richness ist eine Zählvariable -> glm mit family=poisson
 mod1<-glm(Richness ~ Weighted_light + Weighted_temperature + Weighted_wetness + Weighted_nitrogen + Weighted_alkalinity+ Hoehe+ HL + ML + SL + TL,family = poisson, data = merged_data)
 summary(mod1)
@@ -2100,8 +2140,9 @@ mod4<-update(mod3,~.-Weighted_alkalinity)
 anova(mod3, mod4, test ="Chisq")
 #p=0.3619
 summary(mod4)
+```
 
-
+```{r}
 check_model(mod4)
 #modell sieht in orndung aus
 
@@ -2117,6 +2158,7 @@ summary(mod4)
 
 ```{r}
 #|label: model shannon
+#|output: false
 mod5<-lm(Shannon ~ Weighted_light + Weighted_temperature + Weighted_wetness + Weighted_nitrogen + Weighted_alkalinity+Hoehe+ HL + ML + SL + TL , data = merged_data)
 summary(mod5)
 mod6<-update(mod5,~.-TL)
@@ -2143,7 +2185,9 @@ mod11<-update(mod10,~.- SL)
 anova(mod10, mod11)
 #p=0.05377
 summary(mod11)
+```
 
+```{r}
 check_model(mod11)
 plot(mod11)
 #plots sehen okay aus
@@ -2158,6 +2202,7 @@ summary(mod11)
 
 ```{r}
 #|label: model evenness
+#|output: false
 mod12<-lm(Evenness ~ Weighted_light + Weighted_temperature + Weighted_wetness + Weighted_nitrogen + Weighted_alkalinity+ HL + ML + SL + TL + Hoehe, data = merged_data)
 summary(mod12)
 mod13<-update(mod12,~.-ML)
@@ -2180,6 +2225,10 @@ mod17<-update(mod16,~.-Weighted_temperature)
 anova(mod16, mod17)
 #p=0.06573
 summary(mod17)
+
+```
+
+```{r}
 check_model(mod17)
 #sieht in ordnung aus
 
@@ -2192,6 +2241,7 @@ summary(mod17)
 
 ```{r}
 #|label: model sukzessionszeiger
+#|output: false
 mod18<-lm(Sukzessionszeiger ~ Weighted_light + Weighted_temperature + Weighted_wetness + Weighted_nitrogen + Weighted_alkalinity+ HL + ML + SL + TL + Hoehe, data = merged_data)
 summary(mod18)
 mod19<-update(mod18,~.-Weighted_nitrogen)
@@ -2202,17 +2252,34 @@ mod20<-update(mod19,~.-TL)
 anova(mod19, mod20)
 #p=0.3559
 summary(mod20)
+```
+
+```{r}
 check_model(mod20)
+
 #sieht nicht so gut aus, ich teste mal log-transformation (log1p macht immer +1 um 0 zu vermeiden)
+
+```
+
+```{r}
+#|label: log1p
+#|output: false
 mod21<-lm(log1p(Sukzessionszeiger) ~ Weighted_light + Weighted_temperature + Weighted_wetness + Weighted_alkalinity + HL + ML + SL + Hoehe,data = merged_data)
 summary(mod21)
 mod22<-update(mod21,~.-Weighted_alkalinity)
 anova(mod21,  mod22)
 #p=0.2134
 summary(mod22)
+```
+
+```{r}
 check_model(mod22)
 plot(mod22)
+```
 
+```{r}
+#|label: gam
+#|output: false
 # das hat auch nix verbessert, ich lasse das modell nochmal von vorne laufen als gam mit family=tweedie, da abhängige Variable stark rechtsschief
 mod23<-gam(Sukzessionszeiger ~ Weighted_light + Weighted_temperature + Weighted_wetness + Weighted_nitrogen + Weighted_alkalinity+ HL + ML + SL + TL + Hoehe,family=tw, data = merged_data)
 summary(mod23)
@@ -2228,7 +2295,9 @@ summary(mod26)
 mod27<-update(mod26,~.-Weighted_nitrogen)
 
 summary(mod27)
+```
 
+```{r}
 gam.check(mod27)
 #bis auf response vs fitted sieht alles in ordnung aus, modell wird erstmal angenommen
 
@@ -2244,6 +2313,7 @@ summary(mod27)
 
 ```{r}
 #|label: model moorarten
+#|output: false
 mod28<- lm(Moorart ~Weighted_light + Weighted_temperature + Weighted_wetness + Weighted_nitrogen + Weighted_alkalinity+ HL + ML + SL + TL + Hoehe, data=merged_data)
 summary(mod28)
 mod29<-update(mod28,~.-Weighted_alkalinity)
@@ -2261,6 +2331,10 @@ summary(mod31)
 mod32<- update(mod31,~.-Weighted_light)
 anova(mod31, mod32)
 #p=0.1053
+
+```
+
+```{r}
 summary(mod32)
 check_model(mod32)
 #Moorarten treten vermehrt auf bei Kälte, Feuchte, Nährstoffarmut, mehr Moose, etwas mehr herbs und shrubs
@@ -2273,6 +2347,11 @@ check_model(mod32)
 #|label: model woody
 hist(merged_data$woody)
 #ich sollte wieder ein gam mit family=tweedie nutzen
+```
+
+```{r}
+#|label: gam
+#|output: false
 mod33<-gam(woody ~Weighted_light + Weighted_temperature + Weighted_wetness + Weighted_nitrogen + Weighted_alkalinity+ HL + ML + SL + TL + Hoehe,family=tw, data=merged_data)
 summary(mod33)
 mod34<-update(mod33,~.-Weighted_temperature)
@@ -2281,6 +2360,9 @@ mod35<-update(mod34,~.-HL)
 summary(mod35)
 mod36<-update(mod35,~.-Weighted_nitrogen)
 summary(mod36)
+```
+
+```{r}
 gam.check(mod36)
 #response vs fitted sieht wieder komisch aus, der rest passt ganz gu
 summary(mod36)
