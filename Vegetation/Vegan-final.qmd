@@ -671,7 +671,7 @@ title = "DCA der Vegetation -- Auf der Pfalz"
 ```{r}
 #|label: dca all species
 comm <- veg_long %>%
-  filter(site=="Meu_nass") %>%  
+  filter(site=="Lic") %>%  
   group_by(plot.ID, Art) %>%
   summarise(
     Deckung = sum(Deckung, na.rm = TRUE),
@@ -694,7 +694,7 @@ dca <- decorana(comm)
 summary(dca)
 
 env <- merged_data %>%
-  filter(site == "Meu_nass")
+  filter(site == "Lic")
 fit <- envfit(dca, env[, c("Weighted_light",
                               "Weighted_temperature",
                               "Weighted_wetness",
@@ -740,7 +740,7 @@ dca_df$Transekt <- vegdata$Transekt[
 ]
 
 #species scores
-species_df <- as.data.frame(scores(dca, display = "species", choices = c(1, 2)))
+species_df <- as.data.frame(scores(dca, display = "species", choices = c(1,2)))
 species_df$Art <- rownames(species_df)
 species_totals <- colSums(comm, na.rm = TRUE)
 species_df <- species_df %>%
@@ -911,7 +911,7 @@ geom_point(
     legend.position = "right"
   )
 p2
-ggsave( "DCA-Meu-nass.png",p2, path="plots",width = 12, height = 10, dpi = 300)
+#ggsave( "DCA-Meu-nass.png",p2, path="plots",width = 12, height = 10, dpi = 300)
 ```
 
 ### 7.2.2 Moose
@@ -924,7 +924,7 @@ ggsave( "DCA-Meu-nass.png",p2, path="plots",width = 12, height = 10, dpi = 300)
 #|label: dca moss
 # nur für Meu_nass und Meu_trock
 comm <- veg_long %>%
-  filter(site=="Meu_trock"&Schicht =="ML") %>%  
+  filter(site=="Meu_nass"&Schicht =="ML") %>%  
   group_by(plot.ID, Art) %>%
   summarise(
     Deckung = sum(Deckung, na.rm = TRUE),
@@ -961,7 +961,7 @@ env_vars <- c(
 
 env <- merged_data %>%
   filter(
-    site == "Meu_trock",
+    site == "Meu_nass",
     as.character(Plot) %in% rownames(comm)
   ) %>%
   select(
@@ -1188,7 +1188,7 @@ geom_point(
     legend.position = "right"
   )
 p3
-ggsave("DCA-Meu-trock-moss.png",p3, path="plots",width = 12, height = 10, dpi = 300)
+#ggsave("DCA-Meu-trock-moss.png",p3, path="plots",width = 12, height = 10, dpi = 300)
 ```
 
 #### b) Lichtenau
@@ -1486,7 +1486,7 @@ geom_point(
     legend.position = "right"
   )
 p4
-ggsave( "DCA-Lic-moss.png",p4, path="plots",width = 12, height = 10, dpi = 300)
+#ggsave( "DCA-Lic-moss.png",p4, path="plots",width = 12, height = 10, dpi = 300)
 ```
 
 ### 7.2.3 Gefäßpflanzen
@@ -1758,7 +1758,7 @@ geom_point(
     legend.position = "right"
   )
 p5
-ggsave( "DCA-Lic-vasc.png",p5, path="plots",width = 12, height = 10, dpi = 300)
+#ggsave( "DCA-Lic-vasc.png",p5, path="plots",width = 12, height = 10, dpi = 300)
 ```
 
 # 8 Transekte plotten
@@ -1846,12 +1846,32 @@ merged_data %>%
   geom_smooth() +
   facet_wrap(~ Transekt)
 
-merged_data %>%
-  filter(site == "Lic") %>%
+#Plots für Höhenprofile
+#adaptiert nach ChatGPT 5.5
+y_min <- merged_data %>%
+  filter(site == "Meu_trock", Transekt == "NS") %>%
+  pull(Hoehe) %>%
+  min(na.rm = TRUE)
+
+p6<-merged_data %>%
+  filter(site == "Meu_trock"&Transekt =="NS") %>%
   ggplot( aes(Transektnummer, Hoehe)) +
-  geom_point() +
+#  geom_point() +
   geom_line()+
-  facet_wrap(~ Transekt)
+  coord_cartesian(
+    ylim = c(y_min-0.1, y_min + 1)
+  ) +
+#  facet_wrap(~ Transekt)+
+  theme_minimal()+
+  theme(
+    axis.title = element_text(
+      size = 18,
+      face = "bold"),
+    axis.text = element_text(
+      size = 15
+    )
+  )
+ggsave("Höhe_MT_NS.png",p6, path="plots",width = 35, height = 5, dpi = 300)
 ```
 
 ## Kreuztransekte
