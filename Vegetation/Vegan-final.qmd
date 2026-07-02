@@ -152,7 +152,7 @@ Lic_subset %>%
 Deckung nach Layer
 
 ```{r}
-#|label: deckung der layer
+#| label: deckung der layer
 
 layer_per_plot<- read.csv("Deckung_Schichten.csv", header=T)
 
@@ -216,7 +216,7 @@ layer_deckung%>%
 # 4 Zeigerwerte einlesen und vorbereiten
 
 ```{r}
-#|label: import zeigerwerte
+#| label: import zeigerwerte
 # Zeigerwerte von GBIF
 zeigerwerte <- read.table("dwca-zeigerwerte-v1.2/ellenberg.txt",sep = "\t", header = TRUE)
 zeigerwerte <- zeigerwerte %>%
@@ -243,8 +243,8 @@ zeiger_mapped <- zeiger_mapped %>%
 ```
 
 ```{r}
-#|label: gewichtete zeigerwerte berechnen
-#|output: false
+#| label: gewichtete zeigerwerte berechnen
+#| output: false
 combined_long <- left_join(veg_long, zeiger_mapped, by = "Art")
 str(combined_long)
 
@@ -266,8 +266,8 @@ weighted_values <- combined_long %>%
 # 5 Höhendaten einlesen und verarbeiten
 
 ```{r}
-#|label: elevation data
-#|output: false
+#| label: elevation data
+#| output: false
 #|warning: false
 # Einlesen
 licMO <- read.csv("../Nele/höhenprofile/Lichtenau/lic_MO.csv", header=F)
@@ -353,7 +353,7 @@ plot(MeutrockWO_hoehe, type ="line")
 ```
 
 ```{r}
-#|label: arbeitsnamen einfügen und überprüfen
+#| label: arbeitsnamen einfügen und überprüfen
 #adaptiert nach ChatGPT 5.5
 #arbeitsnamen anfügen, da nicht alle vegetationsaufnahmen in der gleichen Richtung erfolgt sind!
 #MT_WO ist WM1-26, MO1-27
@@ -437,8 +437,8 @@ ggplot(vegdata,
 # 6 Diversitätsmaße berechnen
 
 ```{r}
-#|label: species richness, Shannon Index, relative Häufigkeit und species evenness bestimmen
-#|output: false
+#| label: species richness, Shannon Index, relative Häufigkeit und species evenness bestimmen
+#| output: false
 #anlegen einer Vegetationsmatrix
 comm_matrix <- veg_long %>%
   group_by(plot.ID, Art) %>%
@@ -470,7 +470,7 @@ str(results)
 ```
 
 ```{r}
-#|label: Zusammenführen mit gewichteten Zeigerwerten
+#| label: Zusammenführen mit gewichteten Zeigerwerten
 results$Plot <- as.integer(results$Plot)
 
 #Höhendaten vorbereiten
@@ -510,7 +510,7 @@ str(merged_data)
 ## Summary Diversitätsmaße berechnen
 
 ```{r}
-#|label: summary pro Standort
+#| label: summary pro Standort
 summary_area <- merged_data%>%
   group_by(site)%>%
   summarize(
@@ -550,7 +550,7 @@ Alle DCA-Codechunks wurden adaptiert nach ChatGPT 5.5
 ## 7.1 Alle Flächen
 
 ```{r}
-#|label: dca all areas
+#| label: dca all areas
 dca <- decorana(comm_matrix)
 summary(dca)
 
@@ -669,7 +669,7 @@ title = "DCA der Vegetation -- Auf der Pfalz"
 ### 7.2.1 Alle Arten
 
 ```{r}
-#|label: dca all species
+#| label: dca all species
 comm <- veg_long %>%
   filter(site=="Lic") %>%  
   group_by(plot.ID, Art) %>%
@@ -921,7 +921,7 @@ p2
 !Achtung! Bei Fläche "Lic" ist für die Moose ein anderes Codechunk auszuführen
 
 ```{r}
-#|label: dca moss
+#| label: dca moss Meusebach
 # nur für Meu_nass und Meu_trock
 comm <- veg_long %>%
   filter(site=="Meu_nass"&Schicht =="ML") %>%  
@@ -1196,7 +1196,7 @@ p3
 Sphagnum squarrosum kommt hier auf nur einem Relevee vor mit einer geringen Deckung, hat aber starken Einfluss auf die DCA und verzerrt die Ergebnisse. Daher wird die Art hier aus der Matrix entfernt bevor die DCA durchgeführt wird
 
 ```{r}
-#|label: dca moss
+#| label: dca moss Lichtenau
 comm <- veg_long %>%
   filter(site=="Lic"&Schicht =="ML") %>%  
   group_by(plot.ID, Art) %>%
@@ -1492,7 +1492,7 @@ p4
 ### 7.2.3 Gefäßpflanzen
 
 ```{r}
-#|label: dca vascular plants
+#| label: dca vascular plants
 comm <- veg_long %>%
   filter(site=="Lic"& Schicht !="ML") %>%  
   group_by(plot.ID, Art) %>%
@@ -1766,7 +1766,7 @@ p5
 Der Flächenname ist ersetzbar mit Lic, Meu_nass, Meu_trock
 
 ```{r}
-#|label: Übersicht Variablen
+#| label: Übersicht Variablen
 #plot entlang der Transekte
 merged_data %>%
   filter(site == "Lic") %>%
@@ -1898,7 +1898,7 @@ ggplot(aes(x = x, y = y, color = woody)) +
 "woody"
 
 ```{r}
-#|label: Kreuzplots für Variablen
+#| label: Kreuzplots für Variablen
 #übernommen von ChatGPT 5.5
 plot_data <- merged_data %>%
   mutate(
@@ -2017,7 +2017,7 @@ Im Error kann die genaue Zahl an bneötigten Farben abgelesen werden und in den 
 Die Fläche kann ersetzt werden mit Meu_nass, Meu_trock oder Lic
 
 ```{r}
-#|label: Kreuzplot für Artengruppen
+#| label: Kreuzplot für Artengruppen
 #adaptiert nach ChatGPT 5.5
 woody_plot_data <- veg_long %>%
   filter(
@@ -2076,7 +2076,7 @@ woody_plot_data%>%
 # 9 Korrelationen testen
 
 ```{r}
-#|label: corrplot 
+#| label: corrplot 
 
 #corrplot() erwartet numerische Matrix!
 #nur erklärende variablen
@@ -2105,7 +2105,7 @@ corrplot(
 ```
 
 ```{r}
-#|label: corrplot Meu trock
+#| label: corrplot Meu trock
 corr_matrix <- merged_data %>%
   filter(site == "Meu_trock") %>%
   select(where(is.numeric)) %>%
@@ -2115,7 +2115,7 @@ corrplot(corr_matrix, method ="number")
 ```
 
 ```{r}
-#|label: corrplot Meu nass
+#| label: corrplot Meu nass
 corr_matrix <- merged_data %>%
   filter(site == "Meu_nass") %>%
   select(where(is.numeric)) %>%
@@ -2125,7 +2125,7 @@ corrplot(corr_matrix, method ="number")
 ```
 
 ```{r}
-#|label: corrplot Lic
+#| label: corrplot Lic
 corr_matrix <- merged_data %>%
   filter(site == "Lic") %>%
   select(where(is.numeric)) %>%
@@ -2139,8 +2139,8 @@ corrplot(corr_matrix, method ="number")
 ## 10.1 Richness
 
 ```{r}
-#|label: model richness
-#|output: false
+#| label: model richness
+#| output: false
 # Richness ist eine Zählvariable -> glm mit family=poisson
 mod1<-glm(Richness ~ Weighted_light + Weighted_temperature + Weighted_wetness + Weighted_nitrogen + Weighted_alkalinity+ Hoehe+ HL + ML + SL + TL,family = poisson, data = merged_data)
 summary(mod1)
@@ -2177,8 +2177,8 @@ summary(mod4)
 ## 10.2 Shannon-Index
 
 ```{r}
-#|label: model shannon
-#|output: false
+#| label: model shannon
+#| output: false
 mod5<-lm(Shannon ~ Weighted_light + Weighted_temperature + Weighted_wetness + Weighted_nitrogen + Weighted_alkalinity+Hoehe+ HL + ML + SL + TL , data = merged_data)
 summary(mod5)
 mod6<-update(mod5,~.-TL)
@@ -2221,8 +2221,8 @@ summary(mod11)
 ## 10.3 Evenness
 
 ```{r}
-#|label: model evenness
-#|output: false
+#| label: model evenness
+#| output: false
 mod12<-lm(Evenness ~ Weighted_light + Weighted_temperature + Weighted_wetness + Weighted_nitrogen + Weighted_alkalinity+ HL + ML + SL + TL + Hoehe, data = merged_data)
 summary(mod12)
 mod13<-update(mod12,~.-ML)
@@ -2260,8 +2260,8 @@ summary(mod17)
 ## 10.4 Sukzessionszeiger
 
 ```{r}
-#|label: model sukzessionszeiger
-#|output: false
+#| label: model sukzessionszeiger
+#| output: false
 mod18<-lm(Sukzessionszeiger ~ Weighted_light + Weighted_temperature + Weighted_wetness + Weighted_nitrogen + Weighted_alkalinity+ HL + ML + SL + TL + Hoehe, data = merged_data)
 summary(mod18)
 mod19<-update(mod18,~.-Weighted_nitrogen)
@@ -2282,8 +2282,8 @@ check_model(mod20)
 ```
 
 ```{r}
-#|label: log1p
-#|output: false
+#| label: log1p
+#| output: false
 mod21<-lm(log1p(Sukzessionszeiger) ~ Weighted_light + Weighted_temperature + Weighted_wetness + Weighted_alkalinity + HL + ML + SL + Hoehe,data = merged_data)
 summary(mod21)
 mod22<-update(mod21,~.-Weighted_alkalinity)
@@ -2298,8 +2298,8 @@ plot(mod22)
 ```
 
 ```{r}
-#|label: gam
-#|output: false
+#| label: gam sukzession
+#| output: false
 # das hat auch nix verbessert, ich lasse das modell nochmal von vorne laufen als gam mit family=tweedie, da abhängige Variable stark rechtsschief
 mod23<-gam(Sukzessionszeiger ~ Weighted_light + Weighted_temperature + Weighted_wetness + Weighted_nitrogen + Weighted_alkalinity+ HL + ML + SL + TL + Hoehe,family=tw, data = merged_data)
 summary(mod23)
@@ -2332,8 +2332,8 @@ summary(mod27)
 ## 10.5 Moorart
 
 ```{r}
-#|label: model moorarten
-#|output: false
+#| label: model moorarten
+#| output: false
 mod28<- lm(Moorart ~Weighted_light + Weighted_temperature + Weighted_wetness + Weighted_nitrogen + Weighted_alkalinity+ HL + ML + SL + TL + Hoehe, data=merged_data)
 summary(mod28)
 mod29<-update(mod28,~.-Weighted_alkalinity)
@@ -2364,14 +2364,14 @@ check_model(mod32)
 ## 10.6 Gehölze
 
 ```{r}
-#|label: model woody
+#| label: model woody
 hist(merged_data$woody)
 #ich sollte wieder ein gam mit family=tweedie nutzen
 ```
 
 ```{r}
-#|label: gam
-#|output: false
+#| label: gam woody
+#| output: false
 mod33<-gam(woody ~Weighted_light + Weighted_temperature + Weighted_wetness + Weighted_nitrogen + Weighted_alkalinity+ HL + ML + SL + TL + Hoehe,family=tw, data=merged_data)
 summary(mod33)
 mod34<-update(mod33,~.-Weighted_temperature)
