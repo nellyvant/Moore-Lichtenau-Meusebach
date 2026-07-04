@@ -1193,7 +1193,7 @@ p3
 
 #### b) Lichtenau
 
-Sphagnum squarrosum kommt hier auf nur einem Relevee vor mit einer geringen Deckung, hat aber starken Einfluss auf die DCA und verzerrt die Ergebnisse. Daher wird die Art hier aus der Matrix entfernt bevor die DCA durchgeführt wird
+DCA1 hat nur eine Achsenlänge von 1,001 und wird maßgeblich von Sphagnum squarrosum bestimmt. Deshalb werden in Lichtenau statt DCA1 und DCA2 die Achsen DCA2 und DCA3 verwendet.
 
 ```{r}
 #| label: dca moss Lichtenau
@@ -1216,30 +1216,6 @@ comm <- comm[
   colSums(comm) > 0,
   drop = FALSE
 ]
-###################################################################################
-#S. squarrosum verzerrt die DCA. Die Art sollte entfernt werden. Sie kommt nur auf einem einzigen relevee vor
-comm[
-  comm[, "Sphagnum_squarrosum"] > 0,
-  "Sphagnum_squarrosum",
-  drop = FALSE
-]
-#die Art kommt nur auf einem Quadrat mit relativ wenig Deckung vor, deswegen wird sie erstmal entfernt
-
-#entfernen von s. squarrosum in Lichtenau
-comm <- comm[
-  rownames(comm) != "225",
-  ,
-  drop = FALSE
-]
-
-# Sphagnum_squarrosum ist danach eine vollständige Nullspalte
-comm <- comm[
-  ,
-  colSums(comm) > 0,
-  drop = FALSE
-]
-###################################################################################
-
 
 dca <- decorana(comm)
 summary(dca)
@@ -1278,12 +1254,12 @@ fit <- envfit(dca, env[, c("Weighted_light",
                               "TL",
                               "ML",
                               "HL",
-                              "SL")])
+                              "SL")], choices =c(1:4))
 
 fit
 
 plot(dca)
-arrows <-as.data.frame(scores(fit, display = "vectors"))
+arrows <-as.data.frame(scores(fit, display = "vectors", choices =c(1:4)))
 arrows$Variable <- rownames(arrows)
 arrows$p_value <- fit$vectors$pvals
 arrows$r2 <- fit$vectors$r
@@ -1315,7 +1291,7 @@ dca_df$Transekt <- vegdata$Transekt[
 ]
 
 #species scores
-species_df <- as.data.frame(scores(dca, display = "species", choices = c(1, 2)))
+species_df <- as.data.frame(scores(dca, display = "species", choices = c(1:4)))
 species_df$Art <- rownames(species_df)
 species_totals <- colSums(comm, na.rm = TRUE)
 species_df <- species_df %>%
@@ -1334,8 +1310,8 @@ geom_point(
   data = dca_df %>%
     filter(Transekt == "NS"),
   aes(
-    x = DCA1,
-    y = DCA2,
+    x = DCA2,
+    y = DCA3,
     fill = Transektnummer,
     shape = Transekt
   ),
@@ -1370,8 +1346,8 @@ geom_point(
   data = dca_df %>%
     filter(Transekt == "WO"),
   aes(
-    x = DCA1,
-    y = DCA2,
+    x = DCA2,
+    y = DCA3,
     fill = Transektnummer,
     shape = Transekt
   ),
@@ -1409,8 +1385,8 @@ geom_segment(
   aes(
     x = 0,
     y = 0,
-    xend = DCA1*2 ,
-    yend = DCA2 *2
+    xend = DCA2*2 ,
+    yend = DCA3 *2
   ),
   inherit.aes = FALSE,
   arrow = arrow(
@@ -1424,8 +1400,8 @@ geom_segment(
   geom_text_repel(
     data = arrows_sig,
     aes(
-      x = DCA1 *2,
-      y = DCA2 *2,
+      x = DCA2 *2,
+      y = DCA3 *2,
       label = Variable
     ),
     inherit.aes = FALSE,
@@ -1443,7 +1419,7 @@ geom_segment(
 # --------------------------------------------------
 geom_point(
   data = species_df,
-  aes(x = DCA1, y = DCA2),
+  aes(x = DCA2, y = DCA3),
   shape = 17,
   size = 2.5,
   colour = "grey30"
@@ -1452,8 +1428,8 @@ geom_point(
   geom_text_repel(
     data = species_df,
     aes(
-      x = DCA1,
-      y = DCA2,
+      x = DCA2,
+      y = DCA3,
       label = Art
     ),
     size = 3.5,
@@ -1471,8 +1447,8 @@ geom_point(
   labs(
     title = "DCA der Moosvegetation – Kleiner Sumpf",
     subtitle = "Aufnahmeflächen, Arten und signifikante Umweltvektoren",
-    x = "DCA1",
-    y = "DCA2"
+    x = "DCA2",
+    y = "DCA3"
   ) +
   coord_equal() +
   theme_minimal() +

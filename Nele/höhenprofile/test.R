@@ -1820,3 +1820,169 @@ woody_plot_data%>%
 
 
 p2
+
+
+
+
+######p3######
+
+p3<-ggplot() +
+  # --------------------------------------------------
+# NS-Transekt: Süden blau, Mitte weiß, Norden rot
+# --------------------------------------------------
+geom_point(
+  data = dca_df %>%
+    filter(Transekt == "NS"),
+  aes(
+    x = DCA2,
+    y = DCA4,
+    fill = Transektnummer,
+    shape = Transekt
+  ),
+  size = 4,
+  stroke = 0.7,
+  colour = "black"
+) +
+  
+  scale_fill_gradient2(
+    low = "#2166AC",
+    mid = "white",
+    high = "#B2182B",
+    midpoint = 0,
+    breaks = c(
+      min(dca_df$Transektnummer[dca_df$Transekt == "NS"],
+          na.rm = TRUE),
+      0,
+      max(dca_df$Transektnummer[dca_df$Transekt == "NS"],
+          na.rm = TRUE)
+    ),
+    labels = c("Süden", "Mitte", "Norden"),
+    name = "NS-Transekt"
+  ) +
+  
+  # Neue unabhängige Füllfarbenskala
+  ggnewscale::new_scale_fill() +
+  
+  # --------------------------------------------------
+# WO-Transekt: Westen grün, Mitte weiß, Osten gelb
+# --------------------------------------------------
+geom_point(
+  data = dca_df %>%
+    filter(Transekt == "WO"),
+  aes(
+    x = DCA2,
+    y = DCA4,
+    fill = Transektnummer,
+    shape = Transekt
+  ),
+  size = 4,
+  stroke = 0.7,
+  colour = "black"
+) +
+  
+  scale_fill_gradient2(
+    low = "#1B7837",
+    mid = "white",
+    high = "#FFD92F",
+    midpoint = 0,
+    breaks = c(
+      min(dca_df$Transektnummer[dca_df$Transekt == "WO"],
+          na.rm = TRUE),
+      0,
+      max(dca_df$Transektnummer[dca_df$Transekt == "WO"],
+          na.rm = TRUE)
+    ),
+    labels = c("Westen", "Mitte", "Osten"),
+    name = "WO-Transekt"
+  ) +
+  scale_shape_manual(
+    name = "Transekt",
+    values = c(NS = 21, WO = 22),
+    labels = c(NS = "Nord–Süd", WO = "West–Ost")
+  )+
+  
+  # --------------------------------------------------
+# Signifikante envfit-Pfeile
+# --------------------------------------------------
+geom_segment(
+  data = arrows_sig,
+  aes(
+    x = 0,
+    y = 0,
+    xend = DCA2*2 ,
+    yend = DCA4 *2
+  ),
+  inherit.aes = FALSE,
+  arrow = arrow(
+    length = unit(0.25, "cm"),
+    type = "closed"
+  ),
+  linewidth = 0.7,
+  colour = "black"
+) +
+  
+  geom_text_repel(
+    data = arrows_sig,
+    aes(
+      x = DCA2 *2,
+      y = DCA4 *2,
+      label = Variable
+    ),
+    inherit.aes = FALSE,
+    size = 3.5,
+    fontface = "bold",
+    colour = "black",
+    box.padding = 0.5,
+    point.padding = 0.2,
+    segment.colour = "grey50",
+    max.overlaps = Inf,
+    seed = 321
+  ) +
+  # --------------------------------------------------
+# Arten
+# --------------------------------------------------
+geom_point(
+  data = species_df,
+  aes(x = DCA2, y = DCA4),
+  shape = 17,
+  size = 2.5,
+  colour = "grey30"
+) +
+  
+  geom_text_repel(
+    data = species_df,
+    aes(
+      x = DCA2,
+      y = DCA4,
+      label = Art
+    ),
+    size = 3.5,
+    colour = "grey30",
+    box.padding = 0.5,
+    point.padding = 0.3,
+    segment.colour = "grey70",
+    max.overlaps = Inf,
+    seed = 123
+  ) +
+  # --------------------------------------------------
+# Beschriftungen von Achsen, Titel usw
+# -------------------------------------------------- 
+
+labs(
+  title = "DCA der Moosvegetation – Fuchshügel",
+  subtitle = "Aufnahmeflächen, Arten und signifikante Umweltvektoren",
+  x = "DCA2",
+  y = "DCA4"
+) +
+  coord_equal() +
+  theme_minimal() +
+  theme(
+    plot.title = element_text(
+      hjust = 0.5,
+      face = "bold"
+    ),
+    plot.subtitle = element_text(hjust = 0.5),
+    panel.grid.minor = element_blank(),
+    legend.position = "right"
+  )
+p3
