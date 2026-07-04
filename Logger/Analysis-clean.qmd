@@ -592,7 +592,7 @@ summary_daily_logger %>%
 Gilt für alle Signifikanztests: Bei Normalverteilung -\> repeated measures anova;\
 keine Normalverteilung -\> friedman-Test
 
-ACHTUNG: Anova benötigt gleiche Zeitreihen. Das heißt, da wo einzelne Logger ausgefallen sind, werden Daten auch anderen Loggern nicht mit in die Anova eingerechnet!! Die Ergebnisse sind daher etwas vorsichtig zu betrachten! Beim friedman-test werden die Tage mit ausgefallenen Loggern ebenfalls entfernt!
+ACHTUNG: Anova benötigt gleiche Zeitreihen. Das heißt, da wo einzelne Logger ausgefallen sind, werden auch Daten der anderen Logger nicht mit in die Anova eingerechnet!! Die Ergebnisse sind daher etwas vorsichtig zu betrachten! Beim friedman-test werden die Tage mit ausgefallenen Loggern ebenfalls entfernt!
 
 ```{r}
 #L
@@ -848,16 +848,16 @@ PostHoc_MT <- emmeans(ANOVA_MT, specs = "Logger")
 pairs(PostHoc_MT, adjust = "bonferroni")
 # 66 Tage wurden wegen fehlender Werte entfernt
 # contrast estimate     SE df t.ratio p.value
-# M - N     -0.1753 0.0368 79  -4.768 <0.0001
-# M - O     -0.0899 0.0197 79  -4.552  0.0002
-# M - S      0.0200 0.0290 79   0.692  1.0000
-# M - W     -0.4315 0.0465 79  -9.284 <0.0001
-# N - O      0.0855 0.0344 79   2.484  0.1510
-# N - S      0.1954 0.0314 79   6.218 <0.0001
-# N - W     -0.2562 0.0436 79  -5.871 <0.0001
-# O - S      0.1099 0.0260 79   4.234  0.0006
-# O - W     -0.3417 0.0444 79  -7.695 <0.0001
-# S - W     -0.4516 0.0455 79  -9.915 <0.0001
+# M - N     -0.1753 0.0368 79  -4.768 <0.0001 *
+# M - O     -0.0899 0.0197 79  -4.552  0.0002 *
+# M - S      0.0200 0.0290 79   0.692  1.0000 
+# M - W     -0.4315 0.0465 79  -9.284 <0.0001 *
+# N - O      0.0855 0.0344 79   2.484  0.1510 
+# N - S      0.1954 0.0314 79   6.218 <0.0001 *
+# N - W     -0.2562 0.0436 79  -5.871 <0.0001 *
+# O - S      0.1099 0.0260 79   4.234  0.0006 *
+# O - W     -0.3417 0.0444 79  -7.695 <0.0001 *
+# S - W     -0.4516 0.0455 79  -9.915 <0.0001 *
 
 #MN
 dat_MN <- summary_daily_logger %>%
@@ -2606,7 +2606,9 @@ ggplot(summary_daily_area,aes(x = Datum, y = rLF_area_mean, color = Standort)) +
   )
 ```
 
-## 6.4 PCA
+## 6.4 PCA -\> sollte raus
+
+PCA ergibt wenig sinn, da nur ein messpunkt pro variable und standort
 
 ```{r}
 #| label: PCA with 2 plots
