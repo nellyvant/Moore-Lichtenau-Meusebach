@@ -504,6 +504,7 @@ plot_box <- function(df, st, titel=NULL, x_name=NULL) {
 
 ```{r}
 plot_lin1(Wassertiefen, "MT", titel="")
+ggsave(filename = "Wassertiefen_MT.png", plot = plot_lin1(Wassertiefen, "MT", titel = ""),width = 16, height = 12,units = "cm",dpi = 300)
 ```
 
 ```{r}
@@ -518,6 +519,7 @@ plot_box(Wassertiefen, st="MT",
 ```{r}
 # Liniendiagramm
 plot_lin1(Wassertiefen, "MN", titel="")
+ggsave(filename = "Wassertiefen_MN.png", plot = plot_lin1(Wassertiefen, "MN", titel = ""),width = 16, height = 12,units = "cm",dpi = 300)
 ```
 
 ```{r}
@@ -532,6 +534,7 @@ plot_box(Wassertiefen, st="MN",
 ```{r}
 # Liniendiagramm
 plot_lin1(Wassertiefen, "L", titel="")
+ggsave(filename = "Wassertiefen_L.png", plot = plot_lin1(Wassertiefen, "L", titel = ""),width = 16, height = 12,units = "cm",dpi = 300)
 ```
 
 ```{r}
