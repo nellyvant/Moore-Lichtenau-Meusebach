@@ -1990,13 +1990,13 @@ p4
 
 
 ######friedman konkrete estimates oder so berehcnen#####
-dat_MT_fried %>%
+dat_L_fried %>%
   group_by(Logger_ID) %>%
   summarise(
     n_Tage = n(),
     Median = median(Licht_summe, na.rm = TRUE),
-    IQR = IQR(Licht_summe, na.rm = TRUE),
-    Mittelwert = mean(Licht_summe, na.rm = TRUE),
+    IQR = IQR(Temp_sonne_max, na.rm = TRUE),
+    Mittelwert = mean(Temp_sonne_max, na.rm = TRUE),
     .groups = "drop"
   ) %>%
   arrange(desc(Median))
