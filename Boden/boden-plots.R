@@ -61,7 +61,7 @@ hum_summary %>%
   theme_minimal()
 
 
-
+#für die Plots der anderen Flächen ist MT durch MN oder L zu ersetzen
 
 plot_data <- hum %>%
   filter(site == "mt" & !is.na(hum_num)) %>%
