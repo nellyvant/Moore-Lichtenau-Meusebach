@@ -12,6 +12,7 @@ editor_options:
 # 1 genutzte Packages
 
 ```{r}
+#| output: false
 library(dplyr)
 library(lubridate)
 library(tidyr)
@@ -1751,8 +1752,8 @@ plusprecipl <- plusprecipl %>%
   mutate(
     Tage_seit_Regen =as.numeric(difftime(Datum, letzter_Regen,units = "days"))) %>%
   select(-letzter_Regen) %>%
-  arrange(Standort, Datum) %>%
-  group_by(Standort) %>%
+  arrange(Logger_ID, Datum) %>%
+  group_by(Logger_ID) %>%
   mutate(
     delta_LF = rLF_mean - lag(rLF_mean)
   ) %>%
@@ -1809,7 +1810,7 @@ pairwise.wilcox.test(
   p.adjust.method = "BH",
   exact = FALSE
 )
-# signif Unterschiede zwischen allen Loggern in Lichtenau
+# keine signif unterschiede
 
 #boxplot
 dat_rLF_L %>%
@@ -1910,91 +1911,65 @@ str(model_data)
 #################################################################
 # Unskaliertes Modell -> Interpretation in Originaleinheiten (physikalisch interpretierbar)
 
-# Skaliertes Modell -> Vergleich der Effektstärken zwischen Prädiktoren möglich (standardisierte Effekte)
 
 #Modell über alle Standorte 
 mod <- lmer(
   delta_LF ~ Deckung_TL + Tage_seit_Regen + Temp_schatten_mean + Standort +
-    (1 | Logger),
+    (1 | Logger_ID),
   data = model_data
 )
 summary(mod)
-#Deckung TL: hoch signifikant p = 1.21e-05, Estimate = 2.721e-02 -> mit steigender Deckung TL, weniger Austrockung
-#Tage seit Regen: signifikant p=0.0283, Estimate = 1.295e-01 -> je länger der Regen heher ist, desto weniger Autrocknung (vmtl starke Austrockung an Tag 1, weniger austrocknung an tag 2 usw?)
-#Standort: MN unterscheidet sich signifikant zu L p = 0.0365, Estimate = -7.541e-01, Standort MN trocknet schneller aus als L
-
-
-#ermöglicht Vergleich der Variabeln, so dass man ermitteln kann welcher Effekt den größten Einfluss hat 
-model_data_scaled <- model_data %>%
-  mutate(
-    delta_LF_z = scale(delta_LF),
-    Deckung_z = scale(Deckung_TL),
-    Regen_z = scale(Tage_seit_Regen),
-    Temp_z = scale(Temp_schatten_mean)
-  )
-
-mod_scaled <-lmer(delta_LF_z ~ Deckung_z + Regen_z + Temp_z + (1 | Logger),
-     data = model_data_scaled)
-summary(mod_scaled)
-#Dekcung TL: stärkster Effekt 0.15662  
-#Regen: 0.06269
-
-     
-r2(mod)
-#Marginal R² = 0.043 -> Temperatur, Regen, Deckung, Standort erklären 4.3% der Variation in delta_LF
-#Conditional R² = 0.155 -> gesamtes Modell (inkl. Logger) erklärt   15.5% der Variation
-# = Modell erklärt nur einen kleinen Teil der Luftfeuchte-Dynamik!!
-
-################################################################
-#Modell für Standort Meusebach nass
-data_MN <- model_data %>%
-  filter(Standort == "MN")
-
-mod_MN <- lmer(
-  delta_LF ~ Deckung_TL + Tage_seit_Regen + Temp_schatten_mean + (1 | Logger),
-  data = data_MN
+#Random effects:
+# Groups    Name        Variance Std.Dev.
+# Logger_ID (Intercept)  0.00    0.000   
+#Logger_ID erklärt keine Effekte, daher wechsel zu einem lm
+mod_lm <- lm(
+  delta_LF ~ Deckung_TL + Tage_seit_Regen +
+    Temp_schatten_mean + Standort,
+  data = model_data
 )
-summary(mod_MN)
-#Temperatur: nicht signifikant, p = 0.2588
-#Deckung_TL: nicht signifikant, p = 0.7045
-#Tage seit Regen: signifikant, p = 0.0418, estimate = 0.14404
-r2(mod_MN)
-#Conditional R2: 0.522
-#Marginal R2: 0.022
+
+summary(mod_lm)
+mod_lm2<-update(mod_lm,~.-Temp_schatten_mean)
+anova(mod_lm, mod_lm2)
+#p=0,97
+summary(mod_lm2)
+mod_lm3<-update(mod_lm2,~.-Deckung_TL)
+anova(mod_lm2, mod_lm3)
+#p=0,6
+summary(mod_lm3)
+#Tage seit Regen einziger übriger Effekt mit Estimate =  -0.027267
+#rel Luftfeuchte nimmt stärker ab, je länger der letze Regentag zurückliegt -> austrockung verstärkt sich mit der zeit
+#in mn und mt ist austrockung stärker als in L
+#Multiple R-squared:  0.02391 -> modell erklärt nur super wenig variation der täglichen luftfeuchteänderung
+
+
+
 
 ###############################################################
-#Modell für Standort Meusebach trocken
+#Modell für Standort einzeln
+#Meusebach trocken, ersetze für andere Standorte MT durch MN oder L
 data_MT <- model_data %>%
   filter(Standort == "MT")
 
-mod_MT <- lmer(
-  delta_LF ~ Deckung_TL + Tage_seit_Regen + Temp_schatten_mean + (1 | Logger),
+mod_MT <- lm(
+  delta_LF ~ Deckung_TL + Tage_seit_Regen + Temp_schatten_mean,
   data = data_MT
 )
 summary(mod_MT)
-#Temperatur: nicht signifikant, p = 0.4694 
-#Deckung_TL: knapp nicht signifikant, p = 0.0515 
-#Tage seit Regen: nicht signifikant, p = 0.1182
-r2(mod_MT)
-#Conditional R2: 0.566
-#Marginal R2: 0.349
+mod2_MT<-update(mod_MT,~.-Temp_schatten_mean)
+anova(mod_MT, mod2_MT)
+#p=0,25
+summary(mod2_MT)
+mod3_MT<-update(mod2_MT,~.-Tage_seit_Regen)
+anova(mod2_MT, mod3_MT)
+#p=0,18
+summary(mod3_MT)
+#DeckungTL als einziger prädikator übrig, Estimate =-0.083405
+#ABER! Gilt für alle standortspezifischen modelle: Deckung TL ist immer gleich, wurde nicht an verschiedenen tagen gemessen UND es gibt nur 5 unterschiedliche logger-> beides führt zu einem extrem kleinen p-wert!
 
-##############################################################
-#Modell für Standort Lichtenau
-data_L <- model_data %>%
-  filter(Standort == "L")
 
-mod_L <- lmer(
-  delta_LF ~ Deckung_TL + Tage_seit_Regen + Temp_schatten_mean + (1 | Logger),
-  data = data_L
-)
-summary(mod_L)
-#Temperatur: nicht signifikant, p = 0.5835 
-#Deckung_TL: nicht signifikant, p = 0.0672 
-#Tage seit Regen: nicht signifikant, p = 0.1565
-r2(mod_L)
-#Conditional R2: 0.702
-#Marginal R2: 0.434
+
 ```
 
 ```{r}
