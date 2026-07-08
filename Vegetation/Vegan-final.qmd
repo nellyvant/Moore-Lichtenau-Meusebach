@@ -672,7 +672,7 @@ title = "DCA der Vegetation -- Auf der Pfalz"
 ```{r}
 #| label: dca all species
 comm <- veg_long %>%
-  filter(site=="Lic") %>%  
+  filter(site=="Meu_trock") %>%  
   group_by(plot.ID, Art) %>%
   summarise(
     Deckung = sum(Deckung, na.rm = TRUE),
@@ -695,7 +695,7 @@ dca <- decorana(comm)
 summary(dca)
 
 env <- merged_data %>%
-  filter(site == "Lic")
+  filter(site == "Meu_trock")
 fit <- envfit(dca, env[, c("Weighted_light",
                               "Weighted_temperature",
                               "Weighted_wetness",
@@ -821,11 +821,11 @@ geom_point(
     labels = c("Westen", "Mitte", "Osten"),
     name = "WO-Transekt"
   ) +
-  scale_shape_manual(
-    name = "Transekt",
-    values = c(NS = 21, WO = 22),
-    labels = c(NS = "Nord–Süd", WO = "West–Ost")
-    )+
+#  scale_shape_manual(
+#    name = "Transekt",
+#    values = c(NS = 21, WO = 22),
+#    labels = c(NS = "Nord–Süd", WO = "West–Ost")
+#    )+
   
   # --------------------------------------------------
 # Signifikante envfit-Pfeile
@@ -855,7 +855,7 @@ geom_segment(
       label = Variable
     ),
     inherit.aes = FALSE,
-    size = 3.5,
+    size = 3.6,
     fontface = "bold",
     colour = "black",
     box.padding = 0.5,
@@ -869,34 +869,44 @@ geom_segment(
 # --------------------------------------------------
 geom_point(
   data = species_df,
-  aes(x = DCA1, y = DCA2),
-  shape = 17,
+  aes(x = DCA1, y = DCA2,shape = "Arten"),
   size = 2.5,
   colour = "grey30"
 ) +
-  
-  geom_text_repel(
-    data = species_df,
-    aes(
-      x = DCA1,
-      y = DCA2,
-      label = Art
-    ),
-    size = 3.5,
-    colour = "grey30",
-    box.padding = 0.5,
-    point.padding = 0.3,
-    segment.colour = "grey70",
-    max.overlaps = Inf,
-    seed = 123
-  ) +
+#  geom_text_repel(
+#    data = species_df,
+##    aes(
+#      x = DCA1,
+#      y = DCA2,
+#      label = Art
+#    ),
+#    size = 3.5,
+#    colour = "grey30",
+#    box.padding = 0.5,
+#    point.padding = 0.3,
+#    segment.colour = "grey70",
+#    max.overlaps = Inf,
+#    seed = 123
+#  ) +
   # --------------------------------------------------
 # Beschriftungen von Achsen, Titel usw
 # -------------------------------------------------- 
-  
+  scale_shape_manual(
+  name = "Symbol",
+  breaks = c("NS", "WO", "Arten"),
+  values = c(
+    NS = 21,
+    WO = 22,
+    Arten = 17
+  ),
+  labels = c(
+    NS = "Nord–Süd",
+    WO = "West–Ost",
+    Arten = "Arten"
+  )
+)+
   labs(
-    title = "DCA der Vegetation – Auf der Pfalz",
-    subtitle = "Aufnahmeflächen, Arten und signifikante Umweltvektoren",
+    title = "DCA der Vegetation – Fuchshügel",
     x = "DCA1",
     y = "DCA2"
   ) +
@@ -907,12 +917,20 @@ geom_point(
       hjust = 0.5,
       face = "bold"
     ),
-    plot.subtitle = element_text(hjust = 0.5),
     panel.grid.minor = element_blank(),
-    legend.position = "right"
+    legend.position = "right",
+    legend.title = element_text(
+    size = 14,
+    face = "bold"
+  ),
+  legend.text = element_text(
+    size = 13
+  ),
+  legend.key.size = unit(0.8, "cm"),
+  legend.spacing.y = unit(0.3, "cm")
   )
 p2
-#ggsave( "DCA-Meu-nass.png",p2, path="plots",width = 12, height = 10, dpi = 300)
+#ggsave( "DCA-Meu-trock.png",p2, path="plots",width = 12, height = 10, dpi = 300)
 ```
 
 ### 7.2.2 Moose
@@ -925,7 +943,7 @@ p2
 #| label: dca moss Meusebach
 # nur für Meu_nass und Meu_trock
 comm <- veg_long %>%
-  filter(site=="Meu_nass"&Schicht =="ML") %>%  
+  filter(site=="Meu_trock"&Schicht =="ML") %>%  
   group_by(plot.ID, Art) %>%
   summarise(
     Deckung = sum(Deckung, na.rm = TRUE),
@@ -962,7 +980,7 @@ env_vars <- c(
 
 env <- merged_data %>%
   filter(
-    site == "Meu_nass",
+    site == "Meu_trock",
     as.character(Plot) %in% rownames(comm)
   ) %>%
   select(
@@ -1146,8 +1164,7 @@ geom_segment(
 # --------------------------------------------------
 geom_point(
   data = species_df,
-  aes(x = DCA1, y = DCA2),
-  shape = 17,
+  aes(x = DCA1, y = DCA2,shape = "Arten"),
   size = 2.5,
   colour = "grey30"
 ) +
@@ -1170,10 +1187,22 @@ geom_point(
   # --------------------------------------------------
 # Beschriftungen von Achsen, Titel usw
 # -------------------------------------------------- 
-  
+  scale_shape_manual(
+  name = "Symbol",
+  breaks = c("NS", "WO", "Arten"),
+  values = c(
+    NS = 21,
+    WO = 22,
+    Arten = 17
+  ),
+  labels = c(
+    NS = "Nord–Süd",
+    WO = "West–Ost",
+    Arten = "Arten"
+  )
+)+
   labs(
     title = "DCA der Moosvegetation – Fuchshügel",
-    subtitle = "Aufnahmeflächen, Arten und signifikante Umweltvektoren",
     x = "DCA1",
     y = "DCA2"
   ) +
@@ -1184,9 +1213,17 @@ geom_point(
       hjust = 0.5,
       face = "bold"
     ),
-    plot.subtitle = element_text(hjust = 0.5),
     panel.grid.minor = element_blank(),
-    legend.position = "right"
+    legend.position = "right",
+    legend.title = element_text(
+    size = 14,
+    face = "bold"
+  ),
+  legend.text = element_text(
+    size = 13
+  ),
+  legend.key.size = unit(0.8, "cm"),
+  legend.spacing.y = unit(0.3, "cm")
   )
 p3
 #ggsave("DCA-Meu-trock-moss.png",p3, path="plots",width = 12, height = 10, dpi = 300)
@@ -1420,8 +1457,7 @@ geom_segment(
 # --------------------------------------------------
 geom_point(
   data = species_df,
-  aes(x = DCA2, y = DCA3),
-  shape = 17,
+  aes(x = DCA1, y = DCA2,shape = "Arten"),
   size = 2.5,
   colour = "grey30"
 ) +
@@ -1444,10 +1480,22 @@ geom_point(
   # --------------------------------------------------
 # Beschriftungen von Achsen, Titel usw
 # -------------------------------------------------- 
-  
+  scale_shape_manual(
+  name = "Symbol",
+  breaks = c("NS", "WO", "Arten"),
+  values = c(
+    NS = 21,
+    WO = 22,
+    Arten = 17
+  ),
+  labels = c(
+    NS = "Nord–Süd",
+    WO = "West–Ost",
+    Arten = "Arten"
+  )
+)+
   labs(
     title = "DCA der Moosvegetation – Kleiner Sumpf",
-    subtitle = "Aufnahmeflächen, Arten und signifikante Umweltvektoren",
     x = "DCA2",
     y = "DCA3"
   ) +
@@ -1458,9 +1506,17 @@ geom_point(
       hjust = 0.5,
       face = "bold"
     ),
-    plot.subtitle = element_text(hjust = 0.5),
     panel.grid.minor = element_blank(),
-    legend.position = "right"
+    legend.position = "right",
+    legend.title = element_text(
+    size = 14,
+    face = "bold"
+  ),
+  legend.text = element_text(
+    size = 13
+  ),
+  legend.key.size = unit(0.8, "cm"),
+  legend.spacing.y = unit(0.3, "cm")
   )
 p4
 #ggsave( "DCA-Lic-moss.png",p4, path="plots",width = 12, height = 10, dpi = 300)
@@ -1471,7 +1527,7 @@ p4
 ```{r}
 #| label: dca vascular plants
 comm <- veg_long %>%
-  filter(site=="Lic"& Schicht !="ML") %>%  
+  filter(site=="Meu_trock"& Schicht !="ML") %>%  
   group_by(plot.ID, Art) %>%
   summarise(
     Deckung = sum(Deckung, na.rm = TRUE),
@@ -1508,7 +1564,7 @@ env_vars <- c(
 
 env <- merged_data %>%
   filter(
-    site == "Lic",
+    site == "Meu_trock",
     as.character(Plot) %in% rownames(comm)
   ) %>%
   select(
@@ -1692,8 +1748,7 @@ geom_segment(
 # --------------------------------------------------
 geom_point(
   data = species_df,
-  aes(x = DCA1, y = DCA2),
-  shape = 17,
+  aes(x = DCA1, y = DCA2,shape = "Arten"),
   size = 2.5,
   colour = "grey30"
 ) +
@@ -1716,10 +1771,22 @@ geom_point(
   # --------------------------------------------------
 # Beschriftungen von Achsen, Titel usw
 # -------------------------------------------------- 
-  
+  scale_shape_manual(
+  name = "Symbol",
+  breaks = c("NS", "WO", "Arten"),
+  values = c(
+    NS = 21,
+    WO = 22,
+    Arten = 17
+  ),
+  labels = c(
+    NS = "Nord–Süd",
+    WO = "West–Ost",
+    Arten = "Arten"
+  )
+)+
   labs(
-    title = "DCA der Vegetation der Gefäßpflanzen – Kleiner Sumpf",
-    subtitle = "Aufnahmeflächen, Arten und signifikante Umweltvektoren",
+    title = "DCA der Vegetation der Gefäßpflanzen – Fuchshügel",
     x = "DCA1",
     y = "DCA2"
   ) +
@@ -1730,12 +1797,20 @@ geom_point(
       hjust = 0.5,
       face = "bold"
     ),
-    plot.subtitle = element_text(hjust = 0.5),
     panel.grid.minor = element_blank(),
-    legend.position = "right"
+    legend.position = "right",
+    legend.title = element_text(
+    size = 14,
+    face = "bold"
+  ),
+  legend.text = element_text(
+    size = 13
+  ),
+  legend.key.size = unit(0.8, "cm"),
+  legend.spacing.y = unit(0.3, "cm")
   )
 p5
-#ggsave( "DCA-Lic-vasc.png",p5, path="plots",width = 12, height = 10, dpi = 300)
+ggsave( "DCA-Meu-trock-vasc.png",p5, path="plots",width = 12, height = 10, dpi = 300)
 ```
 
 # 8 Transekte plotten
@@ -1885,39 +1960,41 @@ plot_data <- merged_data %>%
 
 #adaptiert nach ChatGPT 5.5
 #Farbschema für Zeigerwerte angepasst, die markierten Zeilen sollten bei Zeigerwerten (Weighted_...) ausgfeführt werden, für alle anderen Größen nicht
-plot_data %>%
+p6<-plot_data %>%
   filter(site == "Lic") %>%
-  ggplot(aes(x = x, y = y, color = woody)) +
+  ggplot(aes(x = x, y = y, color = Weighted_wetness)) +
   geom_point(size = 4) +
   coord_equal() +
   scale_color_gradientn(
   colours = viridisLite::turbo(10), 
-#  values = scales::rescale(0:9),  # nur bei zeigerwerten ausführen
-#  limits = c(0, 9), # nur bei zeigerwerten ausführen
-#  breaks = c(1, 3, 5, 7, 9), # nur bei zeigerwerten ausführen
-#  labels = c(1, 3, 5, 7, 9) # nur bei zeigerwerten ausführen
+  values = scales::rescale(0:9),  # nur bei zeigerwerten ausführen
+  limits = c(0, 9), # nur bei zeigerwerten ausführen
+  breaks = c(1, 3, 5, 7, 9), # nur bei zeigerwerten ausführen
+  labels = c(1, 3, 5, 7, 9) # nur bei zeigerwerten ausführen
   ) + 
   annotate("text",
            x = max(plot_data$x),y = 0,
            label = "O",
-           size = 5,
+           size = 5.5,
            hjust = 1.4) +
   annotate("text",
            x = min(plot_data$x),y = 0,
            label = "W",
-           size = 5,
+           size = 5.5,
            hjust = 1.4) +
   annotate("text",
            x = 0,y = max(plot_data$y),
            label = "N",
-           size = 5,
+           size = 5.5,
            vjust = -0.3) +
   annotate("text",
            x = 0,y = min(plot_data$y),
            label = "S",
-           size = 5,
+           size = 5.5,
            vjust = 1.3) +
-  labs(x = NULL, y = NULL)
+  labs(x = NULL, y = NULL)+
+  theme_minimal()
+#ggsave("Lic-wet.png",p6, path="plots",width = 12, height = 10, dpi = 300)
 ```
 
 ## Plots Einzelarten
@@ -1991,14 +2068,13 @@ Insufficient values in manual scale. 8 needed but only 4 provided.
 
 Im Error kann die genaue Zahl an bneötigten Farben abgelesen werden und in den Befehl colorRampPalette() eingefügt werden.
 
-Die Fläche kann ersetzt werden mit Meu_nass, Meu_trock oder Lic
+Die Fläche kann ersetzt werden mit Meu_nass, Meu_trock oder Lic. anchließend muss das gesamte chunk ausgfeührt werden
 
 ```{r}
 #| label: Kreuzplot für Artengruppen
 #adaptiert nach ChatGPT 5.5
 woody_plot_data <- veg_long %>%
-  filter(
-    grepl("^Sphag", Art) &
+  filter(Wuchsform =="woody" &
     Deckung > 0) %>%
   mutate(
     x = if_else(Transekt == "WO", Transektnummer, 0),
@@ -2006,18 +2082,18 @@ woody_plot_data <- veg_long %>%
   )
 
 woody_plot_data <- woody_plot_data %>%
-  filter(site == "Meu_nass") %>%
+  filter(site == "Lic") %>%
   arrange(desc(Deckung)) 
 
 
 #Farbpalette erweitern auf 30 farben
 dark2_erweitert <- colorRampPalette(
   RColorBrewer::brewer.pal(8, "Dark2")
-)(8)
+)(9)
 
 #adaptiert nach ChatGPT 5.5
 #Plot
-woody_plot_data%>%
+p8<-woody_plot_data%>%
   ggplot(
     aes(
       x = x,
@@ -2036,7 +2112,7 @@ woody_plot_data%>%
   ) +
   coord_equal() +
   scale_color_manual(
-    name = "Holzige Art",
+    name = "Sphagnum-Arten",
     values = dark2_erweitert,
     guide = guide_legend(
     override.aes = list(
@@ -2048,6 +2124,8 @@ woody_plot_data%>%
     y = "Süd–Nord"
   ) +
   theme_minimal()
+p8
+ggsave("Lic-woody.png",p8, path="plots",width = 12, height = 10, dpi = 300)
 ```
 
 # 9 Korrelationen testen
