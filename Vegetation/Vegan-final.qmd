@@ -2074,7 +2074,7 @@ Die Fläche kann ersetzt werden mit Meu_nass, Meu_trock oder Lic. anchließend m
 #| label: Kreuzplot für Artengruppen
 #adaptiert nach ChatGPT 5.5
 woody_plot_data <- veg_long %>%
-  filter(Wuchsform =="woody" &
+  filter(Wuchsform =="grass" &
     Deckung > 0) %>%
   mutate(
     x = if_else(Transekt == "WO", Transektnummer, 0),
@@ -2082,7 +2082,7 @@ woody_plot_data <- veg_long %>%
   )
 
 woody_plot_data <- woody_plot_data %>%
-  filter(site == "Lic") %>%
+  filter(site == "Meu_nass") %>%
   arrange(desc(Deckung)) 
 
 
@@ -2112,7 +2112,7 @@ p8<-woody_plot_data%>%
   ) +
   coord_equal() +
   scale_color_manual(
-    name = "Sphagnum-Arten",
+    name = "Arten",
     values = dark2_erweitert,
     guide = guide_legend(
     override.aes = list(
@@ -2125,7 +2125,7 @@ p8<-woody_plot_data%>%
   ) +
   theme_minimal()
 p8
-ggsave("Lic-woody.png",p8, path="plots",width = 12, height = 10, dpi = 300)
+ggsave("MN-grass.png",p8, path="plots",width = 12, height = 10, dpi = 300)
 ```
 
 # 9 Korrelationen testen
