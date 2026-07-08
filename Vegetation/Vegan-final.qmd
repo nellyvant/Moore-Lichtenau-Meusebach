@@ -31,6 +31,7 @@ library(conflicted)
   conflict_prefer("select", "dplyr")
   conflict_prefer("filter", "dplyr")
 library(mgcv)
+library(emmeans)
 ```
 
 # 2 Daten einlesen und vorbereiten
@@ -2118,36 +2119,46 @@ corrplot(corr_matrix, method ="number")
 #| label: model richness
 #| output: false
 # Richness ist eine Zählvariable -> glm mit family=poisson
-mod1<-glm(Richness ~ Weighted_light + Weighted_temperature + Weighted_wetness + Weighted_nitrogen + Weighted_alkalinity+ Hoehe+ HL + ML + SL + TL,family = poisson, data = merged_data)
+mod1<-glm(Richness ~ Weighted_light + Weighted_temperature + Weighted_wetness + Weighted_nitrogen + Weighted_alkalinity+ Hoehe+ HL + ML + SL + TL+site,family = poisson, data = merged_data)
 summary(mod1)
 # keine overdipersion
 #vereinfachung
 #nicht singif. größen entfernen
-#-ML&TL
-mod2<-update(mod1, ~.-TL)
+
+mod2<-update(mod1, ~.-ML)
 anova(mod1, mod2, test= "Chisq")
-#p=0.7657
+#p=0.75
 summary(mod2)
-mod3<- update(mod2,~.-ML)
+mod3<- update(mod2,~.-TL)
 anova(mod2, mod3, test ="Chisq")
-#p=0.2483
+#p=0.57
 summary(mod3)
-mod4<-update(mod3,~.-Weighted_alkalinity)
+mod4<-update(mod3,~.-Weighted_temperature)
 anova(mod3, mod4, test ="Chisq")
-#p=0.3619
+#p=0.29
 summary(mod4)
+mod41<- update(mod4,~.-Hoehe)
+anova(mod4, mod41, test ="Chisq")
+#p=0.12
+summary(mod41)
 ```
 
 ```{r}
-check_model(mod4)
+check_model(mod41)
 #modell sieht in orndung aus
 
-summary(mod4)
+summary(mod41)
 
 #Layer: Richness steigt bei mehr shrubs und weniger herbs
-#Zeigerwerte: Richness steigt je dunkler, wärmer, trockener, nährstoffreicher der Standort ist
-#Höhe bbeinflusst Richness in positive Richtung -> höher=artenreicher
-#Nitrogen hat stärksten estimta =0.175368 , gefolgt von licht estimate = -0.168134
+#Zeigerwerte: Richness steigt je dunkler, trockener, nährstoffreicher und alkalischer der Standort ist
+#Nitrogen hat stärksten estimta =0.123680 , gefolgt von licht estimate = -0.168134
+
+site_emm <- emmeans(mod41, ~ site, type = "response")
+site_emm
+
+pairs(site_emm, adjust = "tukey")
+
+#signif untersch. zw erwartetr richness in lic&trock, erwartetet artzahl am höchsten in meu_trock mit 4.82 (Arten pro relevee), meu nass 4,27, lic 3,68
 ```
 
 ## 10.2 Shannon-Index
@@ -2155,43 +2166,54 @@ summary(mod4)
 ```{r}
 #| label: model shannon
 #| output: false
-mod5<-lm(Shannon ~ Weighted_light + Weighted_temperature + Weighted_wetness + Weighted_nitrogen + Weighted_alkalinity+Hoehe+ HL + ML + SL + TL , data = merged_data)
+mod5<-lm(Shannon ~ Weighted_light + Weighted_temperature + Weighted_wetness + Weighted_nitrogen + Weighted_alkalinity+Hoehe+ HL + ML + SL + TL +site, data = merged_data)
 summary(mod5)
 mod6<-update(mod5,~.-TL)
-anova(mod6,mod5)
-#p=0.5639
+anova(mod5,mod6)
+#p=0.53
 summary(mod6)
-mod7<- update(mod6, ~.-Weighted_temperature)
+mod7<- update(mod6, ~.-Hoehe)
 anova(mod7,mod6)
-#p=0.4736
+#p=0.49
 summary(mod7)
-mod8<-update(mod7,~.-ML)
+mod8<-update(mod7,~.-Weighted_temperature)
 anova(mod7, mod8)
-#p=0.2079
+#p=0.47
 summary(mod8)
-mod9<- update(mod8,~.-Weighted_light)
+mod9<- update(mod8,~.-ML)
 anova(mod8,mod9)
-#p= 0.3398
+#p= 0.26
 summary(mod9)
-mod10<-update(mod9,~.-HL)
+mod10<-update(mod9,~.-Weighted_light)
 anova(mod9,mod10)
-#p=0.08798
+#p=0.28
 summary(mod10)
-mod11<-update(mod10,~.- SL)
+mod11<-update(mod10,~.- HL)
 anova(mod10, mod11)
-#p=0.05377
+#p=0.08
 summary(mod11)
+mod111<-update(mod11,~.-SL)
+anova(mod11, mod111)
+#p=0,06
+summary(mod111)
 ```
 
 ```{r}
-check_model(mod11)
-plot(mod11)
+check_model(mod111)
+plot(mod111)
 #plots sehen okay aus
 
-summary(mod11)
+summary(mod111)
 
-#Shannon wird größer bei Trockenheit, Nährstoffarmut, höherer pH, höher im Gelände
-#stärkster Faktor ph Estinate=0.191090
+#Shannon wird größer bei Trockenheit, Nährstoffarmut, höherer pH
+#stärkster Faktor ph Estinate=0.19
+
+site_emm <- emmeans(mod111, ~ site, type = "response")
+site_emm
+
+pairs(site_emm, adjust = "tukey")
+#höchste erwartetet shannon mt 0,83, mn 0,81, niedirgster lic 0,7
+#signif L-MT, L-MN
 ```
 
 ## 10.3 Evenness
@@ -2199,38 +2221,47 @@ summary(mod11)
 ```{r}
 #| label: model evenness
 #| output: false
-mod12<-lm(Evenness ~ Weighted_light + Weighted_temperature + Weighted_wetness + Weighted_nitrogen + Weighted_alkalinity+ HL + ML + SL + TL + Hoehe, data = merged_data)
+mod12<-lm(Evenness ~ Weighted_light + Weighted_temperature + Weighted_wetness + Weighted_nitrogen + Weighted_alkalinity+ HL + ML + SL + TL + Hoehe+site, data = merged_data)
 summary(mod12)
 mod13<-update(mod12,~.-ML)
 anova(mod12,mod13)
-#p=0.9305
+#p=0.93
 summary(mod13)
-mod14<- update(mod13,~.-TL)
+mod14<- update(mod13,~.-Hoehe)
 anova(mod13, mod14)
-#p=0.5464
+#p=0.73
 summary(mod14)
-mod15<-update(mod14,~.-SL)
+mod15<-update(mod14,~.-TL)
 anova(mod14, mod15)
-#p=0.2056
+#p=0.54
 summary(mod15)
-mod16<-update(mod15,~.-HL)
+mod16<-update(mod15,~.-SL)
 anova(mod15, mod16)
-#p=0.1266
+#p=0.21
 summary(mod16)
-mod17<-update(mod16,~.-Weighted_temperature)
+mod17<-update(mod16,~.-HL)
 anova(mod16, mod17)
-#p=0.06573
+#p=0.14
 summary(mod17)
-
+mod171<-update(mod17,~.-Weighted_temperature)
+anova(mod17, mod171)
+#p=0,07
+summary(mod171)
 ```
 
 ```{r}
-check_model(mod17)
+check_model(mod171)
 #sieht in ordnung aus
 
-summary(mod17)
-#Evenness steigt bei mehr Licht, Trockenheit, Nährstoffarmut, höherer pH, niedrige Geländehöhe
-#pH stärkster Faktor Estimate =0.098082
+summary(mod171)
+#Evenness steigt bei mehr Licht, Trockenheit, Nährstoffarmut, höherer pH
+#pH stärkster Faktor Estimate =0.096715 
+site_emm <- emmeans(mod171, ~ site, type = "response")
+site_emm
+
+pairs(site_emm, adjust = "tukey")
+#erwartete evenness in Lic 0,65, MN 0,55, MT 0,54
+#singif Lic zu beiden Meusebach-flächen
 ```
 
 ## 10.4 Sukzessionszeiger
@@ -2238,20 +2269,32 @@ summary(mod17)
 ```{r}
 #| label: model sukzessionszeiger
 #| output: false
-mod18<-lm(Sukzessionszeiger ~ Weighted_light + Weighted_temperature + Weighted_wetness + Weighted_nitrogen + Weighted_alkalinity+ HL + ML + SL + TL + Hoehe, data = merged_data)
+mod18<-lm(Sukzessionszeiger ~ Weighted_light + Weighted_temperature + Weighted_wetness + Weighted_nitrogen + Weighted_alkalinity+ HL + ML + SL + TL + Hoehe+site, data = merged_data)
 summary(mod18)
 mod19<-update(mod18,~.-Weighted_nitrogen)
 anova(mod18, mod19)
-#p=0.894
+#p=0.92
 summary(mod19)
-mod20<-update(mod19,~.-TL)
+mod20<-update(mod19,~.-ML)
 anova(mod19, mod20)
-#p=0.3559
+#p=0.74
 summary(mod20)
+mod201<-update(mod20,~.-Weighted_wetness)
+anova(mod20, mod201)
+#p=0,16
+summary(mod201)
+mod202<-update(mod201,~.-Hoehe)
+anova(mod201,mod202)
+#p=0,12
+summary(mod202)
+mod203<-update(mod202,~.-Weighted_alkalinity)
+anova(mod202,mod203)
+#p=0,11
+summary(mod203)
 ```
 
 ```{r}
-check_model(mod20)
+check_model(mod203)
 
 #sieht nicht so gut aus, ich teste mal log-transformation (log1p macht immer +1 um 0 zu vermeiden)
 
@@ -2260,49 +2303,60 @@ check_model(mod20)
 ```{r}
 #| label: log1p
 #| output: false
-mod21<-lm(log1p(Sukzessionszeiger) ~ Weighted_light + Weighted_temperature + Weighted_wetness + Weighted_alkalinity + HL + ML + SL + Hoehe,data = merged_data)
+mod21<-lm(log1p(Sukzessionszeiger) ~ Weighted_light + Weighted_temperature + HL + SL + TL + site,data = merged_data)
 summary(mod21)
-mod22<-update(mod21,~.-Weighted_alkalinity)
-anova(mod21,  mod22)
+#mod22<-update(mod21,~.-Weighted_alkalinity)
+#anova(mod21,  mod22)
 #p=0.2134
-summary(mod22)
+#summary(mod22)
 ```
 
 ```{r}
-check_model(mod22)
-plot(mod22)
+check_model(mod21)
+plot(mod21)
 ```
 
 ```{r}
 #| label: gam sukzession
 #| output: false
 # das hat auch nix verbessert, ich lasse das modell nochmal von vorne laufen als gam mit family=tweedie, da abhängige Variable stark rechtsschief
-mod23<-gam(Sukzessionszeiger ~ Weighted_light + Weighted_temperature + Weighted_wetness + Weighted_nitrogen + Weighted_alkalinity+ HL + ML + SL + TL + Hoehe,family=tw, data = merged_data)
+mod23<-gam(Sukzessionszeiger ~ Weighted_light + Weighted_temperature + Weighted_wetness + Weighted_nitrogen + Weighted_alkalinity+ HL + ML + SL + TL + Hoehe+site,family=tw, data = merged_data)
 summary(mod23)
-mod24<-update(mod23,~.-HL)
+mod24<-update(mod23,~.-Hoehe)
 
 summary(mod24)
-mod25<-update(mod24,~.-TL)
+mod25<-update(mod24,~.-HL)
 
 summary(mod25)
-mod26<-update(mod25,~.-Hoehe)
+mod26<-update(mod25,~.-Weighted_nitrogen)
 
 summary(mod26)
-mod27<-update(mod26,~.-Weighted_nitrogen)
+mod27<-update(mod26,~.-TL)
 
 summary(mod27)
+mod271<-update(mod27,~.-Weighted_alkalinity)
+
+summary(mod271)
 ```
 
 ```{r}
-gam.check(mod27)
+gam.check(mod271)
 #bis auf response vs fitted sieht alles in ordnung aus, modell wird erstmal angenommen
 
-summary(mod27)
-#Sukzessionszeiger treten vermehrt auf bei Schatten, höheren Temperaturen, Trockenheit, niedriger pH, wenig Moose, viel Shrubs
+summary(mod271)
+#Sukzessionszeiger treten vermehrt auf bei Schatten, höheren Temperaturen, Trockenheit, wenig Moose, viel Shrubs
 #moose und shrubs logisch, da meiste sukzessionszeiger shrubs sind...
 #stärkster einfluss licht Estimate = -1.094643
 #schatten könnte zirkelschluss sein, da sukzessionszeiger meist shrubs, die beschatten umgebung -> kommen da vor, wo arten in ihrem schatten vorkommen
-#zweitsträrkster einfluss Temperatur Estzimate=0.885005. Je wärmer desto mehr Sukzesinszeiger
+#zweitsträrkster einfluss temperatur estimate = 0.643054 Je wärmer desto mehr Sukzesinszeiger
+
+site_emm <- emmeans(mod271, ~ site, type = "response")
+site_emm
+
+pairs(site_emm, adjust = "tukey")
+
+#meiste sukzessionszeiger in MT 1,6; Lic 1; MN 0,15
+#MN singif zu lic und MT
 ```
 
 ## 10.5 Moorart
@@ -2310,23 +2364,24 @@ summary(mod27)
 ```{r}
 #| label: model moorarten
 #| output: false
-mod28<- lm(Moorart ~Weighted_light + Weighted_temperature + Weighted_wetness + Weighted_nitrogen + Weighted_alkalinity+ HL + ML + SL + TL + Hoehe, data=merged_data)
+mod28<- lm(Moorart ~Weighted_light + Weighted_temperature + Weighted_wetness + Weighted_nitrogen + Weighted_alkalinity+ HL + ML + SL + TL + Hoehe+site, data=merged_data)
 summary(mod28)
-mod29<-update(mod28,~.-Weighted_alkalinity)
+mod29<-update(mod28,~.-Weighted_light)
 anova(mod28, mod29)
-#p=0.9165
+#p=0.97
 summary(mod29)
-mod30<-update(mod29,~.-TL)
+mod30<-update(mod29,~.-Weighted_alkalinity)
 anova(mod29, mod30)
-#p=0.4797
+#p=0.25
 summary(mod30)
-mod31<- update(mod30,~.-Hoehe)
+mod31<- update(mod30,~.-TL)
 anova(mod30, mod31)
-#p=0.09228
+#p=0.07
 summary(mod31)
-mod32<- update(mod31,~.-Weighted_light)
+mod32<- update(mod31,~.-Hoehe)
 anova(mod31, mod32)
-#p=0.1053
+#p=0.06
+summary(mod32)
 
 ```
 
@@ -2335,6 +2390,13 @@ summary(mod32)
 check_model(mod32)
 #Moorarten treten vermehrt auf bei Kälte, Feuchte, Nährstoffarmut, mehr Moose, etwas mehr herbs und shrubs
 #makes sense :)
+
+site_emm <- emmeans(mod32, ~ site, type = "response")
+site_emm
+
+pairs(site_emm, adjust = "tukey")
+#meiste moorarten in MN 75,1; Lic 70.9; MT 59,5
+# Lic und mn kein signif unterschied
 ```
 
 ## 10.6 Gehölze
@@ -2348,20 +2410,29 @@ hist(merged_data$woody)
 ```{r}
 #| label: gam woody
 #| output: false
-mod33<-gam(woody ~Weighted_light + Weighted_temperature + Weighted_wetness + Weighted_nitrogen + Weighted_alkalinity+ HL + ML + SL + TL + Hoehe,family=tw, data=merged_data)
+mod33<-gam(woody ~Weighted_light + Weighted_temperature + Weighted_wetness + Weighted_nitrogen + Weighted_alkalinity+ HL + ML + SL + TL + Hoehe+site,family=tw, data=merged_data)
 summary(mod33)
 mod34<-update(mod33,~.-Weighted_temperature)
 summary(mod34)
-mod35<-update(mod34,~.-HL)
+mod35<-update(mod34,~.-Weighted_nitrogen)
 summary(mod35)
-mod36<-update(mod35,~.-Weighted_nitrogen)
+mod36<-update(mod35,~.-HL)
 summary(mod36)
+mod37<-update(mod36,~.-Hoehe)
+summary(mod37)
 ```
 
 ```{r}
-gam.check(mod36)
+gam.check(mod37)
 #response vs fitted sieht wieder komisch aus, der rest passt ganz gu
-summary(mod36)
-#Gehölze treten vermehrt auf bei Schatten, Trockenheit, höherem pH, weniger Moos, mehr shrubs, herbs und trees, höhere geländehöhe
+summary(mod37)
+#Gehölze treten vermehrt auf bei Schatten, Trockenheit, höherem pH, weniger Moos, mehr shrubs und trees
 # Schichten skönnten wieder zirkelschluss sein -> gehölze kommen in allen schichten außer moos vor
+
+site_emm <- emmeans(mod37, ~ site, type = "response")
+site_emm
+
+pairs(site_emm, adjust = "tukey")
+#lic-MT signif
+#meiste gehölze MT 2,5; MN 2,3; Lic 1,6
 ```
