@@ -451,6 +451,47 @@ summary_logger_year <- all_loggers %>%
     .groups = "drop"
   )
 
+# verwendet nur die Messungen, wo auf einer Fläche alle Logger funktionsfähig waren 
+summary_logger_year_1 <- all_loggers %>%
+  group_by(Standort, DateTime) %>%      
+  filter(n_distinct(Logger_ID) == 5) %>%
+  ungroup() %>%
+  group_by(Standort, Logger, Logger_ID) %>%
+  summarise(
+    Tempsonne_Jahresmittel = mean(Temp_sonne_C, na.rm = TRUE),
+    Tempsonne_Jahres_sd = sd(Temp_sonne_C, na.rm = TRUE),
+    Tempsonne_Jahres_min = min(Temp_sonne_C, na.rm = TRUE),
+    Tempsonne_Jahres_max = max(Temp_sonne_C, na.rm = TRUE),
+    Tempsonne_Jahres_range = Tempsonne_Jahres_max - Tempsonne_Jahres_min,
+    
+    Tempschatten_Jahresmittel = mean(Temp_schatten_C, na.rm = TRUE),
+    Tempschatten_Jahres_sd = sd(Temp_schatten_C, na.rm = TRUE),
+    Tempschatten_Jahres_min = min(Temp_schatten_C, na.rm = TRUE),
+    Tempschatten_Jahres_max = max(Temp_schatten_C, na.rm = TRUE),
+    Tempschatten_Jahres_range = Tempschatten_Jahres_max - Tempschatten_Jahres_min,
+    
+    Licht_Jahresmittel = mean(Licht_lux, na.rm = TRUE),
+    Licht_Jahres_sd = sd(Licht_lux, na.rm = TRUE),
+    Licht_Jahres_min = min(Licht_lux, na.rm = TRUE),
+    Licht_Jahres_max = max(Licht_lux, na.rm = TRUE),
+    Licht_Jahres_mean_day = mean(Licht_lux[Licht_lux > 1], na.rm = TRUE),
+    Licht_Jahres_range = Licht_Jahres_max - Licht_Jahres_min,
+    Licht_Jahres_summe = sum(Licht_lux, na.rm = TRUE),
+    
+    rLF_Jahresmittel = mean(relLF_percent, na.rm = TRUE),
+    rLF_Jahres_sd = sd(relLF_percent, na.rm = TRUE),
+    rLF_Jahres_min = min(relLF_percent, na.rm = TRUE),
+    rLF_Jahres_max = max(relLF_percent, na.rm = TRUE),
+    rLF_Jahres_range = rLF_Jahres_max - rLF_Jahres_min,
+    
+    Tp_Jahresmittel = mean(Taupunkt_C, na.rm = TRUE),
+    Tp_Jahres_sd = sd(Taupunkt_C, na.rm = TRUE),
+    Tp_Jahres_min = min(Taupunkt_C, na.rm = TRUE),
+    Tp_Jahres_max = max(Taupunkt_C, na.rm = TRUE),
+    Tp_Jahres_range = Tp_Jahres_max - Tp_Jahres_min,
+    
+    .groups = "drop"
+  )
 
 lightsum <- all_loggers %>%
   mutate(Datum = as.Date(DateTime)) %>%
@@ -563,6 +604,51 @@ summary_area_year <- all_loggers %>%
   )
 
 str(summary_area_year)
+
+# verwendet nur die Messungen, wo auf einer Fläche alle Logger funktionsfähig waren 
+summary_area_year_1 <- all_loggers %>%
+  group_by(Standort, DateTime) %>%
+  filter(n_distinct(Logger_ID) == 5) %>%   
+  ungroup() %>%
+  group_by(Standort) %>%
+  summarise(
+    Temp_area_sonne_mean = mean(Temp_sonne_C, na.rm = T),
+    Temp_area_sonne_max = max(Temp_sonne_C, na.rm = T),
+    Temp_area_sonne_min = min(Temp_sonne_C, na.rm = T),
+    Temp_area_sonne_sd = sd(Temp_sonne_C, na.rm = T),
+    Temp_area_sonne_range = Temp_area_sonne_max - Temp_area_sonne_min,
+    
+    Temp_area_schatten_mean = mean(Temp_schatten_C, na.rm = T),
+    Temp_area_schatten_max =  max(Temp_schatten_C, na.rm = T),
+    Temp_area_schatten_min = min(Temp_schatten_C, na.rm = T),
+    Temp_area_schatten_sd = sd(Temp_schatten_C, na.rm = T),
+    Temp_area_schatten_range = Temp_area_schatten_max - Temp_area_schatten_min,
+    
+    Licht_area_mean = mean(Licht_lux, na.rm = T),
+    Licht_area_max = max(Licht_lux, na.rm = T),
+    Licht_area_min = min(Licht_lux, na.rm = T),
+    Licht_area_sd = sd(Licht_lux, na.rm = T),
+    Licht_area_range = Licht_area_max - Licht_area_min,
+    Licht_area_mean_day = mean(Licht_lux[Licht_lux>1], na.rm =T),
+    #    Sonnenaufgang = min(DateTime[Licht_lux > 1], na.rm = T),
+    #    Sonnenuntergang  = max(DateTime[Licht_lux > 1], na.rm = T),
+    #    Tageslicht = as.numeric(difftime(Sonnenuntergang, Sonnenaufgang, units = "hours")),
+    Licht_summe = sum(Licht_lux*10, na.rm=T),
+    
+    rLF_area_mean = mean(relLF_percent, na.rm = T),
+    rLF_area_max = max(relLF_percent, na.rm = T),
+    rLF_area_min = min(relLF_percent, na.rm = T),
+    rLF_area_sd = sd(relLF_percent, na.rm = T),
+    rLF_area_range = rLF_area_max - rLF_area_min,
+    
+    Tp_area_mean = mean(Taupunkt_C, na.rm = T),
+    Tp_area_max = max(Taupunkt_C, na.rm = T),
+    Tp_area_min = min(Taupunkt_C, na.rm = T),
+    Tp_area_sd = sd(Taupunkt_C, na.rm = T),
+    Tp_area_range = Tp_area_max - Tp_area_min,
+    
+    .groups = "drop"
+  )
 ```
 
 # 5. Analyse & Plots Vergleich innerhalb der Flächen bzw. zwischen den Loggern
@@ -663,6 +749,19 @@ pairwise.wilcox.test(
 #MTO 0.010   < 2e-16 -       -      
 #MTS 3.9e-16 < 2e-16 < 2e-16 -      
 #MTW 0.039   < 2e-16 0.577   9.1e-16
+
+dat_MT_fried
+Licht_mean = mean(Licht_lux, na.rm = T),
+Licht_max = max(Licht_lux, na.rm = T),
+Licht_min = min(Licht_lux, na.rm = T),
+Licht_sd = sd(Licht_lux, na.rm = T),
+Licht_range = Licht_max - Licht_min,
+    Licht_mean_day = mean(Licht_lux[Licht_lux>1], na.rm =T),
+#    Sonnenaufgang = min(DateTime[Licht_lux > 1], na.rm = T),
+#    Sonnenuntergang  = max(DateTime[Licht_lux > 1], na.rm = T),
+#    Tageslicht = as.numeric(difftime(Sonnenuntergang, Sonnenaufgang, units = "hours")),
+    Licht_summe = sum(Licht_lux, na.rm=T),
+    #Licht_summe = sum(Licht_lux, na.rm =T),
 ```
 
 ### 5.1.3 Plots
@@ -1831,7 +1930,7 @@ ggplot(dat_rLF_L, aes(x = Logger_ID, y = delta_LF)) +
 #dieser Plot zeigt, in der Mitte nimmt die Luftfeuchte stärker ab als an den Rändern -> kann an Schatten liegen, Deckung der Bäume, Temperatur usw, dafür brauchen wir ein Model
 #Wenn kein model ausreichend Varianz erklärt, müssten andere Methoden verwendet werden, um die Frage zu beantworten
 
-#Für ein Modell, was die Austrockunungsrate deltaLF vorhersagt, benötigt man dieDeckung der Tree layer an den Loggerstandpunkten. Die Tabelle Deckung_schichten.csv stammt aus dem Ordner Vegetation und enthält die prozentuale Schätzung der Vegetationsschichten in allen Aufnhamequadratn. Füe die Loggerstandpunkte werden jeweils die Aufnhamequadrate an den Enden der Transekte und in der Mitte (Transektnummer = 0) verwendet.
+#Für ein Modell, was die Austrockunungsrate deltaLF vorhersagt, benötigt man die Deckung der Tree layer an den Loggerstandpunkten. Die Tabelle Deckung_schichten.csv stammt aus dem Ordner Vegetation und enthält die prozentuale Schätzung der Vegetationsschichten in allen Aufnhamequadraten. Füe die Loggerstandpunkte werden jeweils die Aufnhamequadrate an den Enden der Transekte und in der Mitte (Transektnummer = 0) verwendet.
 
 #Deckung TL
 treelayer<- read.csv("../Vegetation/treelayer.csv", header=T)
@@ -1982,7 +2081,7 @@ mod_int <- lmer(
   data = model_data
 )
 summary(mod_int)
-#Ergebniss: nicht signifikant -> nein tnún sie nicht = Es gibt keinen statistischen Hinweis auf eine Interaktion zw. Temperatur und Bedeckung
+#Ergebniss: nicht signifikant -> nein tun sie nicht = Es gibt keinen statistischen Hinweis auf eine Interaktion zw. Temperatur und Bedeckung
 ```
 
 ## 
