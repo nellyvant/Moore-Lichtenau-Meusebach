@@ -1205,7 +1205,7 @@ geom_point(
   )
 )+
   labs(
-    title = "DCA der Moosvegetation – Fuchshügel",
+    title = "DCA der Moosvegetation – Auf der Pfalz",
     x = "DCA1",
     y = "DCA2"
   ) +
