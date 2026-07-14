@@ -560,11 +560,12 @@ fit <- envfit(dca, merged_data[, c("Weighted_light",
     "Weighted_wetness",
     "Weighted_nitrogen",
     "Weighted_alkalinity",
-    "Hoehe",
-    "TL",
-    "SL",
-    "HL",
-    "ML"
+    "Hoehe"
+#    ,
+#    "TL",
+#    "SL",
+#    "HL",
+#    "ML"
     )],
     na.rm=T)
 fit
@@ -575,16 +576,17 @@ arrows$Variable <- rownames(arrows)
 arrows$p_value <- fit$vectors$pvals
 arrows$r2 <- fit$vectors$r
 arrows$Variable <- c(
-  "Licht",
-  "Temperatur",
-  "Feuchte",
-  "Stickstoff",
-  "Basengehalt",
-  "Höhe",
-  "Baumschicht",
-  "Strauchschicht",
-  "Krautschicht",
-  "Moosschicht"
+  "Lichtzahl",
+  "Temperaturzahl",
+  "Feuchtezahl",
+  "Nährstoffzahl",
+  "Reaktionszahl",
+  "Höhe"
+#  ,
+#  "Baumschicht",
+#  "Strauchschicht",
+#  "Krautschicht",
+#  "Moosschicht"
 )
 
 arrows_sig <- arrows %>%
@@ -608,15 +610,20 @@ p1<-ggplot(dca_df, aes(DCA1, DCA2, colour = site)) +
     arrow = arrow(length = unit(0.25, "cm")),
     colour = "black"
   ) +
-  geom_text(
-  data = arrows,
-  aes(
-    x = DCA1 * 2.3,
-    y = DCA2 * 2.3,
-    label = Variable
-  ),
-  inherit.aes = FALSE
-)+
+  geom_text_repel(
+    data = arrows,
+    aes(
+      x = DCA1 * 2.3,
+      y = DCA2 * 2.3,
+      label = Variable
+    ),
+    inherit.aes = FALSE,
+    colour = "black",
+    box.padding = 0.5,
+    point.padding = 0.2,
+    segment.colour = "grey50",
+    max.overlaps = Inf
+  ) +
  scale_colour_manual(
     breaks = c("Meu_trock", "Meu_nass", "Lic"),
     values = c(
@@ -643,7 +650,7 @@ p1<-ggplot(dca_df, aes(DCA1, DCA2, colour = site)) +
     plot.title = element_text(hjust = 0.5)
   )
 p1
-ggsave("DCA-all-areas.png",p1, path ="plots")
+ggsave("DCA-all-areas.png",p1, path ="plots",width = 10, height = 6, dpi = 300)
 ```
 
 ## 7.2 Einzelne Flächen
@@ -701,11 +708,13 @@ fit <- envfit(dca, env[, c("Weighted_light",
                               "Weighted_wetness",
                               "Weighted_nitrogen",
                               "Weighted_alkalinity",
-                              "Hoehe",
-                              "TL",
-                              "ML",
-                              "HL",
-                              "SL")])
+                              "Hoehe"
+                           #,
+                             # "TL",
+                            #  "ML",
+                            #  "HL",
+                            #  "SL"
+                           )])
 fit
 
 plot(dca)
@@ -714,16 +723,17 @@ arrows$Variable <- rownames(arrows)
 arrows$p_value <- fit$vectors$pvals
 arrows$r2 <- fit$vectors$r
 arrows$Variable <- c(
-  "Licht",
-  "Temperatur",
-  "Feuchte",
-  "Stickstoff",
-  "Basengehalt",
-  "Höhe",
-  "Baumschicht",
-  "Moosschicht",
-  "Krautschicht",
-  "Strauchschicht"
+  "Lichtzahl",
+  "Temperaturzahl",
+  "Feuchtezahl",
+  "Nährstoffzahl",
+  "Reaktionszahl",
+  "Höhe"
+#  ,
+#  "Baumschicht",
+#  "Strauchschicht",
+#  "Krautschicht",
+#  "Moosschicht"
 )
 # nur Umweltvariablen mit signifikanten p-Werten anzeigen
 arrows_sig <- arrows %>%
@@ -765,7 +775,7 @@ geom_point(
     fill = Transektnummer,
     shape = Transekt
   ),
-  size = 4,
+  size = 5.5,
   stroke = 0.7,
   colour = "black"
 ) +
@@ -874,8 +884,8 @@ geom_point(
   colour = "grey30"
 ) +
 #  geom_text_repel(
-#    data = species_df,
-##    aes(
+#data = species_df,
+#    aes(
 #      x = DCA1,
 #      y = DCA2,
 #      label = Art
@@ -930,7 +940,7 @@ geom_point(
   legend.spacing.y = unit(0.3, "cm")
   )
 p2
-#ggsave( "DCA-Meu-trock.png",p2, path="plots",width = 12, height = 10, dpi = 300)
+ggsave( "DCA-Meu-trock.png",p2, path="plots",width = 12, height = 10, dpi = 300)
 ```
 
 ### 7.2.2 Moose
@@ -943,7 +953,7 @@ p2
 #| label: dca moss Meusebach
 # nur für Meu_nass und Meu_trock
 comm <- veg_long %>%
-  filter(site=="Meu_trock"&Schicht =="ML") %>%  
+  filter(site=="Meu_nass"&Schicht =="ML") %>%  
   group_by(plot.ID, Art) %>%
   summarise(
     Deckung = sum(Deckung, na.rm = TRUE),
@@ -971,16 +981,17 @@ env_vars <- c(
   "Weighted_wetness",
   "Weighted_nitrogen",
   "Weighted_alkalinity",
-  "Hoehe",
-  "TL",
-  "ML",
-  "HL",
-  "SL"
+  "Hoehe"
+#  ,
+#  "TL",
+#  "ML",
+#  "HL",
+#  "SL"
 )
 
 env <- merged_data %>%
   filter(
-    site == "Meu_trock",
+    site == "Meu_nass",
     as.character(Plot) %in% rownames(comm)
   ) %>%
   select(
@@ -990,16 +1001,7 @@ env <- merged_data %>%
   mutate(plot.ID = as.character(plot.ID)) %>%
   distinct()
 
-fit <- envfit(dca, env[, c("Weighted_light",
-                              "Weighted_temperature",
-                              "Weighted_wetness",
-                              "Weighted_nitrogen",
-                              "Weighted_alkalinity",
-                              "Hoehe",
-                              "TL",
-                              "ML",
-                              "HL",
-                              "SL")])
+fit <- envfit(dca, env[, env_vars])
 
 fit
 
@@ -1009,16 +1011,17 @@ arrows$Variable <- rownames(arrows)
 arrows$p_value <- fit$vectors$pvals
 arrows$r2 <- fit$vectors$r
 arrows$Variable <- c(
-  "Licht",
-  "Temperatur",
-  "Feuchte",
-  "Stickstoff",
-  "Basengehalt",
-  "Höhe",
-  "Baumschicht",
-  "Moosschicht",
-  "Krautschicht",
-  "Strauchschicht"
+  "Lichtzahl",
+  "Temperaturzahl",
+  "Feuchtezahl",
+  "Nährstoffzahl",
+  "Reaktionszahl",
+  "Höhe"
+#  ,
+#  "Baumschicht",
+#  "Strauchschicht",
+#  "Krautschicht",
+#  "Moosschicht"
 )
 # nur Umweltvariablen mit signifikanten p-Werten anzeigen
 arrows_sig <- arrows %>%
@@ -1226,7 +1229,7 @@ geom_point(
   legend.spacing.y = unit(0.3, "cm")
   )
 p3
-#ggsave("DCA-Meu-trock-moss.png",p3, path="plots",width = 12, height = 10, dpi = 300)
+ggsave("DCA-Meu-nass-moss.png",p3, path="plots",width = 12, height = 10, dpi = 300)
 ```
 
 #### b) Lichtenau
@@ -1264,11 +1267,12 @@ env_vars <- c(
   "Weighted_wetness",
   "Weighted_nitrogen",
   "Weighted_alkalinity",
-  "Hoehe",
-  "TL",
-  "ML",
-  "HL",
-  "SL"
+  "Hoehe"
+#  ,
+#  "TL",
+#  "ML",
+#  "HL",
+#  "SL"
 )
 
 env <- merged_data %>%
@@ -1283,16 +1287,7 @@ env <- merged_data %>%
   mutate(plot.ID = as.character(plot.ID)) %>%
   distinct()
 
-fit <- envfit(dca, env[, c("Weighted_light",
-                              "Weighted_temperature",
-                              "Weighted_wetness",
-                              "Weighted_nitrogen",
-                              "Weighted_alkalinity",
-                              "Hoehe",
-                              "TL",
-                              "ML",
-                              "HL",
-                              "SL")], choices =c(1:4))
+fit <- envfit(dca, env[, env_vars], choices =c(1:4))
 
 fit
 
@@ -1302,16 +1297,17 @@ arrows$Variable <- rownames(arrows)
 arrows$p_value <- fit$vectors$pvals
 arrows$r2 <- fit$vectors$r
 arrows$Variable <- c(
-  "Licht",
-  "Temperatur",
-  "Feuchte",
-  "Stickstoff",
-  "Basengehalt",
-  "Höhe",
-  "Baumschicht",
-  "Moosschicht",
-  "Krautschicht",
-  "Strauchschicht"
+  "Lichtzahl",
+  "Temperaturzahl",
+  "Feuchtezahl",
+  "Nährstoffzahl",
+  "Reaktionszahl",
+  "Höhe"
+#  ,
+#  "Baumschicht",
+#  "Strauchschicht",
+#  "Krautschicht",
+#  "Moosschicht"
 )
 # nur Umweltvariablen mit signifikanten p-Werten anzeigen
 arrows_sig <- arrows %>%
@@ -1457,7 +1453,7 @@ geom_segment(
 # --------------------------------------------------
 geom_point(
   data = species_df,
-  aes(x = DCA1, y = DCA2,shape = "Arten"),
+  aes(x = DCA2, y = DCA3, shape = "Arten"),
   size = 2.5,
   colour = "grey30"
 ) +
@@ -1519,7 +1515,7 @@ geom_point(
   legend.spacing.y = unit(0.3, "cm")
   )
 p4
-#ggsave( "DCA-Lic-moss.png",p4, path="plots",width = 12, height = 10, dpi = 300)
+ggsave( "DCA-Lic-moss.png",p4, path="plots",width = 12, height = 10, dpi = 300)
 ```
 
 ### 7.2.3 Gefäßpflanzen
@@ -1527,7 +1523,7 @@ p4
 ```{r}
 #| label: dca vascular plants
 comm <- veg_long %>%
-  filter(site=="Meu_trock"& Schicht !="ML") %>%  
+  filter(site=="Lic"& Schicht !="ML") %>%  
   group_by(plot.ID, Art) %>%
   summarise(
     Deckung = sum(Deckung, na.rm = TRUE),
@@ -1555,16 +1551,17 @@ env_vars <- c(
   "Weighted_wetness",
   "Weighted_nitrogen",
   "Weighted_alkalinity",
-  "Hoehe",
-  "TL",
-  "ML",
-  "HL",
-  "SL"
+  "Hoehe"
+#  ,
+#  "TL",
+#  "ML",
+#  "HL",
+#  "SL"
 )
 
 env <- merged_data %>%
   filter(
-    site == "Meu_trock",
+    site == "Lic",
     as.character(Plot) %in% rownames(comm)
   ) %>%
   select(
@@ -1574,16 +1571,7 @@ env <- merged_data %>%
   mutate(plot.ID = as.character(plot.ID)) %>%
   distinct()
 
-fit <- envfit(dca, env[, c("Weighted_light",
-                              "Weighted_temperature",
-                              "Weighted_wetness",
-                              "Weighted_nitrogen",
-                              "Weighted_alkalinity",
-                              "Hoehe",
-                              "TL",
-                              "ML",
-                              "HL",
-                              "SL")])
+fit <- envfit(dca, env[, env_vars])
 
 fit
 
@@ -1593,16 +1581,17 @@ arrows$Variable <- rownames(arrows)
 arrows$p_value <- fit$vectors$pvals
 arrows$r2 <- fit$vectors$r
 arrows$Variable <- c(
-  "Licht",
-  "Temperatur",
-  "Feuchte",
-  "Stickstoff",
-  "Basengehalt",
-  "Höhe",
-  "Baumschicht",
-  "Moosschicht",
-  "Krautschicht",
-  "Strauchschicht"
+  "Lichtzahl",
+  "Temperaturzahl",
+  "Feuchtezahl",
+  "Nährstoffzahl",
+  "Reaktionszahl",
+  "Höhe"
+#  ,
+#  "Baumschicht",
+#  "Strauchschicht",
+#  "Krautschicht",
+#  "Moosschicht"
 )
 # nur Umweltvariablen mit signifikanten p-Werten anzeigen
 arrows_sig <- arrows %>%
@@ -1786,7 +1775,7 @@ geom_point(
   )
 )+
   labs(
-    title = "DCA der Vegetation der Gefäßpflanzen – Fuchshügel",
+    title = "DCA der Vegetation der Gefäßpflanzen – Kleiner Sumpf",
     x = "DCA1",
     y = "DCA2"
   ) +
@@ -1810,7 +1799,7 @@ geom_point(
   legend.spacing.y = unit(0.3, "cm")
   )
 p5
-ggsave( "DCA-Meu-trock-vasc.png",p5, path="plots",width = 12, height = 10, dpi = 300)
+ggsave( "DCA-Lic-vasc.png",p5, path="plots",width = 12, height = 10, dpi = 300)
 ```
 
 # 8 Transekte plotten
