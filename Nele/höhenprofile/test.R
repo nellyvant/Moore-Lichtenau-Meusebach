@@ -2000,3 +2000,100 @@ dat_L_fried %>%
     .groups = "drop"
   ) %>%
   arrange(desc(Median))
+
+##### besserer barplot für boden #####
+Hum_MT <- ggplot(plot_data) +
+  geom_rect(
+    aes(
+      xmin = as.numeric(Punkt) - 0.4,
+      xmax = as.numeric(Punkt) + 0.4,
+      ymin = bottom,
+      ymax = top,
+      fill = hum_factor
+    ),
+    color = "black",
+    show.legend = TRUE
+  ) +
+  
+  scale_fill_manual(
+    values = hum_colors,
+    limits = names(hum_colors),
+    breaks = names(hum_colors),
+    name = "Humifizierung",
+    drop = FALSE,
+    labels = paste0("H", names(hum_colors)),
+    na.translate = FALSE
+  ) +
+  
+  scale_x_continuous(
+    breaks = seq_along(levels(plot_data$Punkt)),
+    labels = stringr::str_wrap(
+      levels(plot_data$Punkt),
+      width = 12
+    )
+  ) +
+  
+  labs(
+    x = "Punkt",
+    y = "Tiefe [cm]"
+  ) +
+  
+  guides(
+    fill = guide_legend(
+      keyheight = grid::unit(0.8, "cm"),
+      keywidth  = grid::unit(1.2, "cm")
+    )
+  ) +
+  
+  theme_minimal(base_size = 16) +
+  
+  theme(
+    # Namen der einzelnen Bars / Bohrpunkte
+    axis.text.x = element_text(
+      size = 14,
+      face = "bold",
+      angle = 45,
+      hjust = 1,
+      vjust = 1,
+      color = "black",
+      margin = margin(t = 8)
+    ),
+    
+    # Beschriftung der Tiefenachse
+    axis.text.y = element_text(
+      size = 13,
+      color = "black"
+    ),
+    
+    # Achsentitel
+    axis.title.x = element_text(
+      size = 17,
+      face = "bold",
+      margin = margin(t = 15)
+    ),
+    axis.title.y = element_text(
+      size = 17,
+      face = "bold",
+      margin = margin(r = 10)
+    ),
+    
+    # Legende
+    legend.title = element_text(
+      size = 16,
+      face = "bold"
+    ),
+    legend.text = element_text(
+      size = 14
+    ),
+    
+    # Abstand zwischen Plot und Legende
+    legend.spacing.y = grid::unit(0.3, "cm"),
+    
+    # Zusätzlicher Platz für die gedrehten Namen
+    plot.margin = margin(
+      t = 15,
+      r = 15,
+      b = 30,
+      l = 15
+    )
+  )
