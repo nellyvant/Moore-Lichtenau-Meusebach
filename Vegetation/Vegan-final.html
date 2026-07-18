@@ -788,27 +788,31 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <span id="cb44-5"><a href="#cb44-5" aria-hidden="true" tabindex="-1"></a>    <span class="at">richness_min =</span> <span class="fu">min</span>(Richness),</span>
 <span id="cb44-6"><a href="#cb44-6" aria-hidden="true" tabindex="-1"></a>    <span class="at">richness_max =</span> <span class="fu">max</span>(Richness),</span>
 <span id="cb44-7"><a href="#cb44-7" aria-hidden="true" tabindex="-1"></a>    <span class="at">richness_range =</span> richness_max<span class="sc">-</span>richness_min,</span>
-<span id="cb44-8"><a href="#cb44-8" aria-hidden="true" tabindex="-1"></a>    <span class="at">shannon_mean =</span> <span class="fu">mean</span>(Shannon),</span>
-<span id="cb44-9"><a href="#cb44-9" aria-hidden="true" tabindex="-1"></a>    <span class="at">shannon_min =</span> <span class="fu">min</span>(Shannon),</span>
-<span id="cb44-10"><a href="#cb44-10" aria-hidden="true" tabindex="-1"></a>    <span class="at">shannon_max =</span><span class="fu">max</span>(Shannon),</span>
-<span id="cb44-11"><a href="#cb44-11" aria-hidden="true" tabindex="-1"></a>    <span class="at">shannon_range =</span> shannon_max<span class="sc">-</span>shannon_min,</span>
-<span id="cb44-12"><a href="#cb44-12" aria-hidden="true" tabindex="-1"></a>    <span class="at">evenness_mean =</span> <span class="fu">mean</span> (Evenness, <span class="at">na.rm=</span>T),</span>
-<span id="cb44-13"><a href="#cb44-13" aria-hidden="true" tabindex="-1"></a>    <span class="at">evenness_min =</span> <span class="fu">min</span>(Evenness, <span class="at">na.rm=</span>T),</span>
-<span id="cb44-14"><a href="#cb44-14" aria-hidden="true" tabindex="-1"></a>    <span class="at">evenness_max =</span> <span class="fu">max</span>(Evenness, <span class="at">na.rm=</span>T),</span>
-<span id="cb44-15"><a href="#cb44-15" aria-hidden="true" tabindex="-1"></a>    <span class="at">evenness_range =</span> evenness_max<span class="sc">-</span>evenness_min,</span>
-<span id="cb44-16"><a href="#cb44-16" aria-hidden="true" tabindex="-1"></a>    <span class="at">.groups =</span> <span class="st">"drop"</span></span>
-<span id="cb44-17"><a href="#cb44-17" aria-hidden="true" tabindex="-1"></a>  )</span>
-<span id="cb44-18"><a href="#cb44-18" aria-hidden="true" tabindex="-1"></a>summary_area</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<span id="cb44-8"><a href="#cb44-8" aria-hidden="true" tabindex="-1"></a>    <span class="at">richness_sd =</span> <span class="fu">sd</span>(Richness),</span>
+<span id="cb44-9"><a href="#cb44-9" aria-hidden="true" tabindex="-1"></a>    <span class="at">shannon_mean =</span> <span class="fu">mean</span>(Shannon),</span>
+<span id="cb44-10"><a href="#cb44-10" aria-hidden="true" tabindex="-1"></a>    <span class="at">shannon_min =</span> <span class="fu">min</span>(Shannon),</span>
+<span id="cb44-11"><a href="#cb44-11" aria-hidden="true" tabindex="-1"></a>    <span class="at">shannon_max =</span><span class="fu">max</span>(Shannon),</span>
+<span id="cb44-12"><a href="#cb44-12" aria-hidden="true" tabindex="-1"></a>    <span class="at">shannon_range =</span> shannon_max<span class="sc">-</span>shannon_min,</span>
+<span id="cb44-13"><a href="#cb44-13" aria-hidden="true" tabindex="-1"></a>    <span class="at">shannon_sd =</span> <span class="fu">sd</span>(Shannon),</span>
+<span id="cb44-14"><a href="#cb44-14" aria-hidden="true" tabindex="-1"></a>    <span class="at">evenness_mean =</span> <span class="fu">mean</span> (Evenness, <span class="at">na.rm=</span>T),</span>
+<span id="cb44-15"><a href="#cb44-15" aria-hidden="true" tabindex="-1"></a>    <span class="at">evenness_min =</span> <span class="fu">min</span>(Evenness, <span class="at">na.rm=</span>T),</span>
+<span id="cb44-16"><a href="#cb44-16" aria-hidden="true" tabindex="-1"></a>    <span class="at">evenness_max =</span> <span class="fu">max</span>(Evenness, <span class="at">na.rm=</span>T),</span>
+<span id="cb44-17"><a href="#cb44-17" aria-hidden="true" tabindex="-1"></a>    <span class="at">evenness_range =</span> evenness_max<span class="sc">-</span>evenness_min,</span>
+<span id="cb44-18"><a href="#cb44-18" aria-hidden="true" tabindex="-1"></a>    <span class="at">evenness_sd =</span> <span class="fu">sd</span>(Evenness, <span class="at">na.rm=</span>T),</span>
+<span id="cb44-19"><a href="#cb44-19" aria-hidden="true" tabindex="-1"></a>    <span class="at">.groups =</span> <span class="st">"drop"</span></span>
+<span id="cb44-20"><a href="#cb44-20" aria-hidden="true" tabindex="-1"></a>  )</span>
+<span id="cb44-21"><a href="#cb44-21" aria-hidden="true" tabindex="-1"></a>summary_area</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 <div class="cell-output cell-output-stdout">
-<pre><code># A tibble: 3 × 13
-  site      richness_mean richness_min richness_max richness_range shannon_mean
-  &lt;chr&gt;             &lt;dbl&gt;        &lt;int&gt;        &lt;int&gt;          &lt;int&gt;        &lt;dbl&gt;
-1 Lic                3.64            1           13             12        0.666
-2 Meu_nass           4.06            1           12             11        0.844
-3 Meu_trock          5.57            2           11              9        0.842
-# ℹ 7 more variables: shannon_min &lt;dbl&gt;, shannon_max &lt;dbl&gt;,
-#   shannon_range &lt;dbl&gt;, evenness_mean &lt;dbl&gt;, evenness_min &lt;dbl&gt;,
-#   evenness_max &lt;dbl&gt;, evenness_range &lt;dbl&gt;</code></pre>
+<pre><code># A tibble: 3 × 16
+  site      richness_mean richness_min richness_max richness_range richness_sd
+  &lt;chr&gt;             &lt;dbl&gt;        &lt;int&gt;        &lt;int&gt;          &lt;int&gt;       &lt;dbl&gt;
+1 Lic                3.64            1           13             12        2.44
+2 Meu_nass           4.06            1           12             11        1.59
+3 Meu_trock          5.57            2           11              9        1.78
+# ℹ 10 more variables: shannon_mean &lt;dbl&gt;, shannon_min &lt;dbl&gt;,
+#   shannon_max &lt;dbl&gt;, shannon_range &lt;dbl&gt;, shannon_sd &lt;dbl&gt;,
+#   evenness_mean &lt;dbl&gt;, evenness_min &lt;dbl&gt;, evenness_max &lt;dbl&gt;,
+#   evenness_range &lt;dbl&gt;, evenness_sd &lt;dbl&gt;</code></pre>
 </div>
 </div>
 </section>
@@ -1280,8 +1284,8 @@ Site scores:
 Weighted_light       -0.95886  0.28390 0.8891  0.001 ***
 Weighted_temperature -0.74456 -0.66756 0.1546  0.001 ***
 Weighted_wetness     -0.86353  0.50429 0.5455  0.001 ***
-Weighted_nitrogen     0.13362  0.99103 0.0352  0.008 ** 
-Weighted_alkalinity  -0.49735  0.86755 0.0281  0.024 *  
+Weighted_nitrogen     0.13362  0.99103 0.0352  0.005 ** 
+Weighted_alkalinity  -0.49735  0.86755 0.0281  0.021 *  
 Hoehe                -0.42942  0.90310 0.0679  0.001 ***
 ---
 Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
@@ -1602,12 +1606,12 @@ Site scores:
 ***VECTORS
 
                          DCA1     DCA2     r2 Pr(&gt;r)    
-Weighted_light       -0.33798 -0.94115 0.0025  0.918    
-Weighted_temperature  0.25404  0.96719 0.0338  0.279    
+Weighted_light       -0.33798 -0.94115 0.0025  0.919    
+Weighted_temperature  0.25404  0.96719 0.0338  0.298    
 Weighted_wetness     -0.59545 -0.80339 0.5291  0.001 ***
 Weighted_nitrogen     0.36916 -0.92937 0.6771  0.001 ***
-Weighted_alkalinity  -0.24587  0.96930 0.0082  0.760    
-Hoehe                -0.01610  0.99987 0.0865  0.046 *  
+Weighted_alkalinity  -0.24587  0.96930 0.0082  0.772    
+Hoehe                -0.01610  0.99987 0.0865  0.044 *  
 ---
 Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
 Permutation: free
@@ -2058,7 +2062,7 @@ Site scores:
 Weighted_light       -0.73623  0.67673 0.8146  0.001 ***
 Weighted_temperature -0.92081 -0.39001 0.3305  0.001 ***
 Weighted_wetness     -0.99189  0.12709 0.5716  0.001 ***
-Weighted_nitrogen     0.97507 -0.22189 0.0460  0.078 .  
+Weighted_nitrogen     0.97507 -0.22189 0.0460  0.075 .  
 Weighted_alkalinity  -0.15179 -0.98841 0.2527  0.001 ***
 Hoehe                 0.88015 -0.47469 0.1686  0.001 ***
 ---
@@ -2534,11 +2538,11 @@ Site scores:
 
                           DCA1      DCA2      DCA3      DCA4     r2 Pr(&gt;r)    
 Weighted_light        0.558020 -0.536640  0.275272  0.569970 0.6711  0.001 ***
-Weighted_temperature  0.985130  0.043510 -0.024741  0.164350 0.0760  0.092 .  
-Weighted_wetness     -0.116490 -0.598560 -0.063491  0.790020 0.2720  0.001 ***
-Weighted_nitrogen     0.997230 -0.048040  0.021434  0.052600 0.1347  0.008 ** 
+Weighted_temperature  0.985130  0.043510 -0.024741  0.164350 0.0760  0.080 .  
+Weighted_wetness     -0.116490 -0.598560 -0.063491  0.790020 0.2720  0.003 ** 
+Weighted_nitrogen     0.997230 -0.048040  0.021434  0.052600 0.1347  0.013 *  
 Weighted_alkalinity   0.972600  0.112990 -0.113430 -0.168570 0.1028  0.027 *  
-Hoehe                -0.982770  0.156350  0.098489  0.004930 0.1926  0.002 ** 
+Hoehe                -0.982770  0.156350  0.098489  0.004930 0.1926  0.001 ***
 ---
 Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
 Permutation: free
@@ -3014,12 +3018,12 @@ Site scores:
 ***VECTORS
 
                          DCA1     DCA2     r2 Pr(&gt;r)    
-Weighted_light       -0.99984  0.01783 0.1069  0.009 ** 
+Weighted_light       -0.99984  0.01783 0.1069  0.004 ** 
 Weighted_temperature  0.98075  0.19528 0.4558  0.001 ***
-Weighted_wetness     -0.97611 -0.21727 0.2852  0.001 ***
+Weighted_wetness     -0.97611 -0.21727 0.2852  0.002 ** 
 Weighted_nitrogen     0.79785 -0.60285 0.1121  0.006 ** 
 Weighted_alkalinity   0.22303  0.97481 0.7548  0.001 ***
-Hoehe                 0.14897 -0.98884 0.0260  0.260    
+Hoehe                 0.14897 -0.98884 0.0260  0.263    
 ---
 Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
 Permutation: free

@@ -519,14 +519,17 @@ summary_area <- merged_data%>%
     richness_min = min(Richness),
     richness_max = max(Richness),
     richness_range = richness_max-richness_min,
+    richness_sd = sd(Richness),
     shannon_mean = mean(Shannon),
     shannon_min = min(Shannon),
     shannon_max =max(Shannon),
     shannon_range = shannon_max-shannon_min,
+    shannon_sd = sd(Shannon),
     evenness_mean = mean (Evenness, na.rm=T),
     evenness_min = min(Evenness, na.rm=T),
     evenness_max = max(Evenness, na.rm=T),
     evenness_range = evenness_max-evenness_min,
+    evenness_sd = sd(Evenness, na.rm=T),
     .groups = "drop"
   )
 summary_area
