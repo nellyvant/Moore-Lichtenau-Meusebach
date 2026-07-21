@@ -1777,7 +1777,7 @@ data = species_df,
   legend.spacing.y = unit(0.3, "cm")
   )
 p5
-ggsave( "DCA-Meu_trock-vasc.png",p5, path="plots",width = 12, height = 10, dpi = 300)
+ggsave( "DCA-Meu-trock-vasc.png",p5, path="plots",width = 12, height = 10, dpi = 300)
 ```
 
 # 8 Transekte plotten
