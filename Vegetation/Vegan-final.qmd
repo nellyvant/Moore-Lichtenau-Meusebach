@@ -712,11 +712,6 @@ fit <- envfit(dca, env[, c("Weighted_light",
                               "Weighted_nitrogen",
                               "Weighted_alkalinity",
                               "Hoehe"
-                           #,
-                             # "TL",
-                            #  "ML",
-                            #  "HL",
-                            #  "SL"
                            )])
 fit
 
@@ -732,11 +727,6 @@ arrows$Variable <- c(
   "Nährstoffzahl",
   "Reaktionszahl",
   "Höhe"
-#  ,
-#  "Baumschicht",
-#  "Strauchschicht",
-#  "Krautschicht",
-#  "Moosschicht"
 )
 # nur Umweltvariablen mit signifikanten p-Werten anzeigen
 arrows_sig <- arrows %>%
@@ -780,9 +770,9 @@ geom_point(
   ),
   size = 5.5,
   stroke = 0.7,
-  colour = "black"
+  colour = "black",
+  alpha =0.6
 ) +
-  
   scale_fill_gradient2(
     low = "#2166AC",
     mid = "white",
@@ -816,7 +806,8 @@ geom_point(
   ),
   size = 4,
   stroke = 0.7,
-  colour = "black"
+  colour = "black",
+  alpha =0.6
 ) +
   
   scale_fill_gradient2(
@@ -834,11 +825,7 @@ geom_point(
     labels = c("Westen", "Mitte", "Osten"),
     name = "WO-Transekt"
   ) +
-#  scale_shape_manual(
-#    name = "Transekt",
-#    values = c(NS = 21, WO = 22),
-#    labels = c(NS = "Nord–Süd", WO = "West–Ost")
-#    )+
+
   
   # --------------------------------------------------
 # Signifikante envfit-Pfeile
@@ -856,8 +843,8 @@ geom_segment(
     length = unit(0.25, "cm"),
     type = "closed"
   ),
-  linewidth = 0.7,
-  colour = "black"
+  linewidth = 0.9,
+  colour = "darkmagenta"
 ) +
   
   geom_text_repel(
@@ -870,7 +857,7 @@ geom_segment(
     inherit.aes = FALSE,
     size = 3.6,
     fontface = "bold",
-    colour = "black",
+    colour = "darkmagenta",
     box.padding = 0.5,
     point.padding = 0.2,
     segment.colour = "grey50",
@@ -883,24 +870,24 @@ geom_segment(
 geom_point(
   data = species_df,
   aes(x = DCA1, y = DCA2,shape = "Arten"),
-  size = 2.5,
-  colour = "grey30"
+  size = 4,
+  colour = "black"
 ) +
-#  geom_text_repel(
-#data = species_df,
-#    aes(
-#      x = DCA1,
-#      y = DCA2,
-#      label = Art
-#    ),
-#    size = 3.5,
-#    colour = "grey30",
-#    box.padding = 0.5,
-#    point.padding = 0.3,
-#    segment.colour = "grey70",
-#    max.overlaps = Inf,
-#    seed = 123
-#  ) +
+geom_text_repel(
+data = species_df,
+    aes(
+      x = DCA1,
+      y = DCA2,
+      label = Art
+    ),
+    size = 4.1,
+    colour = "black",
+    box.padding = 0.9,
+    point.padding = 0.5,
+    segment.colour = "black",
+    max.overlaps = Inf,
+    seed = 321
+  ) +
   # --------------------------------------------------
 # Beschriftungen von Achsen, Titel usw
 # -------------------------------------------------- 
@@ -956,7 +943,7 @@ ggsave( "DCA-Meu-trock.png",p2, path="plots",width = 12, height = 10, dpi = 300)
 #| label: dca moss Meusebach
 # nur für Meu_nass und Meu_trock
 comm <- veg_long %>%
-  filter(site=="Meu_nass"&Schicht =="ML") %>%  
+  filter(site=="Meu_trock"&Schicht =="ML") %>%  
   group_by(plot.ID, Art) %>%
   summarise(
     Deckung = sum(Deckung, na.rm = TRUE),
@@ -994,7 +981,7 @@ env_vars <- c(
 
 env <- merged_data %>%
   filter(
-    site == "Meu_nass",
+    site == "Meu_trock",
     as.character(Plot) %in% rownames(comm)
   ) %>%
   select(
@@ -1066,11 +1053,11 @@ geom_point(
     fill = Transektnummer,
     shape = Transekt
   ),
-  size = 4,
+  size = 5.5,
   stroke = 0.7,
-  colour = "black"
+  colour = "black",
+  alpha =0.6
 ) +
-  
   scale_fill_gradient2(
     low = "#2166AC",
     mid = "white",
@@ -1104,7 +1091,8 @@ geom_point(
   ),
   size = 4,
   stroke = 0.7,
-  colour = "black"
+  colour = "black",
+  alpha =0.6
 ) +
   
   scale_fill_gradient2(
@@ -1122,11 +1110,7 @@ geom_point(
     labels = c("Westen", "Mitte", "Osten"),
     name = "WO-Transekt"
   ) +
-  scale_shape_manual(
-    name = "Transekt",
-    values = c(NS = 21, WO = 22),
-    labels = c(NS = "Nord–Süd", WO = "West–Ost")
-    )+
+
   
   # --------------------------------------------------
 # Signifikante envfit-Pfeile
@@ -1144,8 +1128,8 @@ geom_segment(
     length = unit(0.25, "cm"),
     type = "closed"
   ),
-  linewidth = 0.7,
-  colour = "black"
+  linewidth = 0.9,
+  colour = "darkmagenta"
 ) +
   
   geom_text_repel(
@@ -1156,9 +1140,9 @@ geom_segment(
       label = Variable
     ),
     inherit.aes = FALSE,
-    size = 3.5,
+    size = 3.6,
     fontface = "bold",
-    colour = "black",
+    colour = "darkmagenta",
     box.padding = 0.5,
     point.padding = 0.2,
     segment.colour = "grey50",
@@ -1171,24 +1155,23 @@ geom_segment(
 geom_point(
   data = species_df,
   aes(x = DCA1, y = DCA2,shape = "Arten"),
-  size = 2.5,
-  colour = "grey30"
+  size = 4,
+  colour = "black"
 ) +
-  
-  geom_text_repel(
-    data = species_df,
+geom_text_repel(
+data = species_df,
     aes(
       x = DCA1,
       y = DCA2,
       label = Art
     ),
-    size = 3.5,
-    colour = "grey30",
-    box.padding = 0.5,
-    point.padding = 0.3,
-    segment.colour = "grey70",
+    size = 4.1,
+    colour = "black",
+    box.padding = 0.9,
+    point.padding = 0.5,
+    segment.colour = "black",
     max.overlaps = Inf,
-    seed = 123
+    seed = 321
   ) +
   # --------------------------------------------------
 # Beschriftungen von Achsen, Titel usw
@@ -1208,7 +1191,7 @@ geom_point(
   )
 )+
   labs(
-    title = "DCA der Moosvegetation – Auf der Pfalz",
+    title = "DCA der Moosvegetation – Fuchshügel",
     x = "DCA1",
     y = "DCA2"
   ) +
@@ -1232,7 +1215,7 @@ geom_point(
   legend.spacing.y = unit(0.3, "cm")
   )
 p3
-ggsave("DCA-Meu-nass-moss.png",p3, path="plots",width = 12, height = 10, dpi = 300)
+ggsave("DCA-Meu-trock-moss.png",p3, path="plots",width = 12, height = 10, dpi = 300)
 ```
 
 #### b) Lichtenau
@@ -1352,11 +1335,11 @@ geom_point(
     fill = Transektnummer,
     shape = Transekt
   ),
-  size = 4,
+  size = 5.5,
   stroke = 0.7,
-  colour = "black"
+  colour = "black",
+  alpha =0.6
 ) +
-  
   scale_fill_gradient2(
     low = "#2166AC",
     mid = "white",
@@ -1390,7 +1373,8 @@ geom_point(
   ),
   size = 4,
   stroke = 0.7,
-  colour = "black"
+  colour = "black",
+  alpha =0.6
 ) +
   
   scale_fill_gradient2(
@@ -1408,11 +1392,7 @@ geom_point(
     labels = c("Westen", "Mitte", "Osten"),
     name = "WO-Transekt"
   ) +
-  scale_shape_manual(
-    name = "Transekt",
-    values = c(NS = 21, WO = 22),
-    labels = c(NS = "Nord–Süd", WO = "West–Ost")
-    )+
+
   
   # --------------------------------------------------
 # Signifikante envfit-Pfeile
@@ -1430,8 +1410,8 @@ geom_segment(
     length = unit(0.25, "cm"),
     type = "closed"
   ),
-  linewidth = 0.7,
-  colour = "black"
+  linewidth = 0.9,
+  colour = "darkmagenta"
 ) +
   
   geom_text_repel(
@@ -1442,9 +1422,9 @@ geom_segment(
       label = Variable
     ),
     inherit.aes = FALSE,
-    size = 3.5,
+    size = 3.6,
     fontface = "bold",
-    colour = "black",
+    colour = "darkmagenta",
     box.padding = 0.5,
     point.padding = 0.2,
     segment.colour = "grey50",
@@ -1456,25 +1436,24 @@ geom_segment(
 # --------------------------------------------------
 geom_point(
   data = species_df,
-  aes(x = DCA2, y = DCA3, shape = "Arten"),
-  size = 2.5,
-  colour = "grey30"
+  aes(x = DCA2, y = DCA3,shape = "Arten"),
+  size = 4,
+  colour = "black"
 ) +
-  
-  geom_text_repel(
-    data = species_df,
+geom_text_repel(
+data = species_df,
     aes(
       x = DCA2,
       y = DCA3,
       label = Art
     ),
-    size = 3.5,
-    colour = "grey30",
-    box.padding = 0.5,
-    point.padding = 0.3,
-    segment.colour = "grey70",
+    size = 4.1,
+    colour = "black",
+    box.padding = 0.9,
+    point.padding = 0.5,
+    segment.colour = "black",
     max.overlaps = Inf,
-    seed = 123
+    seed = 321
   ) +
   # --------------------------------------------------
 # Beschriftungen von Achsen, Titel usw
@@ -1526,7 +1505,7 @@ ggsave( "DCA-Lic-moss.png",p4, path="plots",width = 12, height = 10, dpi = 300)
 ```{r}
 #| label: dca vascular plants
 comm <- veg_long %>%
-  filter(site=="Lic"& Schicht !="ML") %>%  
+  filter(site=="Meu_trock"& Schicht !="ML") %>%  
   group_by(plot.ID, Art) %>%
   summarise(
     Deckung = sum(Deckung, na.rm = TRUE),
@@ -1564,7 +1543,7 @@ env_vars <- c(
 
 env <- merged_data %>%
   filter(
-    site == "Lic",
+    site == "Meu_trock",
     as.character(Plot) %in% rownames(comm)
   ) %>%
   select(
@@ -1636,11 +1615,11 @@ geom_point(
     fill = Transektnummer,
     shape = Transekt
   ),
-  size = 4,
+  size = 5.5,
   stroke = 0.7,
-  colour = "black"
+  colour = "black",
+  alpha =0.6
 ) +
-  
   scale_fill_gradient2(
     low = "#2166AC",
     mid = "white",
@@ -1674,7 +1653,8 @@ geom_point(
   ),
   size = 4,
   stroke = 0.7,
-  colour = "black"
+  colour = "black",
+  alpha =0.6
 ) +
   
   scale_fill_gradient2(
@@ -1692,11 +1672,7 @@ geom_point(
     labels = c("Westen", "Mitte", "Osten"),
     name = "WO-Transekt"
   ) +
-  scale_shape_manual(
-    name = "Transekt",
-    values = c(NS = 21, WO = 22),
-    labels = c(NS = "Nord–Süd", WO = "West–Ost")
-    )+
+
   
   # --------------------------------------------------
 # Signifikante envfit-Pfeile
@@ -1714,8 +1690,8 @@ geom_segment(
     length = unit(0.25, "cm"),
     type = "closed"
   ),
-  linewidth = 0.7,
-  colour = "black"
+  linewidth = 0.9,
+  colour = "darkmagenta"
 ) +
   
   geom_text_repel(
@@ -1726,9 +1702,9 @@ geom_segment(
       label = Variable
     ),
     inherit.aes = FALSE,
-    size = 3.5,
+    size = 3.6,
     fontface = "bold",
-    colour = "black",
+    colour = "darkmagenta",
     box.padding = 0.5,
     point.padding = 0.2,
     segment.colour = "grey50",
@@ -1741,24 +1717,23 @@ geom_segment(
 geom_point(
   data = species_df,
   aes(x = DCA1, y = DCA2,shape = "Arten"),
-  size = 2.5,
-  colour = "grey30"
+  size = 4,
+  colour = "black"
 ) +
-  
-  geom_text_repel(
-    data = species_df,
+geom_text_repel(
+data = species_df,
     aes(
       x = DCA1,
       y = DCA2,
       label = Art
     ),
-    size = 3.5,
-    colour = "grey30",
-    box.padding = 0.5,
-    point.padding = 0.3,
-    segment.colour = "grey70",
+    size = 4.1,
+    colour = "black",
+    box.padding = 0.9,
+    point.padding = 0.5,
+    segment.colour = "black",
     max.overlaps = Inf,
-    seed = 123
+    seed = 321
   ) +
   # --------------------------------------------------
 # Beschriftungen von Achsen, Titel usw
@@ -1778,7 +1753,7 @@ geom_point(
   )
 )+
   labs(
-    title = "DCA der Vegetation der Gefäßpflanzen – Kleiner Sumpf",
+    title = "DCA der Gefäßpflanzenvegetation – Fuchshügel",
     x = "DCA1",
     y = "DCA2"
   ) +
@@ -1802,7 +1777,7 @@ geom_point(
   legend.spacing.y = unit(0.3, "cm")
   )
 p5
-ggsave( "DCA-Lic-vasc.png",p5, path="plots",width = 12, height = 10, dpi = 300)
+ggsave( "DCA-Meu_trock-vasc.png",p5, path="plots",width = 12, height = 10, dpi = 300)
 ```
 
 # 8 Transekte plotten
